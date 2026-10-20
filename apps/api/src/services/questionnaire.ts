@@ -5,6 +5,9 @@ type RawQuestion = z.infer<typeof questionnaireOutputSchema>["questions"][number
 
 const DEFAULT_SLIDER = { min: 0, max: 10 };
 
+/** Multi-choice questions get a built-in "None of these" button, so drop model-written ones. */
+const NONE_OPTION = /^(none|none of (these|the above)|n\/a|not applicable)\.?$/i;
+
 /** Aim for ~2 questions per rated attribute, within sane bounds. */
 export function targetQuestionCount(leafCount: number): number {
   return Math.min(MAX_QUESTIONS, Math.max(6, leafCount * 2));
@@ -32,7 +35,9 @@ function normalizeOne(raw: RawQuestion, nodeIds: string[], id: string): Question
   switch (raw.type) {
     case "single_choice":
     case "multi_choice": {
-      const options = [...new Set(raw.options.map((o) => o.trim()).filter(Boolean))].slice(0, 8);
+      const options = [...new Set(raw.options.map((o) => o.trim()).filter(Boolean))]
+        .filter((o) => raw.type === "single_choice" || !NONE_OPTION.test(o))
+        .slice(0, 8);
       return options.length >= 2 ? { ...base, ...empty, options } : null;
     }
     case "slider": {

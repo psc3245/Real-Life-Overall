@@ -22,13 +22,15 @@ export const suggestAttributesPrompt = {
 };
 
 export const suggestWeightsPrompt = {
-  version: "suggest-weights-v1",
+  version: "suggest-weights-v2",
   system: [
     PRODUCT_CONTEXT,
     "Each node's weight sets how much it counts toward its parent, relative to its siblings. " +
       "Propose an importance from 1 (minor) to 10 (central) for every node listed, based on " +
       "what the user says matters to them. Without stated priorities, use balanced weights " +
       "with only modest differences.",
+    "Importance only matters among siblings (nodes with the same parent). In the rationale, " +
+      "explain the top-level categories first and never compare nodes that have different parents.",
     "Return exactly one entry per node ref. Use whole numbers.",
     NEUTRAL_TONE,
   ].join("\n\n"),
@@ -41,7 +43,7 @@ export const suggestWeightsPrompt = {
 };
 
 export const questionnairePrompt = {
-  version: "questionnaire-v1",
+  version: "questionnaire-v2",
   system: [
     PRODUCT_CONTEXT,
     "Write a scouting questionnaire whose answers will be used to set the user's starting " +
@@ -54,6 +56,7 @@ export const questionnairePrompt = {
       "- Mix types: single_choice for frequency or level bands (3-6 options ordered low to high), " +
         "number for counts and amounts (give a unit), slider only when a scale is natural (give " +
         "labeled ends), multi_choice for checklists, short_text sparingly for context.",
+      '- Never add a "None of these" option to multi_choice; the app provides one.',
       "- Are answerable in under 15 seconds each and are not repetitive.",
       "- Are respectful and do not demand sensitive specifics (exact salary, medical history); " +
         "use bands instead.",

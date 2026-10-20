@@ -8,7 +8,6 @@ export function FollowupChat({ state }: { state: OnboardingStateDto }) {
   const followup = useFollowup();
   const finish = useFinishFollowup();
   const [draft, setDraft] = useState("");
-  const [lastSent, setLastSent] = useState<string | null>(null);
   const opened = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
   const { chat } = state;
@@ -29,11 +28,10 @@ export function FollowupChat({ state }: { state: OnboardingStateDto }) {
     e.preventDefault();
     const message = draft.trim();
     if (!message || followup.isPending) return;
-    setLastSent(message);
-    followup.mutate(message, { onSuccess: () => setDraft("") });
+    // Clear right away so the reply reads as sent; restore it if sending fails.
+    setDraft("");
+    followup.mutate(message, { onError: () => setDraft((current) => current || message) });
   };
-
-  const retry = () => followup.mutate(chat.length === 0 ? undefined : (lastSent ?? undefined));
   const waiting = followup.isPending;
 
   return (
@@ -57,10 +55,10 @@ export function FollowupChat({ state }: { state: OnboardingStateDto }) {
         ))}
         {waiting && (
           <>
-            {lastSent && followup.variables && (
+            {followup.variables && (
               <div className="flex justify-end">
                 <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-neon/10 px-4 py-2.5 text-court-300">
-                  {lastSent}
+                  {followup.variables}
                 </p>
               </div>
             )}
@@ -75,7 +73,10 @@ export function FollowupChat({ state }: { state: OnboardingStateDto }) {
       {followup.isError && (
         <div className="flex flex-wrap items-center gap-3">
           <ErrorNote error={followup.error} />
-          <Button onClick={retry}>Try again</Button>
+          {/* A failed reply is back in the input; only the opening turn needs a retry button. */}
+          {chat.length === 0 && (
+            <Button onClick={() => followup.mutate(undefined)}>Try again</Button>
+          )}
         </div>
       )}
 

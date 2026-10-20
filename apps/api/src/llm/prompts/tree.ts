@@ -26,23 +26,20 @@ export function toPromptNodes<
     }));
 }
 
-/** Indented outline of the tree, e.g. "- [n1] Fitness" / "  - [n3] Cardio — Endurance". */
+/**
+ * Indented outline of the tree, depth-first so each node sits directly under its parent:
+ * "- [n1] Fitness" / "  - [n3] Cardio — Endurance".
+ */
 export function renderTree(nodes: PromptNode[], markLeaves = false): string {
-  const parents = new Set(nodes.map((n) => n.parentRef));
-  const depthOf = (node: PromptNode): number => {
-    let depth = 0;
-    let current: PromptNode | undefined = node;
-    while (current?.parentRef) {
-      depth += 1;
-      current = nodes.find((n) => n.ref === current!.parentRef);
-    }
-    return depth;
+  const childrenOf = (ref: string | null) => nodes.filter((n) => n.parentRef === ref);
+  const lines: string[] = [];
+  const visit = (node: PromptNode, depth: number) => {
+    const children = childrenOf(node.ref);
+    const desc = node.description ? ` — ${node.description}` : "";
+    const leaf = markLeaves && children.length === 0 ? " (rated attribute)" : "";
+    lines.push(`${"  ".repeat(depth)}- [${node.ref}] ${node.name}${desc}${leaf}`);
+    for (const child of children) visit(child, depth + 1);
   };
-  return nodes
-    .map((n) => {
-      const desc = n.description ? ` — ${n.description}` : "";
-      const leaf = markLeaves && !parents.has(n.ref) ? " (rated attribute)" : "";
-      return `${"  ".repeat(depthOf(n))}- [${n.ref}] ${n.name}${desc}${leaf}`;
-    })
-    .join("\n");
+  for (const top of childrenOf(null)) visit(top, 0);
+  return lines.join("\n");
 }

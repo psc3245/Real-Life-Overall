@@ -44,6 +44,19 @@ describe("normalizeQuestions", () => {
     expect(out[0]).toMatchObject({ id: "q1", type: "multi_choice", options: ["A", "B"] });
   });
 
+  it("drops model-written 'none' options from multi choice only", () => {
+    const [multi, single] = normalizeQuestions(
+      [
+        raw({ type: "multi_choice", options: ["Course", "Mentoring", "None of these"] }),
+        raw({ type: "single_choice", options: ["None", "Some", "Lots"] }),
+      ],
+      idByRef,
+      leaves,
+    );
+    expect(multi!.options).toEqual(["Course", "Mentoring"]);
+    expect(single!.options).toEqual(["None", "Some", "Lots"]);
+  });
+
   it("repairs bad slider bounds and inverted number bounds", () => {
     const [slider, number] = normalizeQuestions(
       [
