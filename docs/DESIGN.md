@@ -457,10 +457,11 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [ ] **Auth decision made before any public deploy**
 
 ### Phase 2: The Core Loop
-- [ ] Day log: journal, habits (8 types, recurrence), guided prompts, "End my day"
-- [ ] Habit → attribute link suggestions (LLM) with confirmation
+- [x] Day log: journal, habits (8 types, weekday schedules), backfill window (3 days)
+- [ ] Guided prompts, "End my day"
+- [x] Habit → attribute link suggestions (LLM) with confirmation (links stored by node lineage)
 - [ ] Daily recap (manual and auto at 04:00 local), itemized changes plus narrative
-- [ ] Ledger re-run on past-day edits; backfill window
+- [ ] Ledger re-run on past-day edits
 - [ ] Decay engine (hybrid), pause mode
 - [ ] Weekly review: narrative, corrections, decay revisions, focus goals, habit proposals, projection, profile summary
 - [ ] RAG: embeddings pipeline and retrieval

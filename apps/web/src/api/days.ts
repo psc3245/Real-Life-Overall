@@ -1,0 +1,90 @@
+import type { DayDto, HabitDto, HabitEntryValue, HabitType, LinkSuggestionDto } from "@rlo/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "./client";
+
+export const dayKey = (date: string | null) => ["day", date ?? "today"] as const;
+export const habitsKey = ["habits"] as const;
+
+/** `date` null loads the user's today (in their timezone). */
+export function useDay(date: string | null) {
+  return useQuery({
+    queryKey: dayKey(date),
+    queryFn: () => api<DayDto>(date ? `/days/${date}` : "/days/today"),
+  });
+}
+
+function useDayMutation<TInput>(request: (input: TInput) => Promise<DayDto>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: (day) => {
+      queryClient.setQueryData(dayKey(day.date), day);
+      if (day.date === day.today) queryClient.setQueryData(dayKey(null), day);
+    },
+  });
+}
+
+export function useSaveJournal(date: string) {
+  return useDayMutation((journal: string) =>
+    api<DayDto>(`/days/${date}/journal`, { method: "PUT", body: JSON.stringify({ journal }) }),
+  );
+}
+
+export function useSaveEntry(date: string, habitId: string) {
+  return useDayMutation((value: HabitEntryValue) =>
+    api<DayDto>(`/days/${date}/habits/${habitId}`, {
+      method: "PUT",
+      body: JSON.stringify(value),
+    }),
+  );
+}
+
+export function useHabits() {
+  return useQuery({ queryKey: habitsKey, queryFn: () => api<HabitDto[]>("/habits") });
+}
+
+function useHabitMutation<TInput, TOutput>(request: (input: TInput) => Promise<TOutput>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: habitsKey }),
+        queryClient.invalidateQueries({ queryKey: ["day"] }),
+      ]),
+  });
+}
+
+export interface HabitInput {
+  name: string;
+  type: HabitType;
+  config: Partial<HabitDto["config"]>;
+  days: number[];
+  links: string[];
+}
+
+export function useCreateHabit() {
+  return useHabitMutation((input: HabitInput) =>
+    api<HabitDto>("/habits", { method: "POST", body: JSON.stringify(input) }),
+  );
+}
+
+export function useUpdateHabit() {
+  return useHabitMutation(({ id, ...input }: Omit<HabitInput, "type"> & { id: string }) =>
+    api<HabitDto>(`/habits/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  );
+}
+
+export function useArchiveHabit() {
+  return useHabitMutation((id: string) => api<null>(`/habits/${id}`, { method: "DELETE" }));
+}
+
+export function useSuggestLinks() {
+  return useMutation({
+    mutationFn: (input: { name: string; type: HabitType }) =>
+      api<LinkSuggestionDto>("/habits/suggest-links", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+  });
+}

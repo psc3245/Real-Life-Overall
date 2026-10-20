@@ -17,7 +17,10 @@ export function DevUserSwitcher() {
 
   return (
     <form onSubmit={onSubmit} className="flex items-center gap-2 text-xs">
-      <label htmlFor="dev-user" className="uppercase tracking-wider text-court-500">
+      <label
+        htmlFor="dev-user"
+        className="hidden uppercase tracking-wider text-court-500 sm:inline"
+      >
         Dev user
       </label>
       <input

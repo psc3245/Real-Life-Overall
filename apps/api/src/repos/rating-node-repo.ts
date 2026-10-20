@@ -46,3 +46,11 @@ export async function updateWeight(
     .returning({ id: ratingNodes.id });
   return rows.length > 0;
 }
+
+/** Node id ↔ lineage id for a season, so cross-season references can be resolved. */
+export async function findLineages(db: Executor, seasonId: string) {
+  return db
+    .select({ id: ratingNodes.id, lineageId: ratingNodes.lineageId })
+    .from(ratingNodes)
+    .where(and(eq(ratingNodes.seasonId, seasonId), isNull(ratingNodes.archivedAt)));
+}

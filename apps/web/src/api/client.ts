@@ -34,7 +34,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body) headers.set("content-type", "application/json");
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
-  const body: unknown = await res.json().catch(() => null);
+  const body: unknown = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     const message =
       body && typeof body === "object" && "error" in body ? String(body.error) : res.statusText;

@@ -6,6 +6,8 @@ import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
 import { LlmError } from "./llm/client";
 import { requireUser } from "./middleware/auth";
+import { dayRoutes } from "./routes/days";
+import { habitRoutes } from "./routes/habits";
 import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
 import { ratingsRoutes } from "./routes/ratings";
@@ -74,9 +76,14 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/onboarding/*", requireUser)
     .use("/ratings", requireUser)
     .use("/ratings/*", requireUser)
+    .use("/habits", requireUser)
+    .use("/habits/*", requireUser)
+    .use("/days/*", requireUser)
     .route("/me", meRoutes)
     .route("/onboarding", onboardingRoutes)
-    .route("/ratings", ratingsRoutes);
+    .route("/ratings", ratingsRoutes)
+    .route("/habits", habitRoutes)
+    .route("/days", dayRoutes);
 
   return routes;
 }

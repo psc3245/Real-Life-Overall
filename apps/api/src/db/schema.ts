@@ -208,3 +208,84 @@ export const llmCalls = pgTable(
   },
   (t) => [index().on(t.userId, t.createdAt)],
 );
+
+export const dayStatus = pgEnum("day_status", ["open", "submitted", "recapped"]);
+
+/** One row per user per local date that has any logged content. */
+export const dayLogs = pgTable(
+  "day_logs",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    localDate: date().notNull(),
+    journal: text().notNull().default(""),
+    status: dayStatus().notNull().default("open"),
+    submittedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex().on(t.userId, t.localDate)],
+);
+
+export const habitType = pgEnum("habit_type", [
+  "checkbox",
+  "checknote",
+  "counter",
+  "duration",
+  "slider",
+  "rating",
+  "shorttext",
+  "journal",
+]);
+
+export const habits = pgTable(
+  "habits",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    type: habitType().notNull(),
+    /** HabitConfig from @rlo/shared, normalized per type. */
+    config: jsonb().notNull(),
+    /** Scheduled weekdays, 0 = Sunday. */
+    days: smallint().array().notNull(),
+    sortOrder: integer().notNull().default(0),
+    archivedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+/** Links survive seasons by pointing at a node lineage rather than a season's node row. */
+export const habitLinks = pgTable(
+  "habit_links",
+  {
+    habitId: uuid()
+      .notNull()
+      .references(() => habits.id, { onDelete: "cascade" }),
+    nodeLineageId: uuid().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex().on(t.habitId, t.nodeLineageId)],
+);
+
+export const habitEntries = pgTable(
+  "habit_entries",
+  {
+    id: id(),
+    habitId: uuid()
+      .notNull()
+      .references(() => habits.id, { onDelete: "cascade" }),
+    localDate: date().notNull(),
+    valueNum: numeric({ precision: 10, scale: 2, mode: "number" }),
+    valueText: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex().on(t.habitId, t.localDate)],
+);

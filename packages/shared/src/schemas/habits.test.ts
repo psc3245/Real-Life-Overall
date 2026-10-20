@@ -1,0 +1,64 @@
+import { describe, expect, it } from "vitest";
+import { addDays, dayOfWeek, isEditableDate, isValidDate } from "../dates";
+import { isHabitDone, normalizeHabitConfig, validateHabitEntry } from "./habits";
+
+describe("dates", () => {
+  it("validates and shifts calendar dates", () => {
+    expect(isValidDate("2026-02-29")).toBe(false);
+    expect(isValidDate("2028-02-29")).toBe(true);
+    expect(addDays("2026-12-30", 3)).toBe("2027-01-02");
+    expect(dayOfWeek("2026-10-20")).toBe(2); // Tuesday
+  });
+
+  it("allows edits within the backfill window only", () => {
+    expect(isEditableDate("2026-10-20", "2026-10-20")).toBe(true);
+    expect(isEditableDate("2026-10-17", "2026-10-20")).toBe(true);
+    expect(isEditableDate("2026-10-16", "2026-10-20")).toBe(false);
+    expect(isEditableDate("2026-10-21", "2026-10-20")).toBe(false);
+  });
+});
+
+describe("normalizeHabitConfig", () => {
+  it("fills type defaults and drops irrelevant settings", () => {
+    expect(normalizeHabitConfig("counter", { unit: "pages", min: 4 })).toEqual({
+      target: 1,
+      unit: "pages",
+      min: null,
+      max: null,
+    });
+    expect(normalizeHabitConfig("duration", {})).toMatchObject({ target: 30 });
+    expect(normalizeHabitConfig("slider", { min: 5, max: 2 })).toMatchObject({ min: 0, max: 10 });
+    expect(normalizeHabitConfig("rating", { max: 99 })).toMatchObject({ min: 1, max: 10 });
+    expect(normalizeHabitConfig("checkbox", { target: 3 })).toEqual({
+      target: null,
+      unit: null,
+      min: null,
+      max: null,
+    });
+  });
+});
+
+describe("validateHabitEntry", () => {
+  const cfg = (type: Parameters<typeof normalizeHabitConfig>[0], c = {}) =>
+    normalizeHabitConfig(type, c);
+  it("checks values per type", () => {
+    expect(validateHabitEntry("checkbox", cfg("checkbox"), { num: 1, text: null })).toBeNull();
+    expect(validateHabitEntry("checkbox", cfg("checkbox"), { num: 2, text: null })).not.toBeNull();
+    expect(validateHabitEntry("counter", cfg("counter"), { num: 2.5, text: null })).not.toBeNull();
+    expect(validateHabitEntry("slider", cfg("slider"), { num: 11, text: null })).not.toBeNull();
+    expect(validateHabitEntry("rating", cfg("rating"), { num: 5, text: null })).toBeNull();
+    expect(validateHabitEntry("rating", cfg("rating"), { num: 0, text: null })).not.toBeNull();
+    expect(
+      validateHabitEntry("shorttext", cfg("shorttext"), { num: null, text: " " }),
+    ).not.toBeNull();
+    expect(validateHabitEntry("journal", cfg("journal"), { num: null, text: "Ran." })).toBeNull();
+  });
+
+  it("knows when a habit counts as done", () => {
+    expect(isHabitDone("counter", cfg("counter", { target: 3 }), { num: 2, text: null })).toBe(
+      false,
+    );
+    expect(isHabitDone("duration", cfg("duration"), { num: 45, text: null })).toBe(true);
+    expect(isHabitDone("checknote", cfg("checknote"), { num: 0, text: "skipped" })).toBe(false);
+  });
+});
