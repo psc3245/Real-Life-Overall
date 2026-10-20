@@ -1,6 +1,8 @@
 import { computeNodeValues, type RatingNodeLike } from "@rlo/shared";
 import { Link } from "react-router";
 import { useMe } from "../api/hooks";
+import { useRatings } from "../api/ratings";
+import { PlayerCard } from "../components/PlayerCard";
 import { OvrBadge } from "../components/OvrBadge";
 import { StatBar } from "../components/StatBar";
 
@@ -26,6 +28,8 @@ const sampleLeaves = new Map([
 
 export function HomePage() {
   const me = useMe();
+  const ratings = useRatings();
+  const rated = Boolean(ratings.data);
   const values = computeNodeValues(sampleNodes, sampleLeaves);
   const categories = sampleNodes.filter((n) => n.depth === 1);
 
@@ -44,32 +48,36 @@ export function HomePage() {
           your days.
         </p>
         <Link
-          to="/onboarding"
+          to={rated ? "/ratings" : "/onboarding"}
           className="mt-8 inline-block rounded-lg bg-neon px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider text-court-950 hover:brightness-110"
         >
-          Build my rating
+          {rated ? "View my rating" : "Build my rating"}
         </Link>
       </section>
 
-      <section
-        aria-label="Sample player card"
-        className="rounded-2xl border border-court-700 bg-court-900/80 p-6 shadow-2xl backdrop-blur"
-      >
-        <div className="flex items-center gap-5">
-          <OvrBadge value={values.get("ovr") ?? 0} />
-          <div>
-            <p className="font-display text-2xl font-semibold uppercase">Sample Player</p>
-            <p className="text-sm uppercase tracking-widest text-court-300">
-              Two-Way Builder · 2026-Q4
-            </p>
+      {ratings.data ? (
+        <PlayerCard ratings={ratings.data} name={me.data?.displayName ?? "Player"} />
+      ) : (
+        <section
+          aria-label="Sample player card"
+          className="rounded-2xl border border-court-700 bg-court-900/80 p-6 shadow-2xl backdrop-blur"
+        >
+          <div className="flex items-center gap-5">
+            <OvrBadge value={values.get("ovr") ?? 0} />
+            <div>
+              <p className="font-display text-2xl font-semibold uppercase">Sample Player</p>
+              <p className="text-sm uppercase tracking-widest text-court-300">
+                Two-Way Builder · 2026-Q4
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="mt-6 space-y-4">
-          {categories.map((c) => (
-            <StatBar key={c.id} label={c.name} value={values.get(c.id) ?? 0} />
-          ))}
-        </div>
-      </section>
+          <div className="mt-6 space-y-4">
+            {categories.map((c) => (
+              <StatBar key={c.id} label={c.name} value={values.get(c.id) ?? 0} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

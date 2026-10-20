@@ -1,5 +1,6 @@
 import type { SeasonDto } from "@rlo/shared";
 import { and, desc, eq } from "drizzle-orm";
+import type { seasonStatus } from "../db/schema";
 import type { Executor } from "../db/client";
 import { seasons } from "../db/schema";
 
@@ -36,4 +37,30 @@ export async function findOrCreate(
     .onConflictDoNothing({ target: [seasons.userId, seasons.label] });
   const rows = await db.select(seasonColumns).from(seasons).where(byLabel);
   return rows[0]!;
+}
+
+export async function findLatestActive(db: Executor, userId: string): Promise<SeasonDto | null> {
+  const rows = await db
+    .select(seasonColumns)
+    .from(seasons)
+    .where(and(eq(seasons.userId, userId), eq(seasons.status, "active")))
+    .orderBy(desc(seasons.startsOn))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function findArchetype(db: Executor, seasonId: string): Promise<string | null> {
+  const rows = await db
+    .select({ archetype: seasons.archetype })
+    .from(seasons)
+    .where(eq(seasons.id, seasonId));
+  return rows[0]?.archetype ?? null;
+}
+
+export async function update(
+  db: Executor,
+  id: string,
+  changes: { status?: (typeof seasonStatus.enumValues)[number]; archetype?: string },
+): Promise<void> {
+  await db.update(seasons).set(changes).where(eq(seasons.id, id));
 }

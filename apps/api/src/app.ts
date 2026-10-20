@@ -8,6 +8,7 @@ import { LlmError } from "./llm/client";
 import { requireUser } from "./middleware/auth";
 import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
+import { ratingsRoutes } from "./routes/ratings";
 
 export type DepsFactory = (env: Env) => Deps;
 
@@ -71,8 +72,11 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/me/*", requireUser)
     .use("/onboarding", requireUser)
     .use("/onboarding/*", requireUser)
+    .use("/ratings", requireUser)
+    .use("/ratings/*", requireUser)
     .route("/me", meRoutes)
-    .route("/onboarding", onboardingRoutes);
+    .route("/onboarding", onboardingRoutes)
+    .route("/ratings", ratingsRoutes);
 
   return routes;
 }

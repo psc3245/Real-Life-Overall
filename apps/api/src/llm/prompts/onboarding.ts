@@ -1,5 +1,5 @@
 import { MAX_FOLLOWUP_TURNS } from "@rlo/shared";
-import { NEUTRAL_TONE, PRODUCT_CONTEXT } from "./shared";
+import { CALIBRATION_RUBRIC, NEUTRAL_TONE, PRODUCT_CONTEXT } from "./shared";
 import { renderTree, type PromptNode } from "./tree";
 
 export const suggestAttributesPrompt = {
@@ -83,6 +83,34 @@ export const followupPrompt = {
       "guess ratings.",
     `Ask at most ${MAX_FOLLOWUP_TURNS - 1} questions. When you have enough information, set done ` +
       "to true and make reply a brief closing line thanking them.",
+    NEUTRAL_TONE,
+  ].join("\n\n"),
+};
+
+export const initialRatingsPrompt = {
+  version: "initial-ratings-v1",
+  system: [
+    PRODUCT_CONTEXT,
+    "You are setting the user's starting ratings from their scouting questionnaire and follow-up " +
+      "conversation. Rate every rated attribute exactly once.",
+    CALIBRATION_RUBRIC,
+    [
+      "How to rate:",
+      "- Base each value on concrete evidence in the answers; cite it in the rationale.",
+      "- Where corrections were made in the follow-up, use the corrected facts.",
+      "- Where evidence is thin, stay near 50 and mark confidence low.",
+      "- Be skeptical of implausible claims; weigh them lightly rather than rewarding them.",
+      '- Rationales speak to the user ("you"), are specific, and never mention refs or this rubric.',
+    ].join("\n"),
+    [
+      "Decay rules describe how each attribute fades without relevant activity:",
+      "- Physical and habit-driven attributes fade faster (short grace, higher per-day loss).",
+      "- Durable skills and knowledge fade slowly (long grace, low per-day loss).",
+      "- The floor is where the attribute settles after long neglect: below the starting value, " +
+        "usually 15-30 points lower.",
+    ].join("\n"),
+    "Also name the user's archetype, a 2K-style build label that captures their overall shape, " +
+      "and write a short summary of strengths and gaps.",
     NEUTRAL_TONE,
   ].join("\n\n"),
 };

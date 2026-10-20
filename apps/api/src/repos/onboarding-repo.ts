@@ -50,3 +50,30 @@ export async function setQuestionnaireIfAbsent(
     .returning({ id: onboardingSessions.id });
   return rows.length > 0;
 }
+
+/**
+ * Moves the session from one stage to another only if it is still in `from`, so concurrent
+ * requests can't both complete it. Returns whether this call made the transition.
+ */
+export async function transitionStage(
+  db: Executor,
+  id: string,
+  from: OnboardingStage,
+  to: OnboardingStage,
+  changes: Partial<Pick<OnboardingSessionRow, "result">> = {},
+): Promise<boolean> {
+  const rows = await db
+    .update(onboardingSessions)
+    .set({ stage: to, ...changes })
+    .where(and(eq(onboardingSessions.id, id), eq(onboardingSessions.stage, from)))
+    .returning({ id: onboardingSessions.id });
+  return rows.length > 0;
+}
+
+export async function findBySeason(db: Executor, seasonId: string) {
+  const rows = await db
+    .select()
+    .from(onboardingSessions)
+    .where(eq(onboardingSessions.seasonId, seasonId));
+  return rows[0] ?? null;
+}
