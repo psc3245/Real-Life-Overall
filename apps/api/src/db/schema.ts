@@ -115,10 +115,43 @@ export const ratingEvents = pgTable(
     source: ratingEventSource().notNull(),
     reason: text().notNull(),
     evidence: jsonb(),
+    /** The recap that produced this change; re-running a recap voids its events. */
+    recapId: uuid().references((): AnyPgColumn => recaps.id, { onDelete: "set null" }),
     voidedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.nodeId), index().on(t.seasonId)],
+  (t) => [index().on(t.nodeId), index().on(t.seasonId), index().on(t.recapId)],
+);
+
+export const recapKind = pgEnum("recap_kind", ["daily", "weekly"]);
+export const recapStatus = pgEnum("recap_status", ["active", "superseded"]);
+
+export const recaps = pgTable(
+  "recaps",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid()
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    kind: recapKind().notNull(),
+    periodStart: date().notNull(),
+    periodEnd: date().notNull(),
+    narrative: text().notNull(),
+    /** The normalized LLM output (flags, prompts, raw reasons). */
+    output: jsonb().notNull(),
+    promptVersion: text().notNull(),
+    status: recapStatus().notNull().default("active"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // At most one current recap per period; re-runs supersede the old one.
+    uniqueIndex("recaps_one_active_per_period")
+      .on(t.userId, t.kind, t.periodStart)
+      .where(sql`${t.status} = 'active'`),
+  ],
 );
 
 export const decayAuthor = pgEnum("decay_author", ["llm", "user"]);
@@ -209,7 +242,8 @@ export const llmCalls = pgTable(
   (t) => [index().on(t.userId, t.createdAt)],
 );
 
-export const dayStatus = pgEnum("day_status", ["open", "submitted", "recapped"]);
+/** open: never recapped. recapped: recap is current. stale: edited since its recap. */
+export const dayStatus = pgEnum("day_status", ["open", "recapped", "stale"]);
 
 /** One row per user per local date that has any logged content. */
 export const dayLogs = pgTable(
@@ -221,8 +255,9 @@ export const dayLogs = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     localDate: date().notNull(),
     journal: text().notNull().default(""),
+    /** GuidedPromptDto[] written by the previous day's recap. */
+    prompts: jsonb().notNull().default([]),
     status: dayStatus().notNull().default("open"),
-    submittedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -253,6 +288,10 @@ export const habits = pgTable(
     config: jsonb().notNull(),
     /** Scheduled weekdays, 0 = Sunday. */
     days: smallint().array().notNull(),
+    /** First local date the habit counts; may be backdated. */
+    startsOn: date()
+      .notNull()
+      .default(sql`CURRENT_DATE`),
     sortOrder: integer().notNull().default(0),
     archivedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),

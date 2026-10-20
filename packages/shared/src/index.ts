@@ -10,3 +10,4 @@ export * from "./schemas/questionnaire";
 export * from "./schemas/ratings";
 export * from "./dates";
 export * from "./schemas/habits";
+export * from "./schemas/recaps";

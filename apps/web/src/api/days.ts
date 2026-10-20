@@ -1,6 +1,7 @@
 import type { DayDto, HabitDto, HabitEntryValue, HabitType, LinkSuggestionDto } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
+import { changesKey, ratingsKey } from "./ratings";
 
 export const dayKey = (date: string | null) => ["day", date ?? "today"] as const;
 export const habitsKey = ["habits"] as const;
@@ -61,6 +62,7 @@ export interface HabitInput {
   config: Partial<HabitDto["config"]>;
   days: number[];
   links: string[];
+  startsOn: string;
 }
 
 export function useCreateHabit() {
@@ -86,5 +88,29 @@ export function useSuggestLinks() {
         method: "POST",
         body: JSON.stringify(input),
       }),
+  });
+}
+
+export function useSavePromptAnswers(date: string) {
+  return useDayMutation((answers: (string | null)[]) =>
+    api<DayDto>(`/days/${date}/prompts`, { method: "PUT", body: JSON.stringify({ answers }) }),
+  );
+}
+
+/** "End my day": runs (or re-runs) the recap, then refreshes everything ratings-related. */
+export function useEndDay(date: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<DayDto>(`/days/${date}/recap`, { method: "POST" }),
+    onSuccess: async (day) => {
+      queryClient.setQueryData(dayKey(day.date), day);
+      if (day.date === day.today) queryClient.setQueryData(dayKey(null), day);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ratingsKey }),
+        queryClient.invalidateQueries({ queryKey: changesKey }),
+        // The recap may have seeded tomorrow's questions.
+        queryClient.invalidateQueries({ queryKey: ["day"] }),
+      ]);
+    },
   });
 }

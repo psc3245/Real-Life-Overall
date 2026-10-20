@@ -67,6 +67,7 @@ export function TreeBuilder({
                 key={t.key}
                 type="button"
                 aria-pressed={on}
+                aria-label={t.name}
                 onClick={() => toggleTemplate(t.key)}
                 title={t.description}
                 className={`rounded-full border px-4 py-1.5 font-display text-sm uppercase tracking-wider transition ${

@@ -2,6 +2,7 @@ import {
   computeNodeValues,
   leafIds,
   leafValuesFromEvents,
+  type ChangeFeedItemDto,
   type Confidence,
   type RatingsDto,
 } from "@rlo/shared";
@@ -55,4 +56,16 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
       };
     }),
   };
+}
+
+/** Recent rating changes for the active season, newest first. */
+export async function getChanges(
+  db: Database,
+  userId: string,
+  limit: number,
+): Promise<ChangeFeedItemDto[]> {
+  const season = await seasonRepo.findLatestActive(db, userId);
+  if (!season) return [];
+  const rows = await eventRepo.findFeed(db, season.id, limit);
+  return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
 }

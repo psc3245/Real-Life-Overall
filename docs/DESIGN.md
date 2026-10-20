@@ -458,15 +458,16 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 
 ### Phase 2: The Core Loop
 - [x] Day log: journal, habits (8 types, weekday schedules), backfill window (3 days)
-- [ ] Guided prompts, "End my day"
+- [x] Guided prompts, "End my day"
 - [x] Habit → attribute link suggestions (LLM) with confirmation (links stored by node lineage)
-- [ ] Daily recap (manual and auto at 04:00 local), itemized changes plus narrative
-- [ ] Ledger re-run on past-day edits
+- [x] Daily recap (manual), itemized changes plus narrative
+- [ ] Auto daily recap at 04:00 local
+- [x] Ledger re-run on past-day edits (edits mark the day stale; "Update recap" re-runs, max 3 per day)
 - [ ] Decay engine (hybrid), pause mode
 - [ ] Weekly review: narrative, corrections, decay revisions, focus goals, habit proposals, projection, profile summary
 - [ ] RAG: embeddings pipeline and retrieval
-- [ ] Change feed
-- [ ] Guardrail caps and skepticism prompting
+- [x] Change feed
+- [x] Guardrail caps (±3 per attribute per day) and skepticism prompting
 
 ### Phase 3: Game Layer
 - [ ] Player card and image export

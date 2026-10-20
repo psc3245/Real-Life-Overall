@@ -12,7 +12,9 @@ import { Link, useSearchParams } from "react-router";
 import { useDay, useSaveEntry, useSaveJournal } from "../../api/days";
 import { useRatings } from "../../api/ratings";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { GuidedPrompts } from "./GuidedPrompts";
 import { HabitEntryInput } from "./HabitEntryInput";
+import { RecapPanel } from "./RecapPanel";
 
 function dayTitle(date: string, today: string) {
   if (date === today) return "Today";
@@ -85,12 +87,10 @@ export function TodayPage() {
         </p>
       )}
 
+      <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
       <Journal key={d.date} day={d} />
       <Habits day={d} leaves={ratings.data?.nodes ?? []} />
-
-      <div className="rounded-xl border border-dashed border-court-700 p-5 text-center text-sm text-court-500">
-        "End my day" and the daily recap that moves your ratings arrive in the next update.
-      </div>
+      <RecapPanel day={d} />
     </div>
   );
 }

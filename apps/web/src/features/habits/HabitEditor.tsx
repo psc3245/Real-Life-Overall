@@ -24,11 +24,14 @@ const field =
 export function HabitEditor({
   habit,
   nodes,
+  today,
   onDone,
 }: {
   /** Omit to create a new habit. */
   habit?: HabitDto;
   nodes: RatedNodeDto[];
+  /** The user's local date, the default start date. */
+  today: string;
   onDone: () => void;
 }) {
   const [name, setName] = useState(habit?.name ?? "");
@@ -38,6 +41,7 @@ export function HabitEditor({
   );
   const [days, setDays] = useState<number[]>(habit?.days ?? ALL_DAYS);
   const [links, setLinks] = useState<string[]>(habit?.links ?? []);
+  const [startsOn, setStartsOn] = useState(habit?.startsOn ?? today);
   const [reason, setReason] = useState<string | null>(null);
   const create = useCreateHabit();
   const update = useUpdateHabit();
@@ -79,7 +83,7 @@ export function HabitEditor({
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const body = { name: name.trim(), config, days, links };
+    const body = { name: name.trim(), config, days, links, startsOn };
     if (habit) update.mutate({ id: habit.id, ...body }, { onSuccess: onDone });
     else create.mutate({ ...body, type }, { onSuccess: onDone });
   };
@@ -182,27 +186,45 @@ export function HabitEditor({
         </div>
       )}
 
-      <fieldset className="space-y-2">
-        <legend className="text-xs uppercase tracking-wider text-court-300">Scheduled on</legend>
-        <div className="flex gap-1.5">
-          {DAY_LETTERS.map((letter, d) => (
-            <button
-              key={d}
-              type="button"
-              aria-pressed={days.includes(d)}
-              aria-label={DAY_NAMES[d]}
-              onClick={() => toggleDay(d)}
-              className={`h-9 w-9 rounded-full border text-sm font-semibold ${
-                days.includes(d)
-                  ? "border-neon bg-neon/15 text-neon"
-                  : "border-court-700 text-court-500"
-              }`}
-            >
-              {letter}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <div className="flex flex-wrap items-end gap-6">
+        <fieldset className="space-y-2">
+          <legend className="text-xs uppercase tracking-wider text-court-300">Scheduled on</legend>
+          <div className="flex gap-1.5">
+            {DAY_LETTERS.map((letter, d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={days.includes(d)}
+                aria-label={DAY_NAMES[d]}
+                onClick={() => toggleDay(d)}
+                className={`h-9 w-9 rounded-full border text-sm font-semibold ${
+                  days.includes(d)
+                    ? "border-neon bg-neon/15 text-neon"
+                    : "border-court-700 text-court-500"
+                }`}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <label className="space-y-2">
+          <span className="block text-xs uppercase tracking-wider text-court-300">Starts on</span>
+          <input
+            type="date"
+            aria-label="Starts on"
+            value={startsOn}
+            required
+            onChange={(e) => setStartsOn(e.target.value)}
+            className={field}
+          />
+        </label>
+      </div>
+      {startsOn < today && (
+        <p className="-mt-3 text-sm text-court-500">
+          Backdated: you can log it on past days, within the 3-day backfill window.
+        </p>
+      )}
 
       <fieldset className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -251,7 +273,7 @@ export function HabitEditor({
         <Button
           type="submit"
           variant="primary"
-          disabled={!name.trim() || days.length === 0 || saving}
+          disabled={!name.trim() || days.length === 0 || !startsOn || saving}
         >
           {saving ? "Saving…" : habit ? "Save habit" : "Add habit"}
         </Button>

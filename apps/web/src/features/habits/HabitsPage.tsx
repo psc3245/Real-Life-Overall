@@ -1,7 +1,7 @@
 import { HABIT_TYPE_LABELS, type HabitDto } from "@rlo/shared";
 import { useState } from "react";
 import { Link } from "react-router";
-import { useArchiveHabit, useHabits } from "../../api/days";
+import { useArchiveHabit, useDay, useHabits } from "../../api/days";
 import { useRatings } from "../../api/ratings";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -20,12 +20,15 @@ export function HabitsPage() {
   const habits = useHabits();
   const ratings = useRatings();
   const archive = useArchiveHabit();
+  const today = useDay(null).data?.today;
+  /** Habit id awaiting archive confirmation. */
+  const [confirming, setConfirming] = useState<string | null>(null);
   /** "new", a habit id being edited, or null. */
   const [editing, setEditing] = useState<string | null>(null);
   const nodes = ratings.data?.nodes ?? [];
   const names = new Map(nodes.map((n) => [n.id, n.name]));
 
-  if (habits.isPending || ratings.isPending)
+  if (habits.isPending || ratings.isPending || !today)
     return <p className="pt-10 text-court-500">Loading…</p>;
   if (habits.isError) return <ErrorNote error={habits.error} />;
 
@@ -45,7 +48,9 @@ export function HabitsPage() {
         )}
       </header>
 
-      {editing === "new" && <HabitEditor nodes={nodes} onDone={() => setEditing(null)} />}
+      {editing === "new" && (
+        <HabitEditor nodes={nodes} today={today} onDone={() => setEditing(null)} />
+      )}
 
       {habits.data.length === 0 && editing === null && (
         <p className="rounded-xl border border-dashed border-court-700 p-8 text-center text-court-500">
@@ -58,7 +63,7 @@ export function HabitsPage() {
         {habits.data.map((h: HabitDto) =>
           editing === h.id ? (
             <li key={h.id}>
-              <HabitEditor habit={h} nodes={nodes} onDone={() => setEditing(null)} />
+              <HabitEditor habit={h} nodes={nodes} today={today} onDone={() => setEditing(null)} />
             </li>
           ) : (
             <li
@@ -68,7 +73,7 @@ export function HabitsPage() {
               <div className="min-w-0">
                 <p className="font-medium">{h.name}</p>
                 <p className="text-sm text-court-500">
-                  {HABIT_TYPE_LABELS[h.type]} · {scheduleLabel(h.days)}
+                  {HABIT_TYPE_LABELS[h.type]} · {scheduleLabel(h.days)} · since {h.startsOn}
                   {h.links.length > 0 &&
                     ` · ${h.links.map((id) => names.get(id) ?? "?").join(", ")}`}
                 </p>
@@ -81,15 +86,29 @@ export function HabitsPage() {
                 >
                   Edit
                 </Button>
-                <Button
-                  variant="danger"
-                  disabled={archive.isPending}
-                  onClick={() => {
-                    if (confirm(`Archive "${h.name}"? Its history is kept.`)) archive.mutate(h.id);
-                  }}
-                >
-                  Archive
-                </Button>
+                {confirming === h.id ? (
+                  <span className="flex items-center gap-1 text-sm text-court-300">
+                    Archive? History is kept.
+                    <Button
+                      variant="danger"
+                      disabled={archive.isPending}
+                      onClick={() => archive.mutate(h.id, { onSettled: () => setConfirming(null) })}
+                    >
+                      {archive.isPending ? "Archiving…" : "Yes, archive"}
+                    </Button>
+                    <Button variant="ghost" onClick={() => setConfirming(null)}>
+                      Keep
+                    </Button>
+                  </span>
+                ) : (
+                  <Button
+                    variant="danger"
+                    disabled={editing !== null}
+                    onClick={() => setConfirming(h.id)}
+                  >
+                    Archive
+                  </Button>
+                )}
               </div>
             </li>
           ),

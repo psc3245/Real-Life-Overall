@@ -71,9 +71,24 @@ describe("RatingsPage", () => {
   });
 
   it("shows the card and expands an attribute's rationale", async () => {
-    mockedApi.mockImplementation(async (path: string) =>
-      path === "/ratings" ? ratings : { displayName: "Peter" },
-    );
+    mockedApi.mockImplementation(async (path: string) => {
+      if (path === "/ratings") return ratings;
+      if (path.startsWith("/ratings/changes")) {
+        return [
+          {
+            id: "e1",
+            nodeId: "cardio",
+            nodeName: "Cardio",
+            delta: 0.6,
+            reason: "You ran 6k.",
+            source: "daily_recap",
+            date: "2026-10-20",
+            createdAt: "2026-10-20T22:00:00Z",
+          },
+        ];
+      }
+      return { displayName: "Peter" };
+    });
     renderPage();
     expect(await screen.findByText("Peter")).toBeInTheDocument();
     expect(screen.getAllByText(/Desk Athlete/).length).toBeGreaterThan(0);
@@ -83,11 +98,14 @@ describe("RatingsPage", () => {
     expect(screen.getByText("You run three times a week.")).toBeInTheDocument();
     expect(screen.getByText("High confidence")).toBeInTheDocument();
     expect(screen.getByText(/Fades 0.3\/day after 3 idle days · floor 50/)).toBeInTheDocument();
+    expect(await screen.findByText("You ran 6k.")).toBeInTheDocument();
+    expect(screen.getByText("+0.6")).toBeInTheDocument();
   });
 
   it("points to onboarding when there are no ratings", async () => {
     mockedApi.mockImplementation(async (path: string) => {
       if (path === "/ratings") throw new ApiError(404, "No ratings yet", null);
+      if (path.startsWith("/ratings/changes")) return [];
       return { displayName: "Peter" };
     });
     renderPage();

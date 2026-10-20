@@ -41,7 +41,9 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
     case "checknote": {
       const done = num === 1;
       return (
-        <div className="flex w-full flex-wrap items-center gap-3">
+        <div
+          className={`flex flex-wrap items-center gap-3 ${habit.type === "checknote" && done ? "w-full" : ""}`}
+        >
           <button
             type="button"
             role="checkbox"

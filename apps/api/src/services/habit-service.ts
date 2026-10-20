@@ -46,12 +46,7 @@ async function timezoneOf(db: Database, userId: string) {
   return user.timezone;
 }
 
-export function toHabitDto(
-  row: HabitRow,
-  lineageIds: string[],
-  ctx: LeafContext | null,
-  timezone: string,
-): HabitDto {
+export function toHabitDto(row: HabitRow, lineageIds: string[], ctx: LeafContext | null): HabitDto {
   return {
     id: row.id,
     name: row.name,
@@ -60,7 +55,7 @@ export function toHabitDto(
     days: [...row.days].sort(),
     links: lineageIds.map((l) => ctx?.nodeByLineage.get(l)).filter((id): id is string => !!id),
     sortOrder: row.sortOrder,
-    createdOn: localDateIn(timezone, row.createdAt),
+    startsOn: row.startsOn,
   };
 }
 
@@ -69,7 +64,6 @@ export async function toHabitDtos(
   db: Database,
   rows: HabitRow[],
   ctx: LeafContext | null,
-  timezone: string,
 ): Promise<HabitDto[]> {
   const links = await habitRepo.findLinks(
     db,
@@ -80,7 +74,6 @@ export async function toHabitDtos(
       r,
       links.filter((l) => l.habitId === r.id).map((l) => l.nodeLineageId),
       ctx,
-      timezone,
     ),
   );
 }
@@ -95,16 +88,14 @@ function linksToLineages(nodeIds: string[], ctx: LeafContext | null): string[] {
 }
 
 export async function listHabits(db: Database, userId: string): Promise<HabitDto[]> {
-  const [rows, ctx, tz] = await Promise.all([
+  const [rows, ctx] = await Promise.all([
     habitRepo.findAllByUser(db, userId),
     loadLeafContext(db, userId),
-    timezoneOf(db, userId),
   ]);
   return toHabitDtos(
     db,
     rows.filter((r) => !r.archivedAt),
     ctx,
-    tz,
   );
 }
 
@@ -126,12 +117,13 @@ export async function createHabit(
       type: input.type,
       config: normalizeHabitConfig(input.type, input.config),
       days: input.days,
+      startsOn: input.startsOn ?? localDateIn(tz, new Date()),
       sortOrder: existing.length,
     });
     await habitRepo.replaceLinks(tx, created.id, lineages);
     return created;
   });
-  return toHabitDto(row, lineages, ctx, tz);
+  return toHabitDto(row, lineages, ctx);
 }
 
 export async function updateHabit(
@@ -142,13 +134,14 @@ export async function updateHabit(
 ): Promise<HabitDto> {
   const habit = await habitRepo.findById(db, userId, habitId);
   if (!habit || habit.archivedAt) throw notFound("Habit not found");
-  const [ctx, tz] = await Promise.all([loadLeafContext(db, userId), timezoneOf(db, userId)]);
+  const ctx = await loadLeafContext(db, userId);
   const lineages = input.links ? linksToLineages(input.links, ctx) : null;
 
   const row = await db.transaction(async (tx) => {
     const updated = await habitRepo.update(tx, habit.id, {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.days !== undefined && { days: input.days }),
+      ...(input.startsOn !== undefined && { startsOn: input.startsOn }),
       ...(input.config !== undefined && {
         config: normalizeHabitConfig(habit.type, {
           ...(habit.config as HabitConfig),
@@ -159,7 +152,7 @@ export async function updateHabit(
     if (lineages) await habitRepo.replaceLinks(tx, habit.id, lineages);
     return updated;
   });
-  const [dto] = await toHabitDtos(db, [row], ctx, tz);
+  const [dto] = await toHabitDtos(db, [row], ctx);
   return dto!;
 }
 
