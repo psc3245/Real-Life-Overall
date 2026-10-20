@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* 2K-style menu theme: dark-first, condensed display type, neon accents (DESIGN.md §10). */
+@theme static {
+  --font-display: "Oswald", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-court-950: #07090d;
+  --color-court-900: #0d1117;
+  --color-court-800: #151b24;
+  --color-court-700: #1f2833;
+  --color-court-500: #3a4757;
+  --color-court-300: #8b98a9;
+  --color-court-100: #e6edf5;
+
+  --color-neon: #3cf2c8;
+  --color-neon-dim: #1d8f76;
+  --color-flare: #ff4d6d;
+
+  /* Rating tiers, keyed to RATING_TIERS in @rlo/shared. */
+  --color-tier-red: #ff4d4d;
+  --color-tier-orange: #ff9f1c;
+  --color-tier-yellow: #e8e337;
+  --color-tier-green: #3ce06b;
+  --color-tier-purple: #b56cff;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-court-950 text-court-100 font-sans antialiased;
+    background-image:
+      radial-gradient(circle at 20% -10%, rgb(60 242 200 / 0.08), transparent 40%),
+      radial-gradient(circle at 110% 10%, rgb(181 108 255 / 0.08), transparent 35%);
+    min-height: 100dvh;
+  }
+}

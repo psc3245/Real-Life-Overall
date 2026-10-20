@@ -280,7 +280,7 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 
 | Layer | Choice | Why |
 |---|---|---|
-| Monorepo | **pnpm workspaces** (+ Turborepo optional) | Shared types and schemas between web and API |
+| Monorepo | **npm workspaces** | Shared types and schemas between web and API; nothing extra to install |
 | Frontend | **React + Vite + TypeScript** | Same as Habit Tracker, now typed |
 | Routing | **React Router** | Real URLs for profiles and shareable cards |
 | Server state | **TanStack Query** | Replaces the Helpers + `useEffect` fetch pattern |
@@ -435,13 +435,13 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 ## 12. Roadmap
 
 ### Phase 0: Foundations
-- [ ] pnpm monorepo: `apps/web`, `apps/api`, `packages/shared`; TS strict; ESLint + Prettier
-- [ ] Vitest in all packages; GitHub Actions running lint, typecheck and test
-- [ ] Neon DB + Drizzle schema + migrations; pgvector enabled
-- [ ] Hono API skeleton with env config, error handling, the `userId` middleware (dev auth mode) and health route
-- [ ] LLM module: provider-agnostic client, per-purpose model config, Zod structured output, retries, `llm_calls` logging
-- [ ] Web skeleton: Vite + React Router + TanStack Query + Tailwind + shadcn; dark 2K theme tokens
-- [ ] Deploy pipeline: Pages + Workers (free), preview deploys
+- [x] npm-workspaces monorepo: `apps/web`, `apps/api`, `packages/shared`; TS strict; ESLint + Prettier
+- [x] Vitest in all packages; GitHub Actions running lint, format check, typecheck, test and web build
+- [x] Drizzle schema + migrations (Neon in dev/prod, in-memory PGlite in tests). pgvector moves to Phase 2 with RAG.
+- [x] Hono API skeleton with env config, error handling, the `userId` middleware (dev auth mode) and health route
+- [x] LLM module: provider-agnostic client, per-purpose model config, Zod structured output, retries, `llm_calls` logging
+- [x] Web skeleton: Vite + React Router + TanStack Query + Tailwind; dark 2K theme tokens (shadcn added when the first complex component needs it)
+- [ ] Deploy pipeline: Pages + Workers (free), preview deploys (needs a Neon project + Cloudflare account)
 
 ### Phase 1: MVP: Categories + Onboarding → Initial Ratings
 - [ ] Category templates (data in `packages/shared`) and the custom tree builder (depth ≤ 3)
