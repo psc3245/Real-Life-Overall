@@ -1,0 +1,33 @@
+{
+  "name": "@rlo/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.84",
+    "@ai-sdk/google": "^4.0.101",
+    "@ai-sdk/openai": "^4.0.98",
+    "@neondatabase/serverless": "^1.2.0",
+    "@rlo/shared": "*",
+    "ai": "^7.0.146",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.13",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "@electric-sql/pglite": "^0.5.10",
+    "dotenv": "^18.0.8",
+    "drizzle-kit": "^0.31.11",
+    "wrangler": "^4.151.3"
+  }
+}
