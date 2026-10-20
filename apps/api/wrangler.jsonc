@@ -4,6 +4,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Hourly at :05. Decay catches up for everyone; users whose local time is 4am get auto-recaps.
+  "triggers": { "crons": ["5 * * * *"] },
   "vars": {
     "APP_ENV": "development",
     "AUTH_MODE": "dev",

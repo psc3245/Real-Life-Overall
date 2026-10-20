@@ -42,6 +42,17 @@ Opens on http://localhost:5173 and proxies `/api/*` to the local API.
 Auth is deferred (DESIGN.md §8.5). In dev, the API trusts an `x-dev-user` header, which you can
 switch from the header of the web app.
 
+### Scheduled jobs
+
+The API runs an hourly Cron Trigger: it brings rating decay up to date for every user and, at 4am
+in each user's timezone, recaps any recent day that has content but no current recap. To try it
+locally:
+
+- In the web app (dev builds only), **My rating → Decay & pauses → Run 4am job now** runs it for
+  the current user immediately.
+- Or run the real Worker handler: start the API with
+  `npx wrangler dev --test-scheduled` (in `apps/api`) and open `http://localhost:8787/__scheduled`.
+
 ## Checks
 
 ```bash

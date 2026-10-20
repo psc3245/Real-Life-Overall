@@ -17,6 +17,7 @@ import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
 import { loadLeafContext, toHabitDtos } from "./habit-service";
+import { invalidateDecay } from "./decay-service";
 import { toRecapDto } from "./recap-view";
 
 async function resolveDate(db: Database, userId: string, date: string | undefined) {
@@ -119,6 +120,8 @@ export async function saveEntry(
     await habitRepo.upsertEntry(db, habit.id, day, { valueNum: value.num, valueText: text });
   }
   await dayRepo.markStaleIfRecapped(db, userId, day);
+  // Completing (or un-completing) a linked habit on a past day changes that day's decay.
+  await invalidateDecay(db, userId, day);
   return getDay(db, userId, day);
 }
 

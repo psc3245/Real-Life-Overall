@@ -117,6 +117,8 @@ export const ratingEvents = pgTable(
     evidence: jsonb(),
     /** The recap that produced this change; re-running a recap voids its events. */
     recapId: uuid().references((): AnyPgColumn => recaps.id, { onDelete: "set null" }),
+    /** The nightly decay run that produced this change. */
+    decayRunId: uuid().references((): AnyPgColumn => decayRuns.id, { onDelete: "set null" }),
     voidedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
   },
@@ -327,4 +329,47 @@ export const habitEntries = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex().on(t.habitId, t.localDate)],
+);
+
+/**
+ * Marks a user's local date as decayed. Backfilled activity voids runs from that date on so
+ * they can be recomputed.
+ */
+export const decayRuns = pgTable(
+  "decay_runs",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid()
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    localDate: date().notNull(),
+    paused: boolean().notNull().default(false),
+    voidedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("decay_runs_one_active_per_day")
+      .on(t.userId, t.localDate)
+      .where(sql`${t.voidedAt} is null`),
+  ],
+);
+
+export const pauses = pgTable(
+  "pauses",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startsOn: date().notNull(),
+    /** Null while open-ended. */
+    endsOn: date(),
+    reason: text().notNull().default(""),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
 );

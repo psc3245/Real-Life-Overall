@@ -7,9 +7,11 @@ import { parseEnv, type Env } from "./env";
 import { LlmError } from "./llm/client";
 import { requireUser } from "./middleware/auth";
 import { dayRoutes } from "./routes/days";
+import { devRoutes } from "./routes/dev";
 import { habitRoutes } from "./routes/habits";
 import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
+import { pauseRoutes } from "./routes/pauses";
 import { ratingsRoutes } from "./routes/ratings";
 
 export type DepsFactory = (env: Env) => Deps;
@@ -79,11 +81,16 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/habits", requireUser)
     .use("/habits/*", requireUser)
     .use("/days/*", requireUser)
+    .use("/pauses", requireUser)
+    .use("/pauses/*", requireUser)
+    .use("/dev/*", requireUser)
     .route("/me", meRoutes)
     .route("/onboarding", onboardingRoutes)
     .route("/ratings", ratingsRoutes)
     .route("/habits", habitRoutes)
-    .route("/days", dayRoutes);
+    .route("/days", dayRoutes)
+    .route("/pauses", pauseRoutes)
+    .route("/dev", devRoutes);
 
   return routes;
 }

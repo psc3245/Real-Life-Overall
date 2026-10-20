@@ -13,12 +13,14 @@ import * as onboardingRepo from "../repos/onboarding-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as nodeRepo from "../repos/rating-node-repo";
 import * as seasonRepo from "../repos/season-repo";
+import { applyDecay } from "./decay-service";
 import type { OnboardingResult } from "./onboarding-service";
 
 /** The user's current ratings: leaf values from the ledger, parents rolled up by weight. */
 export async function getRatings(db: Database, userId: string): Promise<RatingsDto> {
   const season = await seasonRepo.findLatestActive(db, userId);
   if (!season) throw notFound("No ratings yet. Finish onboarding first.");
+  await applyDecay(db, userId); // catch up if the scheduled job hasn't run yet
 
   const [nodes, events, archetype, session] = await Promise.all([
     nodeRepo.findActiveBySeason(db, season.id),
@@ -67,5 +69,9 @@ export async function getChanges(
   const season = await seasonRepo.findLatestActive(db, userId);
   if (!season) return [];
   const rows = await eventRepo.findFeed(db, season.id, limit);
-  return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+  return rows.map(({ recapDate, decayDate, ...r }) => ({
+    ...r,
+    date: recapDate ?? decayDate,
+    createdAt: r.createdAt.toISOString(),
+  }));
 }

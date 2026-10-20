@@ -7,6 +7,7 @@ import { Delta } from "../../components/Delta";
 import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { DecayCard } from "./DecayCard";
 
 const CONFIDENCE_LABEL = {
   low: "Low confidence",
@@ -66,6 +67,8 @@ export function RatingsPage() {
           </section>
         ))}
       </div>
+
+      <DecayCard />
     </div>
   );
 }

@@ -43,6 +43,13 @@
       "when": 1792523076996,
       "tag": "0005_drop_day_submitted",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792524499133,
+      "tag": "0006_decay_and_pauses",
+      "breakpoints": true
     }
   ]
 }

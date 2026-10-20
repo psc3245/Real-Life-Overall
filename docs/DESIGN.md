@@ -461,9 +461,10 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Guided prompts, "End my day"
 - [x] Habit → attribute link suggestions (LLM) with confirmation (links stored by node lineage)
 - [x] Daily recap (manual), itemized changes plus narrative
-- [ ] Auto daily recap at 04:00 local
+- [x] Auto daily recap at 04:00 local (hourly Cron Trigger; dev button to run on demand)
 - [x] Ledger re-run on past-day edits (edits mark the day stale; "Update recap" re-runs, max 3 per day)
-- [ ] Decay engine (hybrid), pause mode
+- [x] Decay engine (LLM-authored rules applied nightly, recomputed after backfills), pause mode
+- [ ] Decay rule revisions in weekly reviews
 - [ ] Weekly review: narrative, corrections, decay revisions, focus goals, habit proposals, projection, profile summary
 - [ ] RAG: embeddings pipeline and retrieval
 - [x] Change feed
