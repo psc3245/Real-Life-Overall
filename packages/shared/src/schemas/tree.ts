@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  DEFAULT_IMPORTANCE,
   MAX_NODE_DESCRIPTION_LENGTH,
   MAX_NODE_NAME_LENGTH,
   MAX_RATING_DEPTH,
@@ -18,7 +19,7 @@ export const treeDraftNodeSchema = z.object({
   parentKey: z.string().min(1).max(64).nullable(),
   name: z.string().trim().min(1).max(MAX_NODE_NAME_LENGTH),
   description: z.string().trim().max(MAX_NODE_DESCRIPTION_LENGTH).default(""),
-  weight: z.number().positive().max(100).default(1),
+  weight: z.number().positive().max(100).default(DEFAULT_IMPORTANCE),
   templateKey: z.string().nullable().default(null),
 });
 export type TreeDraftNode = z.infer<typeof treeDraftNodeSchema>;

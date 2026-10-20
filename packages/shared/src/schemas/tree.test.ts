@@ -9,7 +9,7 @@ const base = [
 describe("treeDraftSchema", () => {
   it("accepts a two-level tree and applies defaults", () => {
     const parsed = treeDraftSchema.parse({ nodes: base });
-    expect(parsed.nodes[0]).toMatchObject({ weight: 1, description: "", templateKey: null });
+    expect(parsed.nodes[0]).toMatchObject({ weight: 5, description: "", templateKey: null });
   });
 
   it("allows three levels below Overall but not four", () => {

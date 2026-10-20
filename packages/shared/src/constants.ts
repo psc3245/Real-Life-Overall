@@ -18,3 +18,8 @@ export const RATING_TIERS = [
 ] as const;
 
 export type RatingTierKey = (typeof RATING_TIERS)[number]["key"];
+
+/** Sibling weights use a 1–10 importance scale; roll-ups normalize them. */
+export const IMPORTANCE_MIN = 1;
+export const IMPORTANCE_MAX = 10;
+export const DEFAULT_IMPORTANCE = 5;

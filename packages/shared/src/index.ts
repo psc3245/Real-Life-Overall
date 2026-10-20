@@ -5,3 +5,4 @@ export * from "./rating/ledger";
 export * from "./season";
 export * from "./templates";
 export * from "./schemas/tree";
+export * from "./schemas/onboarding";

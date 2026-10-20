@@ -1,13 +1,23 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
+import { LlmError } from "./llm/client";
 import { requireUser } from "./middleware/auth";
 import { meRoutes } from "./routes/me";
+import { onboardingRoutes } from "./routes/onboarding";
 
 export type DepsFactory = (env: Env) => Deps;
+
+function hasExecutionCtx(c: Context): boolean {
+  try {
+    return Boolean(c.executionCtx);
+  } catch {
+    return false; // Hono throws when there is no ExecutionContext (tests, Node).
+  }
+}
 
 export function createApp(makeDeps: DepsFactory) {
   const app = new Hono<AppEnv>();
@@ -18,7 +28,15 @@ export function createApp(makeDeps: DepsFactory) {
     const deps = makeDeps(env);
     c.set("db", deps.db);
     c.set("llm", deps.llm);
-    await next();
+    try {
+      await next();
+    } finally {
+      if (deps.dispose) {
+        const done = deps.dispose().catch((err) => console.error("dispose failed", err));
+        if (hasExecutionCtx(c)) c.executionCtx.waitUntil(done);
+        else await done;
+      }
+    }
   });
 
   app.use("*", (c, next) =>
@@ -34,6 +52,10 @@ export function createApp(makeDeps: DepsFactory) {
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
+    if (err instanceof LlmError) {
+      console.error(err, err.cause);
+      return c.json({ error: err.message, retryable: true }, 502);
+    }
     if (err instanceof ZodError) {
       return c.json({ error: "Validation failed", issues: err.issues }, 400);
     }
@@ -45,9 +67,12 @@ export function createApp(makeDeps: DepsFactory) {
 
   const routes = app
     .get("/health", (c) => c.json({ ok: true }))
-    .use("/me/*", requireUser)
     .use("/me", requireUser)
-    .route("/me", meRoutes);
+    .use("/me/*", requireUser)
+    .use("/onboarding", requireUser)
+    .use("/onboarding/*", requireUser)
+    .route("/me", meRoutes)
+    .route("/onboarding", onboardingRoutes);
 
   return routes;
 }
