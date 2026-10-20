@@ -42,6 +42,9 @@ export function createEnvModelResolver(env: Env): ModelResolver {
       case "anthropic":
         model = createAnthropic({
           apiKey: requireKey(env.ANTHROPIC_API_KEY, "ANTHROPIC_API_KEY"),
+          ...(env.ANTHROPIC_WORKSPACE_ID
+            ? { headers: { "anthropic-workspace-id": env.ANTHROPIC_WORKSPACE_ID } }
+            : {}),
         })(modelId);
         break;
       case "openai":

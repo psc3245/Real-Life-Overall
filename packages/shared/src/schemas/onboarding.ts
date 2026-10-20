@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Answers, ChatMessageDto, QuestionDto } from "./questionnaire";
 import {
   IMPORTANCE_MAX,
   IMPORTANCE_MIN,
@@ -44,6 +45,10 @@ export interface OnboardingStateDto {
   weightRationale: string | null;
   /** Includes the Overall root (parentId null). Empty until the tree is first saved. */
   nodes: RatingNodeDto[];
+  /** Null until generated; once it exists the tree and weights are locked. */
+  questionnaire: QuestionDto[] | null;
+  answers: Answers;
+  chat: ChatMessageDto[];
 }
 
 // Request bodies

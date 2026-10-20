@@ -1,4 +1,4 @@
-import { generateText, Output, type ModelMessage } from "ai";
+import { APICallError, generateText, Output, type ModelMessage } from "ai";
 import type { z } from "zod";
 import type { Database } from "../db/client";
 import { llmCalls } from "../db/schema";
@@ -13,6 +13,8 @@ export interface StructuredRequest<T extends z.ZodType> {
   /** A single user prompt, or a full conversation (e.g. the onboarding follow-up chat). */
   prompt: string | ModelMessage[];
   promptVersion: string;
+  /** Raise for long structured outputs (e.g. a full questionnaire) to avoid truncation. */
+  maxOutputTokens?: number;
 }
 
 export interface LlmCallRecord {
@@ -73,6 +75,7 @@ export class LlmClient {
           system: req.system,
           ...(typeof req.prompt === "string" ? { prompt: req.prompt } : { messages: req.prompt }),
           output: Output.object({ schema: req.schema }),
+          maxOutputTokens: req.maxOutputTokens ?? 4096,
           maxRetries: 1,
         });
         const { inputTokens, outputTokens } = result.usage;
@@ -95,6 +98,12 @@ export class LlmClient {
           latencyMs: Date.now() - started,
           error: error instanceof Error ? error.message.slice(0, 1000) : String(error),
         });
+        // Auth and configuration errors won't fix themselves; surface them immediately.
+        if (APICallError.isInstance(error) && !error.isRetryable) {
+          throw new LlmError(`LLM request rejected: ${error.message}`, req.purpose, {
+            cause: error,
+          });
+        }
       }
     }
 

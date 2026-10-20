@@ -1,4 +1,5 @@
 import type {
+  AnswerValue,
   AttributeSuggestionDto,
   OnboardingStateDto,
   TreeDraftNode,
@@ -60,4 +61,38 @@ export function useSuggestAttributes() {
         body: JSON.stringify(input),
       }),
   });
+}
+
+const post = (path: string, body?: unknown) => () =>
+  api<OnboardingStateDto>(path, {
+    method: "POST",
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+
+export function useGenerateQuestionnaire() {
+  return useStateMutation(() => post("/onboarding/questionnaire")());
+}
+
+export function useSaveAnswers() {
+  return useStateMutation((answers: Record<string, AnswerValue | null>) =>
+    api<OnboardingStateDto>("/onboarding/answers", {
+      method: "PUT",
+      body: JSON.stringify({ answers }),
+    }),
+  );
+}
+
+export function useSubmitQuestionnaire() {
+  return useStateMutation(() => post("/onboarding/questionnaire/submit")());
+}
+
+/** No message opens the conversation; afterwards each call sends the user's reply. */
+export function useFollowup() {
+  return useStateMutation((message: string | undefined) =>
+    post("/onboarding/followup", message === undefined ? undefined : { message })(),
+  );
+}
+
+export function useFinishFollowup() {
+  return useStateMutation(() => post("/onboarding/followup/finish")());
 }

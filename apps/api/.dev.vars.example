@@ -1,6 +1,8 @@
 # Copy to .dev.vars (used by `wrangler dev`) and .env (used by drizzle-kit).
 DATABASE_URL=postgresql://user:password@your-neon-host/neondb?sslmode=require
 ANTHROPIC_API_KEY=
+# Only if your key is not scoped to a workspace (Console → Settings → Workspaces):
+# ANTHROPIC_WORKSPACE_ID=
 # Optional overrides, "provider:modelId":
 # LLM_FAST_MODEL=anthropic:claude-haiku-5-5
 # LLM_SMART_MODEL=anthropic:claude-sonnet-5-5
