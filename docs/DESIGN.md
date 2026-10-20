@@ -444,15 +444,15 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [ ] Deploy pipeline: Pages + Workers (free), preview deploys (needs a Neon project + Cloudflare account)
 
 ### Phase 1: MVP: Categories + Onboarding → Initial Ratings
-- [ ] Category templates (data in `packages/shared`) and the custom tree builder (depth ≤ 3)
-- [ ] LLM attribute suggestions (optional helper)
-- [ ] Weights: LLM proposal plus user adjustment
+- [x] Category templates (data in `packages/shared`) and the custom tree builder (depth ≤ 3)
+- [x] LLM attribute suggestions (optional helper)
+- [x] Weights: LLM proposal plus user adjustment (1–10 importance per sibling, shown as % share)
 - [ ] LLM questionnaire generation, form rendering by question type, resumable answers
 - [ ] Follow-up chat (bounded)
 - [ ] Initial ratings, decay rules and archetype from the LLM, written as `onboarding` rating events
 - [ ] Rating roll-up math (shared, unit-tested)
 - [ ] OVR reveal and basic ratings tree view with rationales
-- [ ] First season created (current quarter)
+- [x] First season created (current quarter, in the user's timezone)
 - [ ] Calibration rubric and fixture-based sanity tests for prompt output parsing
 - [ ] **Auth decision made before any public deploy**
 

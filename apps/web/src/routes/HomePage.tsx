@@ -1,4 +1,5 @@
 import { computeNodeValues, type RatingNodeLike } from "@rlo/shared";
+import { Link } from "react-router";
 import { useMe } from "../api/hooks";
 import { OvrBadge } from "../components/OvrBadge";
 import { StatBar } from "../components/StatBar";
@@ -42,14 +43,12 @@ export function HomePage() {
           scouting questionnaire, and get your starting ratings. Then watch them move as you log
           your days.
         </p>
-        <button
-          type="button"
-          disabled
-          className="mt-8 rounded-lg bg-neon px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider text-court-950 disabled:cursor-not-allowed disabled:opacity-40"
-          title="Onboarding arrives in the next Phase 1 chunk"
+        <Link
+          to="/onboarding"
+          className="mt-8 inline-block rounded-lg bg-neon px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider text-court-950 hover:brightness-110"
         >
           Build my rating
-        </button>
+        </Link>
       </section>
 
       <section

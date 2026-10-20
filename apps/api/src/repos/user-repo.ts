@@ -22,6 +22,11 @@ export async function findById(db: Database, id: string): Promise<PublicUser | n
 }
 
 export async function findOrCreateDevUser(db: Database, username: string): Promise<PublicUser> {
+  const [existing] = await db
+    .select(publicUserColumns)
+    .from(users)
+    .where(eq(users.username, username));
+  if (existing) return existing;
   await db
     .insert(users)
     .values({ username, email: `${username}@dev.local`, displayName: username })

@@ -1,0 +1,1 @@
+ALTER TABLE "onboarding_sessions" ADD COLUMN "weight_rationale" text;

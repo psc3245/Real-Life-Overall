@@ -178,6 +178,8 @@ export const onboardingSessions = pgTable(
     stage: onboardingStage().notNull().default("tree"),
     /** Free-text priorities the user gives when weighting categories. */
     priorities: text(),
+    /** The LLM's explanation of its proposed weights, shown on the weights step. */
+    weightRationale: text(),
     questionnaire: jsonb(),
     answers: jsonb(),
     chat: jsonb(),

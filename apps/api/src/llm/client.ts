@@ -48,7 +48,14 @@ export class LlmClient {
   ) {}
 
   async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<z.infer<T>> {
-    const { spec, provider, modelId, model } = this.resolveModel(req.purpose);
+    let resolved: ReturnType<ModelResolver>;
+    try {
+      resolved = this.resolveModel(req.purpose);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new LlmError(`LLM is not configured: ${reason}`, req.purpose, { cause: error });
+    }
+    const { spec, provider, modelId, model } = resolved;
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
