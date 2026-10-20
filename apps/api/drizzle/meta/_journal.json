@@ -15,6 +15,13 @@
       "when": 1792516784547,
       "tag": "0001_onboarding_weight_rationale",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792521820404,
+      "tag": "0002_day_logs_and_habits",
+      "breakpoints": true
     }
   ]
 }
