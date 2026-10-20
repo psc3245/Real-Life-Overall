@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { DATE_PATTERN } from "../dates";
+import { DATE_PATTERN, isValidDate } from "../dates";
+import type { GuidedPromptDto, RecapDto } from "./recaps";
 
 export const HABIT_TYPES = [
   "checkbox",
@@ -149,7 +150,8 @@ export interface HabitDto {
   /** Rated attributes (current-season node ids) this habit feeds. */
   links: string[];
   sortOrder: number;
-  createdOn: string;
+  /** First day the habit counts (YYYY-MM-DD). Can be in the past for backfilled habits. */
+  startsOn: string;
 }
 
 export interface DayHabitDto {
@@ -162,9 +164,13 @@ export interface DayDto {
   date: string;
   today: string;
   editable: boolean;
-  status: "open" | "submitted" | "recapped";
+  /** open: never recapped. recapped: recap is current. stale: edited since its recap. */
+  status: "open" | "recapped" | "stale";
   journal: string;
   habits: DayHabitDto[];
+  /** Questions from the previous day's recap. */
+  prompts: GuidedPromptDto[];
+  recap: RecapDto | null;
 }
 
 export interface LinkSuggestionDto {
@@ -173,6 +179,8 @@ export interface LinkSuggestionDto {
 }
 
 // Request bodies
+
+const dateSchema = z.string().refine(isValidDate, "Use a valid YYYY-MM-DD date");
 
 const daysSchema = z
   .array(z.number().int().min(0).max(6))
@@ -186,6 +194,8 @@ export const createHabitBodySchema = z.object({
   config: habitConfigInputSchema,
   days: daysSchema.default(ALL_DAYS),
   links: z.array(z.uuid()).max(MAX_HABIT_LINKS).default([]),
+  /** Defaults to the user's today. */
+  startsOn: dateSchema.optional(),
 });
 
 export const updateHabitBodySchema = z
@@ -194,6 +204,7 @@ export const updateHabitBodySchema = z
     config: habitConfigInputSchema,
     days: daysSchema,
     links: z.array(z.uuid()).max(MAX_HABIT_LINKS),
+    startsOn: dateSchema,
   })
   .partial();
 

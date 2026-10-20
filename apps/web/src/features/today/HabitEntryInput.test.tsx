@@ -11,7 +11,7 @@ const habit = (type: HabitType, config = {}): HabitDto => ({
   days: [0, 1, 2, 3, 4, 5, 6],
   links: [],
   sortOrder: 0,
-  createdOn: "2026-10-01",
+  startsOn: "2026-10-01",
 });
 
 describe("HabitEntryInput", () => {

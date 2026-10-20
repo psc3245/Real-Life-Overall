@@ -1,9 +1,10 @@
-import type { OnboardingStateDto, RatingsDto } from "@rlo/shared";
+import type { ChangeFeedItemDto, OnboardingStateDto, RatingsDto } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
 import { onboardingKey } from "./onboarding";
 
 export const ratingsKey = ["ratings"] as const;
+export const changesKey = ["rating-changes"] as const;
 
 /** Resolves to null (not an error) when the user has no ratings yet. */
 export function useRatings() {
@@ -28,5 +29,12 @@ export function useRateInitial() {
       queryClient.setQueryData(onboardingKey, state);
       await queryClient.invalidateQueries({ queryKey: ratingsKey });
     },
+  });
+}
+
+export function useChanges(limit = 30) {
+  return useQuery({
+    queryKey: [...changesKey, limit],
+    queryFn: () => api<ChangeFeedItemDto[]>(`/ratings/changes?limit=${limit}`),
   });
 }

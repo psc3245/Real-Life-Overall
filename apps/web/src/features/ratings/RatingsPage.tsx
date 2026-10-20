@@ -2,7 +2,8 @@ import type { RatedNodeDto, RatingsDto } from "@rlo/shared";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useMe } from "../../api/hooks";
-import { useRatings } from "../../api/ratings";
+import { useChanges, useRatings } from "../../api/ratings";
+import { Delta } from "../../components/Delta";
 import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -52,6 +53,8 @@ export function RatingsPage() {
           </p>
         </div>
       </div>
+
+      <RecentChanges />
 
       <div className="grid gap-6 md:grid-cols-2">
         {categories.map((c) => (
@@ -118,5 +121,42 @@ function Detail({ node }: { node: RatedNodeDto }) {
         )}
       </div>
     </div>
+  );
+}
+
+const SOURCE_LABEL = {
+  onboarding: "Scouting",
+  daily_recap: "Recap",
+  weekly_review: "Weekly",
+  decay: "Decay",
+  recalibration: "New season",
+} as const;
+
+function RecentChanges() {
+  const changes = useChanges(15);
+  const items = (changes.data ?? []).filter((c) => c.source !== "onboarding");
+  if (!items.length) return null;
+  return (
+    <section className="space-y-3">
+      <h2 className="font-display text-2xl uppercase tracking-wider">Recent changes</h2>
+      <ul className="divide-y divide-court-800 rounded-xl border border-court-700 bg-court-900/70">
+        {items.map((c) => (
+          <li
+            key={c.id}
+            className="grid grid-cols-[4rem_1fr_auto] items-baseline gap-3 px-4 py-2.5"
+          >
+            <Delta value={c.delta} className="text-lg" />
+            <div className="min-w-0">
+              <p className="font-medium">{c.nodeName}</p>
+              <p className="text-sm text-court-300">{c.reason}</p>
+            </div>
+            <span className="text-right text-xs uppercase tracking-wider text-court-500">
+              {SOURCE_LABEL[c.source]}
+              {c.date && <span className="block normal-case tracking-normal">{c.date}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

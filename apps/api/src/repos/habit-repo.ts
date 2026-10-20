@@ -28,7 +28,9 @@ export async function insert(db: Executor, row: typeof habits.$inferInsert): Pro
 export async function update(
   db: Executor,
   id: string,
-  changes: Partial<Pick<HabitRow, "name" | "config" | "days" | "archivedAt" | "sortOrder">>,
+  changes: Partial<
+    Pick<HabitRow, "name" | "config" | "days" | "startsOn" | "archivedAt" | "sortOrder">
+  >,
 ): Promise<HabitRow> {
   const rows = await db.update(habits).set(changes).where(eq(habits.id, id)).returning();
   return rows[0]!;

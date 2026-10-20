@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from "react-router";
 import { useHealth } from "../api/hooks";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
+import { TimezoneSync } from "../components/TimezoneSync";
 
 export function RootLayout() {
   const health = useHealth();
@@ -8,6 +9,7 @@ export function RootLayout() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col px-4">
+      <TimezoneSync />
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-5">
         <Link to="/" className="font-display text-2xl font-bold tracking-wider">
           <span className="text-neon">OVR</span>

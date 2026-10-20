@@ -4,6 +4,8 @@ export interface PromptNode {
   parentRef: string | null;
   name: string;
   description: string;
+  /** Current rating, when the prompt needs it. */
+  value?: number;
 }
 
 export function refsFor<T extends { id: string; parentId: string | null }>(nodes: T[]) {
@@ -15,7 +17,7 @@ export function refsFor<T extends { id: string; parentId: string | null }>(nodes
 
 export function toPromptNodes<
   T extends { id: string; parentId: string | null; name: string; description: string },
->(nodes: T[], refById: Map<string, string>): PromptNode[] {
+>(nodes: T[], refById: Map<string, string>, values?: ReadonlyMap<string, number>): PromptNode[] {
   return nodes
     .filter((n) => refById.has(n.id))
     .map((n) => ({
@@ -23,6 +25,7 @@ export function toPromptNodes<
       parentRef: (n.parentId && refById.get(n.parentId)) ?? null,
       name: n.name,
       description: n.description,
+      ...(values?.has(n.id) && { value: values.get(n.id)! }),
     }));
 }
 
@@ -37,7 +40,8 @@ export function renderTree(nodes: PromptNode[], markLeaves = false): string {
     const children = childrenOf(node.ref);
     const desc = node.description ? ` — ${node.description}` : "";
     const leaf = markLeaves && children.length === 0 ? " (rated attribute)" : "";
-    lines.push(`${"  ".repeat(depth)}- [${node.ref}] ${node.name}${desc}${leaf}`);
+    const value = node.value === undefined ? "" : `: ${node.value.toFixed(1)}`;
+    lines.push(`${"  ".repeat(depth)}- [${node.ref}] ${node.name}${value}${desc}${leaf}`);
     for (const child of children) visit(child, depth + 1);
   };
   for (const top of childrenOf(null)) visit(top, 0);

@@ -182,3 +182,54 @@ describe("days", () => {
     expect(write.status).toBe(404);
   });
 });
+
+describe("habit start dates", () => {
+  it("defaults to today, can be backdated, and gates logging", async () => {
+    const { request } = await createRatedApp();
+    const today = (await body<DayDto>(await request("/days/today"))).today;
+    const plain = await body<HabitDto>(
+      await request("/habits", { method: "POST", ...json({ name: "Plain", type: "checkbox" }) }),
+    );
+    expect(plain.startsOn).toBe(today);
+
+    const backdated = await body<HabitDto>(
+      await request("/habits", {
+        method: "POST",
+        ...json({ name: "Old", type: "checkbox", startsOn: addDays(today, -2) }),
+      }),
+    );
+    const twoDaysAgo = await body<DayDto>(await request(`/days/${addDays(today, -2)}`));
+    expect(twoDaysAgo.habits.map((h) => h.habit.name)).toEqual(["Old"]);
+
+    const blocked = await request(`/days/${addDays(today, -1)}/habits/${plain.id}`, {
+      method: "PUT",
+      ...json({ num: 1 }),
+    });
+    expect(blocked.status).toBe(400);
+
+    const moved = await body<HabitDto>(
+      await request(`/habits/${plain.id}`, {
+        method: "PATCH",
+        ...json({ startsOn: addDays(today, -1) }),
+      }),
+    );
+    expect(moved.startsOn).toBe(addDays(today, -1));
+    expect(
+      (
+        await request(`/days/${addDays(today, -1)}/habits/${plain.id}`, {
+          method: "PUT",
+          ...json({ num: 1 }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(backdated.startsOn).toBe(addDays(today, -2));
+    expect(
+      (
+        await request("/habits", {
+          method: "POST",
+          ...json({ name: "X", type: "checkbox", startsOn: "2026-02-30" }),
+        })
+      ).status,
+    ).toBe(400);
+  });
+});
