@@ -16,6 +16,8 @@ export const envSchema = z.object({
   LLM_FAST_MODEL: optionalKey,
   LLM_SMART_MODEL: optionalKey,
   ANTHROPIC_API_KEY: optionalKey,
+  /** Required by Anthropic when the API key is not scoped to a single workspace. */
+  ANTHROPIC_WORKSPACE_ID: optionalKey,
   OPENAI_API_KEY: optionalKey,
   GOOGLE_GENERATIVE_AI_API_KEY: optionalKey,
 });

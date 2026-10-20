@@ -1,4 +1,12 @@
 import {
+  followupOutputSchema,
+  leafIds,
+  MAX_FOLLOWUP_TURNS,
+  unansweredRequired,
+  validateAnswer,
+  type Answers,
+  type ChatMessageDto,
+  type QuestionDto,
   attributeSuggestionOutputSchema,
   DEFAULT_IMPORTANCE,
   DRAFT_ROOT_KEY,
@@ -17,12 +25,21 @@ import {
 import type { Database } from "../db/client";
 import { badRequest, conflict, notFound } from "../errors";
 import type { LlmClient } from "../llm/client";
-import { suggestAttributesPrompt, suggestWeightsPrompt } from "../llm/prompts/onboarding";
+import type { ModelMessage } from "ai";
+import { renderAnswers } from "../llm/prompts/answers";
+import {
+  followupPrompt,
+  questionnairePrompt,
+  suggestAttributesPrompt,
+  suggestWeightsPrompt,
+} from "../llm/prompts/onboarding";
+import { refsFor, renderTree, toPromptNodes } from "../llm/prompts/tree";
 import * as onboardingRepo from "../repos/onboarding-repo";
 import type { OnboardingSessionRow } from "../repos/onboarding-repo";
 import * as nodeRepo from "../repos/rating-node-repo";
 import * as seasonRepo from "../repos/season-repo";
 import * as userRepo from "../repos/user-repo";
+import { normalizeQuestions, questionnaireSchemaFor, targetQuestionCount } from "./questionnaire";
 
 /** The tree and weights stay editable until the questionnaire is generated (structure locks). */
 function isStructureEditable(session: OnboardingSessionRow): boolean {
@@ -50,8 +67,16 @@ export async function getState(db: Database, userId: string): Promise<Onboarding
     priorities: session.priorities,
     weightRationale: session.weightRationale,
     nodes: await nodeRepo.findActiveBySeason(db, season.id),
+    questionnaire: questionsOf(session),
+    answers: answersOf(session),
+    chat: chatOf(session),
   };
 }
+
+// jsonb columns are written only by this service, so their shapes are trusted on read.
+const questionsOf = (s: OnboardingSessionRow) => s.questionnaire as QuestionDto[] | null;
+const answersOf = (s: OnboardingSessionRow) => (s.answers ?? {}) as Answers;
+const chatOf = (s: OnboardingSessionRow) => (s.chat ?? []) as ChatMessageDto[];
 
 /** Replaces the season's whole tree. Safe because nothing is rated during onboarding. */
 export async function saveTree(
@@ -131,23 +156,13 @@ export async function suggestWeights(
   const nodes = (await nodeRepo.findActiveBySeason(db, season.id)).filter((n) => n.parentId);
   if (!nodes.length) throw badRequest("Save a rating tree first");
 
-  // Short refs instead of UUIDs: fewer tokens and fewer copying mistakes by the model.
-  const refById = new Map(nodes.map((n, i) => [n.id, `n${i + 1}`]));
-  const idByRef = new Map([...refById].map(([id, ref]) => [ref, id]));
+  const { refById, idByRef } = refsFor(nodes);
   const output = await llm.generateStructured({
     purpose: "onboarding.weights",
     userId,
     schema: weightSuggestionOutputSchema,
     system: suggestWeightsPrompt.system,
-    prompt: suggestWeightsPrompt.user({
-      priorities,
-      nodes: nodes.map((n) => ({
-        ref: refById.get(n.id)!,
-        parentRef: refById.get(n.parentId!) ?? null,
-        name: n.name,
-        description: n.description,
-      })),
-    }),
+    prompt: suggestWeightsPrompt.user({ priorities, nodes: toPromptNodes(nodes, refById) }),
     promptVersion: suggestWeightsPrompt.version,
   });
 
@@ -183,5 +198,136 @@ export async function saveWeights(
     }
     await onboardingRepo.update(tx, session.id, { stage: "questionnaire" });
   });
+  return getState(db, userId);
+}
+
+export async function generateQuestionnaire(
+  db: Database,
+  llm: LlmClient,
+  userId: string,
+): Promise<OnboardingStateDto> {
+  const { season, session } = await loadSession(db, userId);
+  if (session.questionnaire !== null) return getState(db, userId); // idempotent
+  if (session.stage !== "questionnaire") throw conflict("Set your weights first");
+
+  const nodes = await nodeRepo.findActiveBySeason(db, season.id);
+  const leaves = leafIds(nodes);
+  const { refById, idByRef } = refsFor(nodes);
+  const output = await llm.generateStructured({
+    purpose: "onboarding.questionnaire",
+    userId,
+    schema: questionnaireSchemaFor(leaves.map((id) => refById.get(id)!)),
+    system: questionnairePrompt.system,
+    prompt: questionnairePrompt.user({
+      priorities: session.priorities,
+      nodes: toPromptNodes(nodes, refById),
+      targetCount: targetQuestionCount(leaves.length),
+    }),
+    promptVersion: questionnairePrompt.version,
+    maxOutputTokens: 16_000,
+  });
+
+  const questions = normalizeQuestions(output.questions, idByRef, new Set(leaves));
+  // If a concurrent request already stored one, theirs wins and this result is discarded.
+  await onboardingRepo.setQuestionnaireIfAbsent(db, session.id, questions);
+  return getState(db, userId);
+}
+
+export async function saveAnswers(
+  db: Database,
+  userId: string,
+  changes: Record<string, string | string[] | number | null>,
+): Promise<OnboardingStateDto> {
+  const { session } = await loadSession(db, userId);
+  const questions = questionsOf(session);
+  if (session.stage !== "questionnaire" || !questions) {
+    throw conflict("The questionnaire is not open");
+  }
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const answers = { ...answersOf(session) };
+  for (const [questionId, value] of Object.entries(changes)) {
+    const question = byId.get(questionId);
+    if (!question) throw badRequest(`Unknown question ${questionId}`);
+    if (value === null) {
+      delete answers[questionId];
+      continue;
+    }
+    const problem = validateAnswer(question, value);
+    if (problem) throw badRequest(`${questionId}: ${problem}`);
+    answers[questionId] = typeof value === "string" ? value.trim() : value;
+  }
+  await onboardingRepo.update(db, session.id, { answers });
+  return getState(db, userId);
+}
+
+export async function submitQuestionnaire(
+  db: Database,
+  userId: string,
+): Promise<OnboardingStateDto> {
+  const { session } = await loadSession(db, userId);
+  const questions = questionsOf(session);
+  if (session.stage !== "questionnaire" || !questions) {
+    throw conflict("The questionnaire is not open");
+  }
+  const missing = unansweredRequired(questions, answersOf(session));
+  if (missing.length) throw badRequest(`${missing.length} question(s) still need an answer`);
+  await onboardingRepo.update(db, session.id, { stage: "followup", chat: [] });
+  return getState(db, userId);
+}
+
+/**
+ * Advances the follow-up chat. With an empty chat this opens the conversation (no message);
+ * afterwards each call carries the user's reply. Nothing is saved if the LLM call fails.
+ */
+export async function continueFollowup(
+  db: Database,
+  llm: LlmClient,
+  userId: string,
+  message: string | undefined,
+): Promise<OnboardingStateDto> {
+  const { season, session } = await loadSession(db, userId);
+  if (session.stage !== "followup") throw conflict("The follow-up chat is not open");
+  const chat = chatOf(session);
+  if (chat.length === 0 && message) throw badRequest("The conversation has not started yet");
+  if (chat.length > 0 && !message) throw badRequest("A message is required");
+
+  const nodes = await nodeRepo.findActiveBySeason(db, season.id);
+  const { refById } = refsFor(nodes);
+  const context = [
+    `What matters to the user: ${session.priorities || "(not stated)"}`,
+    "Rating tree (Overall is the implicit root):",
+    renderTree(toPromptNodes(nodes, refById), true),
+    "Questionnaire answers:",
+    renderAnswers(questionsOf(session) ?? [], answersOf(session), refById),
+  ].join("\n\n");
+
+  const updated: ChatMessageDto[] = message ? [...chat, { role: "user", content: message }] : chat;
+  const messages: ModelMessage[] = [
+    { role: "user", content: context },
+    ...updated.map((m): ModelMessage => ({ role: m.role, content: m.content })),
+  ];
+  const output = await llm.generateStructured({
+    purpose: "onboarding.followup",
+    userId,
+    schema: followupOutputSchema,
+    system: followupPrompt.system,
+    prompt: messages,
+    promptVersion: followupPrompt.version,
+  });
+
+  const final = [...updated, { role: "assistant" as const, content: output.reply.trim() }];
+  const assistantTurns = final.filter((m) => m.role === "assistant").length;
+  const done = output.done || assistantTurns >= MAX_FOLLOWUP_TURNS;
+  await onboardingRepo.update(db, session.id, {
+    chat: final,
+    ...(done ? { stage: "rating" as const } : {}),
+  });
+  return getState(db, userId);
+}
+
+export async function finishFollowup(db: Database, userId: string): Promise<OnboardingStateDto> {
+  const { session } = await loadSession(db, userId);
+  if (session.stage !== "followup") throw conflict("The follow-up chat is not open");
+  await onboardingRepo.update(db, session.id, { stage: "rating" });
   return getState(db, userId);
 }

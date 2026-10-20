@@ -447,8 +447,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Category templates (data in `packages/shared`) and the custom tree builder (depth ≤ 3)
 - [x] LLM attribute suggestions (optional helper)
 - [x] Weights: LLM proposal plus user adjustment (1–10 importance per sibling, shown as % share)
-- [ ] LLM questionnaire generation, form rendering by question type, resumable answers
-- [ ] Follow-up chat (bounded)
+- [x] LLM questionnaire generation, form rendering by question type, resumable answers
+- [x] Follow-up chat (bounded to 5 questions, skippable)
 - [ ] Initial ratings, decay rules and archetype from the LLM, written as `onboarding` rating events
 - [ ] Rating roll-up math (shared, unit-tested)
 - [ ] OVR reveal and basic ratings tree view with rationales

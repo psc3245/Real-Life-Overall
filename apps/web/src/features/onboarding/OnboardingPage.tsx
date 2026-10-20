@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useOnboarding, useSaveTree } from "../../api/onboarding";
 import { ErrorNote } from "./ErrorNote";
 import { nodesToDraft } from "./draft";
-import { ScoutingPlaceholder } from "./ScoutingPlaceholder";
+import { RevealPlaceholder } from "./RevealPlaceholder";
+import { ScoutingStep } from "./ScoutingStep";
 import { StepIndicator, type StepKey } from "./StepIndicator";
 import { TreeBuilder } from "./TreeBuilder";
 import { WeightsStep } from "./WeightsStep";
@@ -33,7 +34,9 @@ export function OnboardingPage() {
 
   const state = onboarding.data;
   const reached = STAGE_TO_STEP[state.stage] ?? "tree";
-  const reachable = STEP_ORDER.slice(0, STEP_ORDER.indexOf(reached) + 1);
+  // Once questions exist the build and weights are locked for the season.
+  const firstOpen = state.questionnaire ? STEP_ORDER.indexOf("questionnaire") : 0;
+  const reachable = STEP_ORDER.slice(firstOpen, STEP_ORDER.indexOf(reached) + 1);
   const step = viewing && reachable.includes(viewing) ? viewing : reached;
 
   return (
@@ -64,7 +67,10 @@ export function OnboardingPage() {
           onSaved={() => setViewing(null)}
         />
       )}
-      {step === "questionnaire" && <ScoutingPlaceholder onEditBuild={() => setViewing("tree")} />}
+      {step === "questionnaire" && (
+        <ScoutingStep state={state} onEditBuild={() => setViewing("tree")} />
+      )}
+      {step === "reveal" && <RevealPlaceholder />}
     </div>
   );
 }
