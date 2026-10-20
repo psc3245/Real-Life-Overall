@@ -55,4 +55,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
   })
   .post("/followup/finish", async (c) =>
     c.json(await onboarding.finishFollowup(c.get("db"), c.get("userId"))),
+  )
+  .post("/rate", async (c) =>
+    c.json(await onboarding.rateInitial(c.get("db"), c.get("llm"), c.get("userId"))),
   );

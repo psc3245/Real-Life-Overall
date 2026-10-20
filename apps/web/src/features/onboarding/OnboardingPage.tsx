@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useOnboarding, useSaveTree } from "../../api/onboarding";
 import { ErrorNote } from "./ErrorNote";
 import { nodesToDraft } from "./draft";
-import { RevealPlaceholder } from "./RevealPlaceholder";
+import { RevealStep } from "./RevealStep";
 import { ScoutingStep } from "./ScoutingStep";
 import { StepIndicator, type StepKey } from "./StepIndicator";
 import { TreeBuilder } from "./TreeBuilder";
@@ -70,7 +70,7 @@ export function OnboardingPage() {
       {step === "questionnaire" && (
         <ScoutingStep state={state} onEditBuild={() => setViewing("tree")} />
       )}
-      {step === "reveal" && <RevealPlaceholder />}
+      {step === "reveal" && <RevealStep state={state} />}
     </div>
   );
 }

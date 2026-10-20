@@ -37,3 +37,37 @@
     min-height: 100dvh;
   }
 }
+
+/* Reveal choreography. Elements start hidden and fade up after their inline animation-delay. */
+@keyframes reveal-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes reveal-in {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.reveal-in {
+  animation: reveal-in 600ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-in,
+  .animate-\[reveal-pop_700ms_ease-out_both\] {
+    animation: none;
+  }
+}

@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router";
+import { Link, NavLink, Outlet } from "react-router";
 import { useHealth } from "../api/hooks";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
 
@@ -16,6 +16,14 @@ export function RootLayout() {
           </span>
         </Link>
         <div className="flex items-center gap-4">
+          <NavLink
+            to="/ratings"
+            className={({ isActive }) =>
+              `font-display text-sm uppercase tracking-wider ${isActive ? "text-neon" : "text-court-300 hover:text-court-100"}`
+            }
+          >
+            My rating
+          </NavLink>
           <span
             className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-court-500"
             title={apiUp ? "API reachable" : "API unreachable — is `npm run dev:api` running?"}

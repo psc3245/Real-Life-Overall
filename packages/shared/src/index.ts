@@ -7,3 +7,4 @@ export * from "./templates";
 export * from "./schemas/tree";
 export * from "./schemas/onboarding";
 export * from "./schemas/questionnaire";
+export * from "./schemas/ratings";

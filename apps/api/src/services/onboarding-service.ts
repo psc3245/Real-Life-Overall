@@ -7,6 +7,7 @@ import {
   type Answers,
   type ChatMessageDto,
   type QuestionDto,
+  type RatingNodeDto,
   attributeSuggestionOutputSchema,
   DEFAULT_IMPORTANCE,
   DRAFT_ROOT_KEY,
@@ -29,6 +30,7 @@ import type { ModelMessage } from "ai";
 import { renderAnswers } from "../llm/prompts/answers";
 import {
   followupPrompt,
+  initialRatingsPrompt,
   questionnairePrompt,
   suggestAttributesPrompt,
   suggestWeightsPrompt,
@@ -39,6 +41,9 @@ import type { OnboardingSessionRow } from "../repos/onboarding-repo";
 import * as nodeRepo from "../repos/rating-node-repo";
 import * as seasonRepo from "../repos/season-repo";
 import * as userRepo from "../repos/user-repo";
+import * as decayRuleRepo from "../repos/decay-rule-repo";
+import * as eventRepo from "../repos/rating-event-repo";
+import { initialRatingsSchemaFor, normalizeInitialRatings } from "./initial-ratings";
 import { normalizeQuestions, questionnaireSchemaFor, targetQuestionCount } from "./questionnaire";
 
 /** The tree and weights stay editable until the questionnaire is generated (structure locks). */
@@ -293,13 +298,7 @@ export async function continueFollowup(
 
   const nodes = await nodeRepo.findActiveBySeason(db, season.id);
   const { refById } = refsFor(nodes);
-  const context = [
-    `What matters to the user: ${session.priorities || "(not stated)"}`,
-    "Rating tree (Overall is the implicit root):",
-    renderTree(toPromptNodes(nodes, refById), true),
-    "Questionnaire answers:",
-    renderAnswers(questionsOf(session) ?? [], answersOf(session), refById),
-  ].join("\n\n");
+  const context = scoutingContext(session, nodes, refById);
 
   const updated: ChatMessageDto[] = message ? [...chat, { role: "user", content: message }] : chat;
   const messages: ModelMessage[] = [
@@ -325,9 +324,95 @@ export async function continueFollowup(
   return getState(db, userId);
 }
 
+/** Everything the scout knows: priorities, the tree, and the questionnaire answers. */
+function scoutingContext(
+  session: OnboardingSessionRow,
+  nodes: RatingNodeDto[],
+  refById: Map<string, string>,
+): string {
+  return [
+    `What matters to the user: ${session.priorities || "(not stated)"}`,
+    "Rating tree (Overall is the implicit root):",
+    renderTree(toPromptNodes(nodes, refById), true),
+    "Questionnaire answers:",
+    renderAnswers(questionsOf(session) ?? [], answersOf(session), refById),
+  ].join("\n\n");
+}
+
 export async function finishFollowup(db: Database, userId: string): Promise<OnboardingStateDto> {
   const { session } = await loadSession(db, userId);
   if (session.stage !== "followup") throw conflict("The follow-up chat is not open");
   await onboardingRepo.update(db, session.id, { stage: "rating" });
+  return getState(db, userId);
+}
+
+export interface OnboardingResult {
+  summary: string;
+  archetypeDescription: string;
+}
+
+/**
+ * Sets starting ratings from the scouting report: one onboarding event per rated attribute
+ * (the ledger starts at the rated value), LLM-authored decay rules, and the archetype.
+ * Completing onboarding activates the season.
+ */
+export async function rateInitial(
+  db: Database,
+  llm: LlmClient,
+  userId: string,
+): Promise<OnboardingStateDto> {
+  const { season, session } = await loadSession(db, userId);
+  if (session.stage === "complete") return getState(db, userId);
+  if (session.stage !== "rating") throw conflict("Finish scouting first");
+
+  const nodes = await nodeRepo.findActiveBySeason(db, season.id);
+  const leaves = leafIds(nodes);
+  const { refById, idByRef } = refsFor(nodes);
+  const transcript = chatOf(session)
+    .map((m) => `${m.role === "user" ? "User" : "Scout"}: ${m.content}`)
+    .join("\n");
+  const output = await llm.generateStructured({
+    purpose: "onboarding.initialRatings",
+    userId,
+    schema: initialRatingsSchemaFor(leaves.map((id) => refById.get(id)!)),
+    system: initialRatingsPrompt.system,
+    prompt: [
+      scoutingContext(session, nodes, refById),
+      `Follow-up conversation:\n${transcript || "(skipped)"}`,
+    ].join("\n\n"),
+    promptVersion: initialRatingsPrompt.version,
+    maxOutputTokens: 16_000,
+  });
+
+  const ratings = normalizeInitialRatings(output, idByRef, new Set(leaves));
+  const result: OnboardingResult = {
+    summary: output.summary.trim(),
+    archetypeDescription: output.archetype.description.trim(),
+  };
+  await db.transaction(async (tx) => {
+    const won = await onboardingRepo.transitionStage(tx, session.id, "rating", "complete", {
+      result,
+    });
+    if (!won) return; // A concurrent request already rated this season.
+    await eventRepo.insertMany(
+      tx,
+      ratings.map((r) => ({
+        nodeId: r.nodeId,
+        seasonId: season.id,
+        delta: r.value,
+        source: "onboarding" as const,
+        reason: r.rationale,
+        evidence: { confidence: r.confidence },
+      })),
+    );
+    await decayRuleRepo.insertMany(
+      tx,
+      ratings.map((r) => ({ nodeId: r.nodeId, ...r.decay, authoredBy: "llm" as const })),
+    );
+    await seasonRepo.update(tx, season.id, {
+      status: "active",
+      archetype: output.archetype.name.trim(),
+    });
+  });
   return getState(db, userId);
 }
