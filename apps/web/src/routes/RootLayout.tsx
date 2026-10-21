@@ -22,6 +22,7 @@ export function RootLayout() {
           {[
             ["/today", "Today"],
             ["/habits", "Habits"],
+            ["/week", "Week"],
             ["/ratings", "My rating"],
           ].map(([to, label]) => (
             <NavLink

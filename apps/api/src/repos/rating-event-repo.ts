@@ -67,6 +67,24 @@ export async function findRecapGains(db: Executor, seasonId: string) {
         eq(ratingEvents.seasonId, seasonId),
         isNull(ratingEvents.voidedAt),
         gt(ratingEvents.delta, 0),
+        // Weekly corrections aren't activity on any particular day.
+        eq(recaps.kind, "daily"),
       ),
     );
+}
+
+/** Non-voided events with the local date they belong to (null for onboarding). */
+export async function findActiveWithDates(db: Executor, seasonId: string) {
+  return db
+    .select({
+      event: ratingEvents,
+      recapKind: recaps.kind,
+      recapStart: recaps.periodStart,
+      recapEnd: recaps.periodEnd,
+      decayDate: decayRuns.localDate,
+    })
+    .from(ratingEvents)
+    .leftJoin(recaps, eq(recaps.id, ratingEvents.recapId))
+    .leftJoin(decayRuns, eq(decayRuns.id, ratingEvents.decayRunId))
+    .where(and(eq(ratingEvents.seasonId, seasonId), isNull(ratingEvents.voidedAt)));
 }

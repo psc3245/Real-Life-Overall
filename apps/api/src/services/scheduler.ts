@@ -6,6 +6,7 @@ import * as seasonRepo from "../repos/season-repo";
 import { getDay } from "./day-service";
 import { applyDecay } from "./decay-service";
 import { hasContent, runDailyRecap } from "./recap-service";
+import { getWeeklyState, runWeeklyReview } from "./weekly-service";
 
 /** Local hour when forgotten days get recapped automatically (DESIGN.md §8.6). */
 export const AUTO_RECAP_HOUR = 4;
@@ -22,6 +23,8 @@ export interface UserRunResult {
   recapped: string[];
   failed: string[];
   decayDays: number;
+  /** Week start of a weekly review written by this run. */
+  weeklyReview: string | null;
 }
 
 /**
@@ -35,7 +38,13 @@ export async function runForUser(
   timezone: string,
   { recap }: { recap: boolean },
 ): Promise<UserRunResult> {
-  const result: UserRunResult = { userId, recapped: [], failed: [], decayDays: 0 };
+  const result: UserRunResult = {
+    userId,
+    recapped: [],
+    failed: [],
+    decayDays: 0,
+    weeklyReview: null,
+  };
   if (recap) {
     const today = localDateIn(timezone);
     for (let date = addDays(today, -BACKFILL_DAYS); date < today; date = addDays(date, 1)) {
@@ -52,6 +61,18 @@ export async function runForUser(
     }
   }
   result.decayDays = await applyDecay(db, userId);
+  // Once a week has finished (and its days are recapped), review it.
+  if (recap) {
+    try {
+      const state = await getWeeklyState(db, userId);
+      if (state.ready && state.week) {
+        await runWeeklyReview(db, llm, userId);
+        result.weeklyReview = state.week.start;
+      }
+    } catch (error) {
+      console.error(`weekly review failed for ${userId}`, error);
+    }
+  }
   return result;
 }
 

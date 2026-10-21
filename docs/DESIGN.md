@@ -203,11 +203,11 @@ All LLM work lives behind one internal module, `apps/api/src/llm/`, with a **pro
 - **Pause mode:** during an active pause, decay is skipped. Recaps still run if the user logs anything.
 - *Open: should users be able to view and edit decay rules? (Default: view only.)*
 
-### 5.5 Memory: full-history RAG
-- **Embeddings** of journal entries, prompt answers, recap narratives and onboarding answers, stored in **Postgres with `pgvector`** (supported on Neon).
-- **Retrieval:** top-k by similarity to today's log, plus filters (same leaf nodes, recency boost).
-- **Rolling profile summary:** a compact LLM-maintained text about goals, context and recurring patterns, updated in the weekly review and **always included** in prompts.
-- The embedding model is also behind the provider-agnostic layer and logged for cost.
+### 5.5 Memory: full-history retrieval
+- **Decision (Phase 2):** Postgres **full-text search** instead of embeddings, to avoid adding an embeddings provider (Anthropic has none). Journals and daily recap narratives have generated `tsvector` columns with GIN indexes.
+- **Retrieval:** the day's (or week's) text becomes an OR query of its most distinctive words; older days are ranked by `ts_rank` and the top 5 go into the prompt as "Related older days". Recent days (the last week) are already included in full.
+- **Rolling profile summary:** a compact LLM-maintained text about goals, context and recurring patterns (`users.profile_summary`), rewritten by each weekly review and **always included** in daily and weekly prompts.
+- **Upgrade path:** embeddings (Voyage, Gemini or Workers AI) with pgvector can replace `searchMemories` behind the same interface if keyword matching proves too literal.
 
 ### 5.6 Guardrails & anti-gaming
 The LLM decides deltas. **Code only enforces:**
@@ -289,7 +289,7 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 | Animation | **Motion** (Framer Motion) | Stat-bar fills, OVR reveal |
 | API framework | **Hono** | TS-native, tiny, runs on Cloudflare Workers **and** Node (portable if hosting changes) |
 | Validation | **Zod** (shared package) | Request bodies **and** LLM structured outputs |
-| DB | **Neon Postgres** (free tier) + **pgvector** | Same provider as before; vectors for RAG |
+| DB | **Neon Postgres** (free tier) | Same provider as before; full-text search for memory |
 | ORM / migrations | **Drizzle** + drizzle-kit migrations | Decided |
 | LLM layer | **Vercel AI SDK** (`ai` package) behind our own `llm/` module | Provider-agnostic, Zod structured output, runs on Workers |
 | Object storage (Phase 5) | **Cloudflare R2** (free tier) | Photos and voice |
@@ -392,7 +392,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `goals` | `node_id`, `target_value` | User half of Potential |
 | `projections` | `node_id`, `recap_id`, `projected_value` | LLM half of Potential |
 | `focus_goals` / `habit_proposals` | from weekly reviews | Phase 2–3 |
-| `embeddings` | `user_id`, `source_type`, `source_id`, `content`, `embedding vector(n)` | pgvector |
+| (memory) | `day_logs.journal_search`, `recaps.narrative_search` (generated `tsvector`, GIN) | Full-text search; no embeddings table (§5.5) |
 | `llm_calls` | `user_id`, `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`, `error` | **From day one** |
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
 | `settings` | per-user UI prefs | Carried over pattern |
@@ -437,7 +437,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 ### Phase 0: Foundations
 - [x] npm-workspaces monorepo: `apps/web`, `apps/api`, `packages/shared`; TS strict; ESLint + Prettier
 - [x] Vitest in all packages; GitHub Actions running lint, format check, typecheck, test and web build
-- [x] Drizzle schema + migrations (Neon in dev/prod, in-memory PGlite in tests). pgvector moves to Phase 2 with RAG.
+- [x] Drizzle schema + migrations (Neon in dev/prod, in-memory PGlite in tests). Memory uses full-text search (§5.5), so no pgvector.
 - [x] Hono API skeleton with env config, error handling, the `userId` middleware (dev auth mode) and health route
 - [x] LLM module: provider-agnostic client, per-purpose model config, Zod structured output, retries, `llm_calls` logging
 - [x] Web skeleton: Vite + React Router + TanStack Query + Tailwind; dark 2K theme tokens (shadcn added when the first complex component needs it)
@@ -464,9 +464,9 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Auto daily recap at 04:00 local (hourly Cron Trigger; dev button to run on demand)
 - [x] Ledger re-run on past-day edits (edits mark the day stale; "Update recap" re-runs, max 3 per day)
 - [x] Decay engine (LLM-authored rules applied nightly, recomputed after backfills), pause mode
-- [ ] Decay rule revisions in weekly reviews
-- [ ] Weekly review: narrative, corrections, decay revisions, focus goals, habit proposals, projection, profile summary
-- [ ] RAG: embeddings pipeline and retrieval
+- [x] Decay rule revisions in weekly reviews (versioned; old rules kept)
+- [x] Weekly review: narrative, corrections (±5), decay revisions, focus goals, one-click habit proposals, profile summary. Season projection and archetype updates move to Phase 3 with Potential.
+- [x] Long-term memory: full-text retrieval of related older days + rolling profile (§5.5)
 - [x] Change feed
 - [x] Guardrail caps (±3 per attribute per day) and skepticism prompting
 

@@ -13,6 +13,7 @@ import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
 import { ratingsRoutes } from "./routes/ratings";
+import { weeklyRoutes } from "./routes/weekly";
 
 export type DepsFactory = (env: Env) => Deps;
 
@@ -84,13 +85,16 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/pauses", requireUser)
     .use("/pauses/*", requireUser)
     .use("/dev/*", requireUser)
+    .use("/weekly", requireUser)
+    .use("/weekly/*", requireUser)
     .route("/me", meRoutes)
     .route("/onboarding", onboardingRoutes)
     .route("/ratings", ratingsRoutes)
     .route("/habits", habitRoutes)
     .route("/days", dayRoutes)
     .route("/pauses", pauseRoutes)
-    .route("/dev", devRoutes);
+    .route("/dev", devRoutes)
+    .route("/weekly", weeklyRoutes);
 
   return routes;
 }
