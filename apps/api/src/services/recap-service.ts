@@ -21,6 +21,7 @@ import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
 import { getDay, requireEditable } from "./day-service";
 import { awardBadges } from "./badge-service";
+import { ensureCurrentSeason } from "./season-service";
 import { applyDecay, invalidateDecay } from "./decay-service";
 import { renderMemories, searchMemories } from "./memory-service";
 import { currentFocus } from "./weekly-service";
@@ -109,6 +110,7 @@ export async function runDailyRecap(
   date: string,
 ): Promise<DayDto> {
   const { day } = await requireEditable(db, userId, date);
+  await ensureCurrentSeason(db, userId);
   const ctx = await loadLeafContext(db, userId);
   if (!ctx) throw conflict("Finish onboarding before recapping days");
   const view = await getDay(db, userId, day);

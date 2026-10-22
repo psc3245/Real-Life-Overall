@@ -20,11 +20,12 @@ import * as userRepo from "../repos/user-repo";
 import { applyDecay } from "./decay-service";
 import { datedEvents } from "./event-dates";
 import { trends } from "./history-service";
+import { ensureCurrentSeason } from "./season-service";
 import type { OnboardingResult } from "./onboarding-service";
 
 /** The user's current ratings: leaf values from the ledger, parents rolled up by weight. */
 export async function getRatings(db: Database, userId: string): Promise<RatingsDto> {
-  const season = await seasonRepo.findLatestActive(db, userId);
+  const season = await ensureCurrentSeason(db, userId);
   if (!season) throw notFound("No ratings yet. Finish onboarding first.");
   await applyDecay(db, userId); // catch up if the scheduled job hasn't run yet
 

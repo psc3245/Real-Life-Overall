@@ -44,6 +44,7 @@ import * as userRepo from "../repos/user-repo";
 import * as decayRuleRepo from "../repos/decay-rule-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import { awardBadges } from "./badge-service";
+import { ensureCurrentSeason } from "./season-service";
 import { initialRatingsSchemaFor, normalizeInitialRatings } from "./initial-ratings";
 import { normalizeQuestions, questionnaireSchemaFor, targetQuestionCount } from "./questionnaire";
 
@@ -59,6 +60,8 @@ function isStructureEditable(session: OnboardingSessionRow): boolean {
 async function loadSession(db: Database, userId: string) {
   const user = await userRepo.findById(db, userId);
   if (!user) throw notFound("User not found");
+  // Roll an ended season first, so a returning player isn't sent into a fresh onboarding.
+  await ensureCurrentSeason(db, userId);
   const period = seasonForDate(localDateIn(user.timezone));
   const season = await seasonRepo.findOrCreate(db, userId, period);
   const session = await onboardingRepo.findOrCreate(db, userId, season.id);

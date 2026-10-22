@@ -63,6 +63,10 @@ export const seasons = pgTable(
     status: seasonStatus().notNull().default("setup"),
     archetype: text(),
     archetypeDescription: text(),
+    /** SeasonCardDto content, frozen when the season is archived. */
+    finalSnapshot: jsonb(),
+    /** Seasons started by rollover can have their tree edited until this date. */
+    setupEndsOn: date(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

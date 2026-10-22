@@ -478,7 +478,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Archetype updates (weekly review), hot/cold indicators (7-day trend)
 - [x] Goals and potential (user goals plus weekly LLM season-end projection)
 - [x] Badges: 8-badge catalog with Bronze→Hall of Fame tiers and a rule engine, plus weekly LLM personal badges (max 6 per season)
-- [ ] Seasons: quarterly rollover, archive card, season setup with structure edits and recalibration
+- [x] Seasons: lazy quarterly rollover (ratings, weights, decay rules and goals carry over), archived season cards, 14-day season setup with structure edits; new attributes rated by the model
 
 ### Phase 4: Social
 - [ ] Privacy model decision
@@ -503,7 +503,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 5. **Mid-season renames:** allow typo fixes and description edits without unlocking structure?
 6. **Backfill window length** (suggested 3 days).
 7. **Questionnaire length cap** (suggested ≤ 40 questions / ~10 min).
-8. **Mid-quarter onboarding:** short first season or extended?
+8. ~~**Mid-quarter onboarding**~~ Decided: the first season is shortened (it ends with the calendar quarter).
 9. **Display precision:** OVR shown as an integer or with one decimal?
 10. **Decay rule visibility and editability** for users.
 11. **Privacy model** for social features.

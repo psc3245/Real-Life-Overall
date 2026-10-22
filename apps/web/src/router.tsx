@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
 import { HabitsPage } from "./features/habits/HabitsPage";
+import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
 import { HomePage } from "./routes/HomePage";
@@ -20,6 +21,14 @@ export const router = createBrowserRouter([
     element: <RootLayout />,
     children: [
       { index: true, element: <HomePage /> },
+      {
+        path: "season-setup",
+        element: (
+          <RequireAuth>
+            <SeasonSetupPage />
+          </RequireAuth>
+        ),
+      },
       { path: "signin", element: <AuthPage mode="signin" /> },
       { path: "signup", element: <AuthPage mode="signup" /> },
       {

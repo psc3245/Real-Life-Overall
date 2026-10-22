@@ -94,6 +94,10 @@ describe("RatingsPage", () => {
       if (path === "/pauses") return [];
       if (path.startsWith("/ratings/history")) return { dates: [], series: [] };
       if (path.startsWith("/ratings/activity")) return [];
+      if (path === "/seasons") return [];
+      if (path === "/seasons/setup") {
+        return { label: "2026-Q4", setupEndsOn: null, editable: false, previous: null };
+      }
       if (path === "/badges") {
         return {
           progress: [

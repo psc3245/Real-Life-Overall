@@ -14,6 +14,7 @@ import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { BadgesSection } from "./BadgesSection";
 import { DecayCard } from "./DecayCard";
+import { NewSeasonBanner, PastSeasons } from "./SeasonSections";
 import { GoalEditor } from "./GoalEditor";
 
 const CONFIDENCE_LABEL = {
@@ -45,6 +46,7 @@ export function RatingsPage() {
 
   return (
     <div className="space-y-10 pt-4">
+      <NewSeasonBanner />
       <div className="grid gap-8 md:grid-cols-[1fr_1.2fr] md:items-start">
         <ExportableCard ratings={data} name={me.data?.displayName ?? "Player"} />
         <div className="space-y-3">
@@ -95,6 +97,8 @@ export function RatingsPage() {
           </section>
         ))}
       </div>
+
+      <PastSeasons />
 
       <DecayCard />
     </div>
