@@ -25,6 +25,7 @@ const node = (over: Partial<RatedNodeDto>): RatedNodeDto => ({
   rationale: null,
   confidence: null,
   decay: null,
+  trend: null,
   ...over,
 });
 
@@ -88,6 +89,8 @@ describe("RatingsPage", () => {
         ];
       }
       if (path === "/pauses") return [];
+      if (path.startsWith("/ratings/history")) return { dates: [], series: [] };
+      if (path.startsWith("/ratings/activity")) return [];
       if (path === "/days/today") return { today: "2026-10-20" };
       return { displayName: "Peter" };
     });

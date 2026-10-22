@@ -23,7 +23,7 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
       </div>
       <div className="mt-6 space-y-4">
         {categories.map((c) => (
-          <StatBar key={c.id} label={c.name} value={c.value ?? 0} />
+          <StatBar key={c.id} label={c.name} value={c.value ?? 0} trend={c.trend} />
         ))}
       </div>
     </section>

@@ -41,6 +41,7 @@ import * as recapRepo from "../repos/recap-repo";
 import type { RecapRow } from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
 import { createHabit, loadLeafContext } from "./habit-service";
+import { datedEvents, type DatedEvent } from "./event-dates";
 import { renderMemories, searchMemories } from "./memory-service";
 import { normalizeRecapChanges } from "./recap-changes";
 
@@ -68,14 +69,6 @@ async function reviewableWeek(db: Database, userId: string, ctx: LeafContext) {
   return { user, week: localDateIn(user.timezone, onboarded) <= week.end ? week : null };
 }
 
-/** Each event's local date: recap/decay day; weekly corrections count on the week's last day. */
-function datedEvents(rows: Awaited<ReturnType<typeof eventRepo.findActiveWithDates>>) {
-  return rows.map((r) => ({
-    ...r.event,
-    date: r.recapKind === "weekly" ? r.recapEnd : (r.recapStart ?? r.decayDate),
-  }));
-}
-
 function overallOf(nodes: RatingNodeDto[], events: { nodeId: string; delta: number }[]) {
   const root = nodes.find((n) => n.parentId === null);
   if (!root) return null;
@@ -85,7 +78,7 @@ function overallOf(nodes: RatingNodeDto[], events: { nodeId: string; delta: numb
 export function toWeeklyDto(
   recap: RecapRow,
   nodes: RatingNodeDto[],
-  events: ReturnType<typeof datedEvents>,
+  events: DatedEvent[],
 ): WeeklyReviewDto {
   const output = recap.output as WeeklyOutput;
   const names = new Map(nodes.map((n) => [n.id, n.name]));
@@ -156,7 +149,7 @@ async function renderWeek(
   ctx: LeafContext,
   week: WeekRange,
   refById: Map<string, string>,
-  events: ReturnType<typeof datedEvents>,
+  events: DatedEvent[],
 ) {
   const names = new Map(ctx.nodes.map((n) => [n.id, n.name]));
   const ref = (id: string) => refById.get(id) ?? "?";

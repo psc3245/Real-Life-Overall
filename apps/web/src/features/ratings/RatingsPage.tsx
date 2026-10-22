@@ -1,8 +1,13 @@
 import type { RatedNodeDto, RatingsDto } from "@rlo/shared";
-import { useState } from "react";
+import { toPng } from "html-to-image";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { useMe } from "../../api/hooks";
-import { useChanges, useRatings } from "../../api/ratings";
+import { useActivity, useChanges, useHistory, useRatings } from "../../api/ratings";
+import { ActivityHeatmap } from "../../components/charts/ActivityHeatmap";
+import { HistoryChart } from "../../components/charts/HistoryChart";
+import { ShapeRadar } from "../../components/charts/ShapeRadar";
+import { Button } from "../../components/Button";
 import { Delta } from "../../components/Delta";
 import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
@@ -39,7 +44,7 @@ export function RatingsPage() {
   return (
     <div className="space-y-10 pt-4">
       <div className="grid gap-8 md:grid-cols-[1fr_1.2fr] md:items-start">
-        <PlayerCard ratings={data} name={me.data?.displayName ?? "Player"} />
+        <ExportableCard ratings={data} name={me.data?.displayName ?? "Player"} />
         <div className="space-y-3">
           <h1 className="font-display text-4xl font-bold uppercase">Scouting report</h1>
           {data.archetype && (
@@ -55,12 +60,14 @@ export function RatingsPage() {
         </div>
       </div>
 
+      <Charts ratings={data} />
+
       <RecentChanges />
 
       <div className="grid gap-6 md:grid-cols-2">
         {categories.map((c) => (
           <section key={c.id} className="rounded-xl border border-court-700 bg-court-900/70 p-5">
-            <StatBar label={c.name} value={c.value ?? 0} />
+            <StatBar label={c.name} value={c.value ?? 0} trend={c.trend} />
             <div className="mt-4 space-y-3 border-t border-court-800 pt-4">
               <Children ratings={data} parent={c} />
             </div>
@@ -82,7 +89,7 @@ function Children({ ratings, parent }: { ratings: RatingsDto; parent: RatedNodeD
         const grandchildren = ratings.nodes.some((n) => n.parentId === child.id);
         return grandchildren ? (
           <div key={child.id} className="space-y-3 border-l border-court-700 pl-3">
-            <StatBar label={child.name} value={child.value ?? 0} />
+            <StatBar label={child.name} value={child.value ?? 0} trend={child.trend} />
             <Children ratings={ratings} parent={child} />
           </div>
         ) : (
@@ -103,7 +110,7 @@ function AttributeRow({ node }: { node: RatedNodeDto }) {
         onClick={() => setOpen((o) => !o)}
         className="block w-full rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-neon"
       >
-        <StatBar label={node.name} value={node.value ?? 0} />
+        <StatBar label={node.name} value={node.value ?? 0} trend={node.trend} />
       </button>
       {open && <Detail node={node} />}
     </div>
@@ -161,5 +168,72 @@ function RecentChanges() {
         ))}
       </ul>
     </section>
+  );
+}
+
+/** The player card plus a PNG export of it (DESIGN.md §7.1). */
+function ExportableCard({ ratings, name }: { ratings: RatingsDto; name: string }) {
+  const card = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const download = async () => {
+    if (!card.current) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const url = await toPng(card.current, {
+        pixelRatio: 2,
+        backgroundColor: "#07090d",
+        cacheBust: true,
+      });
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "player"}-ovr-${ratings.season.label}.png`;
+      link.click();
+    } catch (e) {
+      setError(e instanceof Error ? e : new Error("Couldn't create the image"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div ref={card} className="rounded-2xl">
+        <PlayerCard ratings={ratings} name={name} />
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        <ErrorNote error={error} />
+        <Button variant="ghost" disabled={exporting} onClick={download}>
+          {exporting ? "Rendering…" : "↓ Download card"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function Charts({ ratings }: { ratings: RatingsDto }) {
+  const history = useHistory(90);
+  const activity = useActivity(119);
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <section className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-5">
+        <h2 className="font-display text-2xl uppercase tracking-wider">History</h2>
+        {history.data ? (
+          <HistoryChart history={history.data} nodes={ratings.nodes} />
+        ) : (
+          <p className="text-sm text-court-500">Loading…</p>
+        )}
+      </section>
+      <section className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-5">
+        <h2 className="font-display text-2xl uppercase tracking-wider">Shape</h2>
+        <ShapeRadar nodes={ratings.nodes} />
+      </section>
+      <section className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-5 lg:col-span-2">
+        <h2 className="font-display text-2xl uppercase tracking-wider">Consistency</h2>
+        {activity.data && <ActivityHeatmap days={activity.data} />}
+      </section>
+    </div>
   );
 }

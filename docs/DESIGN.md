@@ -473,8 +473,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Guardrail caps (±3 per attribute per day) and skepticism prompting
 
 ### Phase 3: Game Layer
-- [ ] Player card and image export
-- [ ] Charts: history lines, radar, heatmap
+- [x] Player card and image export (PNG via html-to-image)
+- [x] Charts: history lines (Overall / Categories, table view), radar, consistency heatmap
 - [ ] Archetype updates, hot/cold indicators
 - [ ] Goals and potential (user goals plus LLM projection)
 - [ ] Badges: catalog and rule engine, plus LLM personal badges
