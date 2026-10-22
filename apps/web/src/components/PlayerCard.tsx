@@ -19,11 +19,24 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
           <p className="text-sm uppercase tracking-widest text-court-300">
             {ratings.archetype?.name ?? "Unranked"} · {ratings.season.label}
           </p>
+          {root?.projection != null && (
+            <p className="mt-1 text-xs uppercase tracking-wider text-court-500">
+              Projected {Math.round(root.projection)} by season end
+              {root.goal != null && ` · goal ${Math.round(root.goal)}`}
+            </p>
+          )}
         </div>
       </div>
       <div className="mt-6 space-y-4">
         {categories.map((c) => (
-          <StatBar key={c.id} label={c.name} value={c.value ?? 0} trend={c.trend} />
+          <StatBar
+            key={c.id}
+            label={c.name}
+            value={c.value ?? 0}
+            trend={c.trend}
+            projection={c.projection}
+            goal={c.goal}
+          />
         ))}
       </div>
     </section>

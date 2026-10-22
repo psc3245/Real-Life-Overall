@@ -47,6 +47,13 @@ const review = (over: Record<string, unknown> = {}) =>
       },
     ],
     profileSummary: "  Software engineer focused on promotion; trains irregularly.  ",
+    projections: [
+      { ref: "overall", value: 72.44 },
+      { ref: "n1", value: 140 },
+      { ref: "n3", value: 75 }, // a leaf: ignored
+      { ref: "n9", value: 50 },
+    ],
+    archetype: { name: "Desk Athlete", description: "Unchanged." },
     ...over,
   });
 
@@ -220,5 +227,82 @@ describe("weekly memory", () => {
       `- ${addDays(week.start, -5)} (journal): River loop run, knees ached.`,
     );
     expect(prompt).toContain("not recapped. Journal: River loop again, knees fine.");
+  });
+});
+
+describe("potential", () => {
+  it("projects season-end ratings for overall and categories, and keeps the archetype unless it changed", async () => {
+    const t = await setup();
+    await t.run();
+    const ratings = (await (await t.request("/ratings")).json()) as {
+      projectedThrough: string | null;
+      archetype: { name: string } | null;
+      nodes: { name: string; projection: number | null }[];
+    };
+    const byName = new Map(ratings.nodes.map((n) => [n.name, n.projection]));
+    expect(byName.get("Overall")).toBe(72.4);
+    expect(byName.get("Fitness")).toBe(100); // clamped
+    expect(byName.get("Cardio")).toBeNull();
+    expect(ratings.projectedThrough).toBe((await t.state()).week!.end);
+    expect(ratings.archetype!.name).toBe("Desk Athlete");
+    expect((await t.state()).review!.archetypeChange).toBeNull();
+
+    const prompt = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
+    expect(prompt).toContain("Current archetype: Desk Athlete: Strong at work.");
+    expect(prompt).toMatch(/Season: \d{4}-Q\d, ends \d{4}-\d{2}-\d{2}/);
+  });
+
+  it("renames the archetype when the review says the shape changed", async () => {
+    const t = await setup([
+      review({
+        archetype: { name: "Two-Way Grinder", description: "Balanced work and training." },
+      }),
+    ]);
+    const state = (await (await t.run()).json()) as WeeklyStateDto;
+    expect(state.review!.archetypeChange).toEqual({
+      from: "Desk Athlete",
+      to: "Two-Way Grinder",
+      description: "Balanced work and training.",
+    });
+    const ratings = (await (await t.request("/ratings")).json()) as {
+      archetype: { name: string; description: string };
+    };
+    expect(ratings.archetype).toEqual({
+      name: "Two-Way Grinder",
+      description: "Balanced work and training.",
+    });
+  });
+
+  it("sets and clears goals on the user's own nodes only", async () => {
+    const t = await setup();
+    const cardio = t.nodeId("Cardio");
+    const goalOf = async () =>
+      (
+        (await (await t.request("/ratings")).json()) as {
+          nodes: { id: string; goal: number | null }[];
+        }
+      ).nodes.find((n) => n.id === cardio)!.goal;
+    expect(
+      (await t.request(`/goals/${cardio}`, { method: "PUT", ...json({ target: 77.75 }) })).status,
+    ).toBe(204);
+    expect(await goalOf()).toBe(77.8);
+    expect(
+      (await t.request(`/goals/${cardio}`, { method: "PUT", ...json({ target: 101 }) })).status,
+    ).toBe(400);
+    expect(
+      (
+        await t.request(`/goals/${cardio}`, {
+          method: "PUT",
+          ...json({ target: 60 }),
+          user: "mallory",
+        })
+      ).status,
+    ).toBe(404);
+
+    await t.run();
+    expect(JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt)).toContain("- Cardio: 77.8");
+
+    expect((await t.request(`/goals/${cardio}`, { method: "DELETE" })).status).toBe(204);
+    expect(await goalOf()).toBeNull();
   });
 });

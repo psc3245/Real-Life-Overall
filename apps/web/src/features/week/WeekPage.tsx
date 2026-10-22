@@ -145,6 +145,16 @@ function ReviewCard({ review, names }: { review: WeeklyReviewDto; names: Map<str
         )}
       </header>
       <p className="text-court-100">{review.narrative}</p>
+      {review.archetypeChange && (
+        <p className="rounded-lg border border-neon/40 bg-neon/5 p-3 text-sm">
+          <span className="font-display uppercase tracking-wider text-neon">New archetype: </span>
+          {review.archetypeChange.from && (
+            <span className="text-court-500 line-through">{review.archetypeChange.from}</span>
+          )}{" "}
+          <span className="font-semibold">{review.archetypeChange.to}</span>.{" "}
+          <span className="text-court-300">{review.archetypeChange.description}</span>
+        </p>
+      )}
 
       {review.focusGoals.length > 0 && (
         <section className="space-y-2">

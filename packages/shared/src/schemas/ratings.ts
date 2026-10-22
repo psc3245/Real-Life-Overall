@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RATING_MAX, RATING_MIN } from "../constants";
 import type { RatingNodeDto, SeasonDto } from "./onboarding";
 
 export const CONFIDENCE_LEVELS = ["low", "medium", "high"] as const;
@@ -25,10 +26,16 @@ export interface RatedNodeDto extends RatingNodeDto {
   decay: DecayRuleDto | null;
   /** Change over the last 7 days (null without history). */
   trend: number | null;
+  /** The user's target rating (Potential, DESIGN.md §7.1). */
+  goal: number | null;
+  /** The latest weekly review's projection for season end (categories and Overall). */
+  projection: number | null;
 }
 
 export interface RatingsDto {
   season: SeasonDto;
+  /** When the projections were made (the reviewed week's end), if any exist. */
+  projectedThrough: string | null;
   archetype: { name: string; description: string } | null;
   summary: string | null;
   nodes: RatedNodeDto[];
@@ -61,4 +68,8 @@ export const initialRatingsOutputSchema = z.object({
     description: z.string().describe("One sentence on what defines this build"),
   }),
   summary: z.string().describe("2-3 neutral sentences: strongest areas, biggest gaps"),
+});
+
+export const setGoalBodySchema = z.object({
+  target: z.number().min(RATING_MIN).max(RATING_MAX),
 });

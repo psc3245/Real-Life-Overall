@@ -53,6 +53,7 @@ const review: WeeklyReviewDto = {
       status: "pending",
     },
   ],
+  archetypeChange: { from: "Desk Athlete", to: "Two-Way Grinder", description: "More balanced." },
   createdAt: "2026-10-19T09:00:00Z",
 };
 
@@ -90,6 +91,7 @@ describe("WeekPage", () => {
     setup({ week, review, ready: false, history: [] });
     expect(await screen.findByText("A steady week.")).toBeInTheDocument();
     expect(screen.getByText("Run twice")).toBeInTheDocument();
+    expect(screen.getByText("Two-Way Grinder")).toBeInTheDocument();
     expect(screen.getByText(/fades 0.4\/day after 2 idle days/)).toBeInTheDocument();
     expect(
       screen.getByText(/Time spent · Mon, Wed, Fri · goal 20 min · Cardio/),

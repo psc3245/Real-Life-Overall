@@ -59,3 +59,14 @@ export function useActivity(days = 119) {
     queryFn: () => api<ActivityDayDto[]>(`/ratings/activity?days=${days}`),
   });
 }
+
+export function useSetGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ nodeId, target }: { nodeId: string; target: number | null }) =>
+      target === null
+        ? api<null>(`/goals/${nodeId}`, { method: "DELETE" })
+        : api<null>(`/goals/${nodeId}`, { method: "PUT", body: JSON.stringify({ target }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ratingsKey }),
+  });
+}

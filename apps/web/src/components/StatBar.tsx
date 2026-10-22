@@ -7,12 +7,14 @@ interface StatBarProps {
   value: number;
   /** 7-day change; shown as a hot/cold marker past the threshold. */
   trend?: number | null;
-  /** Ghost marker for a goal or projected rating (Potential, DESIGN.md §7.1). */
-  potential?: number;
+  /** Season-end projection, drawn as a ghost bar (Potential, DESIGN.md §7.1). */
+  projection?: number | null;
+  /** The user's target, drawn as a tick on the track. */
+  goal?: number | null;
 }
 
 /** A 2K-style attribute bar that fills on mount. */
-export function StatBar({ label, value, potential, trend }: StatBarProps) {
+export function StatBar({ label, value, projection, goal, trend }: StatBarProps) {
   const [width, setWidth] = useState(0);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setWidth(value));
@@ -42,23 +44,31 @@ export function StatBar({ label, value, potential, trend }: StatBarProps) {
         {value.toFixed(1)}
       </span>
       <div
-        className="relative h-2 overflow-hidden rounded-full bg-court-700"
+        className="relative h-2 rounded-full bg-court-700"
         role="meter"
         aria-label={label}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={value}
       >
-        {potential !== undefined && (
+        {projection != null && (
           <div
             className="absolute inset-y-0 left-0 rounded-full opacity-25"
-            style={{ width: `${potential}%`, backgroundColor: color }}
+            style={{ width: `${projection}%`, backgroundColor: color }}
+            title={`Projected ${projection.toFixed(1)} at season end`}
           />
         )}
         <div
           className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-out"
           style={{ width: `${width}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}` }}
         />
+        {goal != null && (
+          <div
+            className="absolute inset-y-[-3px] w-0.5 rounded-full bg-court-100"
+            style={{ left: `calc(${goal}% - 1px)` }}
+            title={`Goal ${goal.toFixed(1)}`}
+          />
+        )}
       </div>
     </div>
   );

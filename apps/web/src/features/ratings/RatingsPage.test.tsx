@@ -26,6 +26,8 @@ const node = (over: Partial<RatedNodeDto>): RatedNodeDto => ({
   confidence: null,
   decay: null,
   trend: null,
+  goal: null,
+  projection: null,
   ...over,
 });
 
@@ -37,6 +39,7 @@ const ratings: RatingsDto = {
     endsOn: "2026-12-31",
     status: "active",
   },
+  projectedThrough: null,
   archetype: { name: "Desk Athlete", description: "Strong at work." },
   summary: "Career leads.",
   nodes: [
@@ -119,6 +122,29 @@ describe("RatingsPage", () => {
     expect(screen.getByRole("link", { name: /Build your rating/ })).toHaveAttribute(
       "href",
       "/onboarding",
+    );
+  });
+});
+
+describe("GoalEditor", () => {
+  it("sets a goal on an attribute", async () => {
+    const { GoalEditor } = await import("./GoalEditor");
+    mockedApi.mockResolvedValue(null);
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <GoalEditor node={node({ id: "cardio", name: "Cardio", projection: 72.5 })} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText("Projected 72.5 by season end")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "+ Set goal" }));
+    fireEvent.change(screen.getByLabelText("Goal for Cardio"), { target: { value: "80" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await vi.waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith("/goals/cardio", {
+        method: "PUT",
+        body: JSON.stringify({ target: 80 }),
+      }),
     );
   });
 });

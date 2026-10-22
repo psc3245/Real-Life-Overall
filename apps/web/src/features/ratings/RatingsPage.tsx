@@ -13,6 +13,7 @@ import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { DecayCard } from "./DecayCard";
+import { GoalEditor } from "./GoalEditor";
 
 const CONFIDENCE_LABEL = {
   low: "Low confidence",
@@ -54,6 +55,14 @@ export function RatingsPage() {
             </p>
           )}
           {data.summary && <p className="text-court-300">{data.summary}</p>}
+          {root && (
+            <div className="rounded-lg border border-court-800 p-3">
+              <p className="mb-1 text-xs uppercase tracking-wider text-court-300">
+                Overall potential
+              </p>
+              <GoalEditor node={root} />
+            </div>
+          )}
           <p className="text-sm text-court-500">
             Tap any attribute to see why it's rated that way.
           </p>
@@ -67,7 +76,16 @@ export function RatingsPage() {
       <div className="grid gap-6 md:grid-cols-2">
         {categories.map((c) => (
           <section key={c.id} className="rounded-xl border border-court-700 bg-court-900/70 p-5">
-            <StatBar label={c.name} value={c.value ?? 0} trend={c.trend} />
+            <StatBar
+              label={c.name}
+              value={c.value ?? 0}
+              trend={c.trend}
+              projection={c.projection}
+              goal={c.goal}
+            />
+            <div className="mt-2">
+              <GoalEditor node={c} />
+            </div>
             <div className="mt-4 space-y-3 border-t border-court-800 pt-4">
               <Children ratings={data} parent={c} />
             </div>
@@ -110,7 +128,7 @@ function AttributeRow({ node }: { node: RatedNodeDto }) {
         onClick={() => setOpen((o) => !o)}
         className="block w-full rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-neon"
       >
-        <StatBar label={node.name} value={node.value ?? 0} trend={node.trend} />
+        <StatBar label={node.name} value={node.value ?? 0} trend={node.trend} goal={node.goal} />
       </button>
       {open && <Detail node={node} />}
     </div>
@@ -121,6 +139,7 @@ function Detail({ node }: { node: RatedNodeDto }) {
   return (
     <div className="mt-2 space-y-2 rounded-lg bg-court-950/60 p-3 text-sm">
       {node.rationale && <p className="text-court-100">{node.rationale}</p>}
+      <GoalEditor node={node} />
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs uppercase tracking-wider text-court-500">
         {node.confidence && <span>{CONFIDENCE_LABEL[node.confidence]}</span>}
         {node.decay && (

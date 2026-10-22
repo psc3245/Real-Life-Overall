@@ -475,8 +475,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 ### Phase 3: Game Layer
 - [x] Player card and image export (PNG via html-to-image)
 - [x] Charts: history lines (Overall / Categories, table view), radar, consistency heatmap
-- [ ] Archetype updates, hot/cold indicators
-- [ ] Goals and potential (user goals plus LLM projection)
+- [x] Archetype updates (weekly review), hot/cold indicators (7-day trend)
+- [x] Goals and potential (user goals plus weekly LLM season-end projection)
 - [ ] Badges: catalog and rule engine, plus LLM personal badges
 - [ ] Seasons: quarterly rollover, archive card, season setup with structure edits and recalibration
 

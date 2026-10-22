@@ -49,18 +49,22 @@ export async function findLatestActive(db: Executor, userId: string): Promise<Se
   return rows[0] ?? null;
 }
 
-export async function findArchetype(db: Executor, seasonId: string): Promise<string | null> {
+export async function findArchetype(db: Executor, seasonId: string) {
   const rows = await db
-    .select({ archetype: seasons.archetype })
+    .select({ name: seasons.archetype, description: seasons.archetypeDescription })
     .from(seasons)
     .where(eq(seasons.id, seasonId));
-  return rows[0]?.archetype ?? null;
+  return rows[0]?.name ? { name: rows[0].name, description: rows[0].description ?? "" } : null;
 }
 
 export async function update(
   db: Executor,
   id: string,
-  changes: { status?: (typeof seasonStatus.enumValues)[number]; archetype?: string },
+  changes: {
+    status?: (typeof seasonStatus.enumValues)[number];
+    archetype?: string;
+    archetypeDescription?: string;
+  },
 ): Promise<void> {
   await db.update(seasons).set(changes).where(eq(seasons.id, id));
 }
