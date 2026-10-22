@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, min } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, min, or } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { decayRuns, ratingEvents } from "../db/schema";
 
@@ -41,11 +41,19 @@ export async function voidFrom(db: Executor, userId: string, from: string): Prom
     );
 }
 
-/** When onboarding ratings were written: decay can't start before then. */
+/**
+ * When the season's starting ratings were written (onboarding, or the carry-over at a season
+ * rollover): decay, history and weekly reviews start there.
+ */
 export async function onboardedAt(db: Executor, seasonId: string): Promise<Date | null> {
   const rows = await db
     .select({ at: min(ratingEvents.createdAt) })
     .from(ratingEvents)
-    .where(and(eq(ratingEvents.seasonId, seasonId), eq(ratingEvents.source, "onboarding")));
+    .where(
+      and(
+        eq(ratingEvents.seasonId, seasonId),
+        or(eq(ratingEvents.source, "onboarding"), eq(ratingEvents.source, "recalibration")),
+      ),
+    );
   return rows[0]?.at ?? null;
 }

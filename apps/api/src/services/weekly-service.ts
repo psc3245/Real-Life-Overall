@@ -48,6 +48,7 @@ import * as userRepo from "../repos/user-repo";
 import { createHabit, loadLeafContext } from "./habit-service";
 import { awardBadges, badgesByRecap } from "./badge-service";
 import { datedEvents, type DatedEvent } from "./event-dates";
+import { ensureCurrentSeason } from "./season-service";
 import { renderMemories, searchMemories } from "./memory-service";
 import { normalizeRecapChanges } from "./recap-changes";
 
@@ -127,6 +128,7 @@ export function toWeeklyDto(
 }
 
 export async function getWeeklyState(db: Database, userId: string): Promise<WeeklyStateDto> {
+  await ensureCurrentSeason(db, userId);
   const ctx = await loadLeafContext(db, userId);
   if (!ctx) return { week: null, review: null, ready: false, history: [] };
   const { week } = await reviewableWeek(db, userId, ctx);

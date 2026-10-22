@@ -14,6 +14,7 @@ import { habitRoutes } from "./routes/habits";
 import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
+import { seasonRoutes } from "./routes/seasons";
 import { ratingsRoutes } from "./routes/ratings";
 import { weeklyRoutes } from "./routes/weekly";
 
@@ -101,6 +102,8 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/dev/*", requireUser)
     .use("/goals/*", requireUser)
     .use("/badges", requireUser)
+    .use("/seasons", requireUser)
+    .use("/seasons/*", requireUser)
     .use("/weekly", requireUser)
     .use("/weekly/*", requireUser)
     .route("/me", meRoutes)
@@ -112,7 +115,8 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/dev", devRoutes)
     .route("/weekly", weeklyRoutes)
     .route("/goals", goalRoutes)
-    .route("/badges", badgeRoutes);
+    .route("/badges", badgeRoutes)
+    .route("/seasons", seasonRoutes);
 
   return routes;
 }

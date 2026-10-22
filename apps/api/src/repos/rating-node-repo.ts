@@ -1,5 +1,5 @@
 import type { RatingNodeDto } from "@rlo/shared";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { ratingNodes } from "../db/schema";
 
@@ -53,4 +53,35 @@ export async function findLineages(db: Executor, seasonId: string) {
     .select({ id: ratingNodes.id, lineageId: ratingNodes.lineageId })
     .from(ratingNodes)
     .where(and(eq(ratingNodes.seasonId, seasonId), isNull(ratingNodes.archivedAt)));
+}
+
+/** Every active node with its lineage, for copying a tree into a new season. */
+export async function findActiveWithLineage(db: Executor, seasonId: string) {
+  return db
+    .select()
+    .from(ratingNodes)
+    .where(and(eq(ratingNodes.seasonId, seasonId), isNull(ratingNodes.archivedAt)))
+    .orderBy(asc(ratingNodes.depth), asc(ratingNodes.sortOrder));
+}
+
+export async function updateNode(
+  db: Executor,
+  id: string,
+  changes: Partial<
+    Pick<
+      typeof ratingNodes.$inferInsert,
+      "name" | "description" | "weight" | "parentId" | "depth" | "sortOrder"
+    >
+  >,
+): Promise<void> {
+  await db.update(ratingNodes).set(changes).where(eq(ratingNodes.id, id));
+}
+
+export async function archiveNodes(db: Executor, ids: string[]): Promise<void> {
+  if (ids.length) {
+    await db
+      .update(ratingNodes)
+      .set({ archivedAt: new Date() })
+      .where(inArray(ratingNodes.id, ids));
+  }
 }

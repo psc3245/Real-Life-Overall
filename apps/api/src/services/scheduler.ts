@@ -4,6 +4,7 @@ import type { LlmClient } from "../llm/client";
 import * as recapRepo from "../repos/recap-repo";
 import * as seasonRepo from "../repos/season-repo";
 import { awardBadges } from "./badge-service";
+import { ensureCurrentSeason } from "./season-service";
 import { getDay } from "./day-service";
 import { applyDecay } from "./decay-service";
 import { hasContent, runDailyRecap } from "./recap-service";
@@ -39,6 +40,7 @@ export async function runForUser(
   timezone: string,
   { recap }: { recap: boolean },
 ): Promise<UserRunResult> {
+  await ensureCurrentSeason(db, userId);
   const result: UserRunResult = {
     userId,
     recapped: [],

@@ -35,11 +35,13 @@ export function TreeBuilder({
   saving,
   saveError,
   onSave,
+  saveLabel = "Save & set weights",
 }: {
   initial: Draft;
   saving: boolean;
   saveError: unknown;
   onSave: (draft: Draft) => void;
+  saveLabel?: string;
 }) {
   const [draft, setDraft] = useState<Draft>(initial);
   const used = usedTemplateKeys(draft);
@@ -110,7 +112,7 @@ export function TreeBuilder({
           )}
         </div>
         <Button variant="primary" disabled={!!problem || saving} onClick={() => onSave(draft)}>
-          {saving ? "Saving…" : "Save & set weights"}
+          {saving ? "Saving…" : saveLabel}
         </Button>
       </div>
     </div>

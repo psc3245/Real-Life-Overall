@@ -62,8 +62,10 @@ export async function update(
   id: string,
   changes: {
     status?: (typeof seasonStatus.enumValues)[number];
-    archetype?: string;
-    archetypeDescription?: string;
+    archetype?: string | null;
+    archetypeDescription?: string | null;
+    finalSnapshot?: unknown;
+    setupEndsOn?: string | null;
   },
 ): Promise<void> {
   await db.update(seasons).set(changes).where(eq(seasons.id, id));
@@ -76,4 +78,27 @@ export async function findActiveUsers(db: Executor) {
     .from(seasonsTable)
     .innerJoin(users, eq(users.id, seasonsTable.userId))
     .where(eq(seasonsTable.status, "active"));
+}
+
+export async function findById(db: Executor, id: string) {
+  const rows = await db.select().from(seasons).where(eq(seasons.id, id));
+  return rows[0] ?? null;
+}
+
+export async function findArchived(db: Executor, userId: string) {
+  return db
+    .select()
+    .from(seasons)
+    .where(and(eq(seasons.userId, userId), eq(seasons.status, "archived")))
+    .orderBy(desc(seasons.startsOn));
+}
+
+/** Archives `id` only if it is still active; returns whether this call did it. */
+export async function archiveIfActive(db: Executor, id: string, finalSnapshot: unknown) {
+  const rows = await db
+    .update(seasons)
+    .set({ status: "archived", finalSnapshot })
+    .where(and(eq(seasons.id, id), eq(seasons.status, "active")))
+    .returning({ id: seasons.id });
+  return rows.length > 0;
 }

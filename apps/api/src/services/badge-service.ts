@@ -121,7 +121,9 @@ export async function computeMetrics(db: Database, userId: string): Promise<Badg
   if (ctx) {
     const events = await eventRepo.findActiveBySeason(db, ctx.season.id);
     const leaves = leafValuesFromEvents(events);
-    const start = leafValuesFromEvents(events.filter((e) => e.source === "onboarding"));
+    const start = leafValuesFromEvents(
+      events.filter((e) => e.source === "onboarding" || e.source === "recalibration"),
+    );
     for (const [id, value] of leaves)
       biggestGain = Math.max(biggestGain, value - (start.get(id) ?? value));
     const values = computeNodeValues(ctx.nodes, leaves);
