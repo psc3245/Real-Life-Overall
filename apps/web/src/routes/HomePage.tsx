@@ -1,5 +1,6 @@
 import { computeNodeValues, type RatingNodeLike } from "@rlo/shared";
 import { Link } from "react-router";
+import { useAuthState } from "../api/auth";
 import { useMe } from "../api/hooks";
 import { useRatings } from "../api/ratings";
 import { PlayerCard } from "../components/PlayerCard";
@@ -27,8 +28,9 @@ const sampleLeaves = new Map([
 ]);
 
 export function HomePage() {
-  const me = useMe();
-  const ratings = useRatings();
+  const auth = useAuthState();
+  const me = useMe(auth.signedIn);
+  const ratings = useRatings(auth.signedIn);
   const rated = Boolean(ratings.data);
   const values = computeNodeValues(sampleNodes, sampleLeaves);
   const categories = sampleNodes.filter((n) => n.depth === 1);
@@ -48,10 +50,10 @@ export function HomePage() {
           your days.
         </p>
         <Link
-          to={rated ? "/ratings" : "/onboarding"}
+          to={!auth.signedIn ? "/signup" : rated ? "/ratings" : "/onboarding"}
           className="mt-8 inline-block rounded-lg bg-neon px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider text-court-950 hover:brightness-110"
         >
-          {rated ? "View my rating" : "Build my rating"}
+          {!auth.signedIn ? "Get started" : rated ? "View my rating" : "Build my rating"}
         </Link>
       </section>
 

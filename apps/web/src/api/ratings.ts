@@ -1,4 +1,10 @@
-import type { ChangeFeedItemDto, OnboardingStateDto, RatingsDto } from "@rlo/shared";
+import type {
+  ActivityDayDto,
+  ChangeFeedItemDto,
+  HistoryDto,
+  OnboardingStateDto,
+  RatingsDto,
+} from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
 import { onboardingKey } from "./onboarding";
@@ -7,8 +13,9 @@ export const ratingsKey = ["ratings"] as const;
 export const changesKey = ["rating-changes"] as const;
 
 /** Resolves to null (not an error) when the user has no ratings yet. */
-export function useRatings() {
+export function useRatings(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ratingsKey,
     queryFn: async () => {
       try {
@@ -36,5 +43,19 @@ export function useChanges(limit = 30) {
   return useQuery({
     queryKey: [...changesKey, limit],
     queryFn: () => api<ChangeFeedItemDto[]>(`/ratings/changes?limit=${limit}`),
+  });
+}
+
+export function useHistory(days = 90) {
+  return useQuery({
+    queryKey: [...ratingsKey, "history", days],
+    queryFn: () => api<HistoryDto>(`/ratings/history?days=${days}`),
+  });
+}
+
+export function useActivity(days = 119) {
+  return useQuery({
+    queryKey: [...ratingsKey, "activity", days],
+    queryFn: () => api<ActivityDayDto[]>(`/ratings/activity?days=${days}`),
   });
 }

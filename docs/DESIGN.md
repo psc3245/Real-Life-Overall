@@ -351,10 +351,12 @@ embed(texts: string[], ctx): Promise<number[][]>
 ```
 `config/models.ts` maps each purpose to `{ provider, model }`. Defaults are cheap models, and the weekly review and initial ratings can be upgraded.
 
-### 8.5 Auth (deferred)
-- **Decide before any public deploy.** Until then, local and dev use a **dev-user header** or seed user, behind an `env.AUTH_MODE = 'dev'` guard that refuses to start in production.
-- Design for it now: all routes read `c.get('userId')` set by an auth middleware, so swapping in real auth means changing one middleware.
-- Candidates to evaluate later: Better Auth (self-hosted, users in our DB, works with Drizzle and Hono), Clerk (managed, generous free tier), Supabase Auth.
+### 8.5 Auth
+- **Better Auth** (decided 2026-10-22), running in the API Worker with users and sessions in Neon via the Drizzle adapter. Sign-in: **email + password** and **Google** (enabled when `GOOGLE_CLIENT_ID/SECRET` are set). Session cookies are first-party: the API lives under `/api` on the same origin as the web app (Vite proxy in dev; one Worker serving both in production).
+- Better Auth's tables (`auth_users`, `auth_sessions`, `auth_accounts`, `auth_verifications`) are separate from the app's `users`; an app user is created on first authenticated request and linked by `users.auth_subject`.
+- Passwords use WebCrypto PBKDF2-SHA256 (`PASSWORD_HASH_ITERATIONS`, default 100k) instead of Better Auth's JS scrypt, to stay within Workers CPU limits. *Verify sign-in CPU time on the free plan at first deploy.*
+- `AUTH_MODE=dev` (the `x-dev-user` header) remains for tests and local experiments and is refused in production.
+- *Later:* email verification and password reset need an email provider (e.g. Resend).
 
 ### 8.6 Scheduled jobs (Cloudflare Cron Triggers)
 | Job | Schedule | Does |
@@ -454,7 +456,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] OVR reveal and basic ratings tree view with rationales
 - [x] First season created (current quarter, in the user's timezone)
 - [x] Calibration rubric and fixture-based sanity tests for prompt output parsing
-- [ ] **Auth decision made before any public deploy**
+- [x] **Auth: Better Auth with email + password and Google (§8.5)**
 
 ### Phase 2: The Core Loop
 - [x] Day log: journal, habits (8 types, weekday schedules), backfill window (3 days)
@@ -471,8 +473,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Guardrail caps (±3 per attribute per day) and skepticism prompting
 
 ### Phase 3: Game Layer
-- [ ] Player card and image export
-- [ ] Charts: history lines, radar, heatmap
+- [x] Player card and image export (PNG via html-to-image)
+- [x] Charts: history lines (Overall / Categories, table view), radar, consistency heatmap
 - [ ] Archetype updates, hot/cold indicators
 - [ ] Goals and potential (user goals plus LLM projection)
 - [ ] Badges: catalog and rule engine, plus LLM personal badges
@@ -494,7 +496,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 ---
 
 ## 13. Open Questions
-1. **Auth provider** (Better Auth vs Clerk vs other). Needed before public deploy.
+1. ~~**Auth provider**~~ Decided: Better Auth (§8.5). Still open: email provider for verification and password reset.
 2. **Name and brand.**
 3. **Sanity caps vs "LLM fully decides":** are wide caps (e.g. ±3/day, ±5/week per leaf) acceptable as anti-abuse rails?
 4. **Rating disputes:** can a user contest an initial rating or a recap change? If so, how (ask the LLM to reconsider with more info, rate-limited)?

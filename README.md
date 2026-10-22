@@ -23,7 +23,10 @@ npm install
 
 1. Create a free Neon project and copy its connection string.
 2. Copy `apps/api/.dev.vars.example` to **both** `apps/api/.dev.vars` (read by `wrangler dev`) and
-   `apps/api/.env` (read by drizzle-kit), then fill in `DATABASE_URL` and `ANTHROPIC_API_KEY`.
+   `apps/api/.env` (read by drizzle-kit), then fill in `DATABASE_URL`, `ANTHROPIC_API_KEY` and
+   `BETTER_AUTH_SECRET` (`openssl rand -base64 32`). For Google sign-in, also set
+   `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` from a Google Cloud OAuth client whose redirect URI
+   is `http://localhost:5173/api/auth/callback/google`.
 3. Apply migrations and start the API on http://localhost:8787:
 
 ```bash
@@ -39,8 +42,9 @@ npm run dev:web
 
 Opens on http://localhost:5173 and proxies `/api/*` to the local API.
 
-Auth is deferred (DESIGN.md §8.5). In dev, the API trusts an `x-dev-user` header, which you can
-switch from the header of the web app.
+Sign in at http://localhost:5173/signup (DESIGN.md §8.5). For quick experiments without accounts,
+set `AUTH_MODE` to `dev` in `apps/api/wrangler.jsonc`: the API then trusts an `x-dev-user` header,
+switchable from the web app's header.
 
 ### Scheduled jobs
 

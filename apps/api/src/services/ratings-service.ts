@@ -2,6 +2,7 @@ import {
   computeNodeValues,
   leafIds,
   leafValuesFromEvents,
+  localDateIn,
   type ChangeFeedItemDto,
   type Confidence,
   type RatingsDto,
@@ -13,7 +14,10 @@ import * as onboardingRepo from "../repos/onboarding-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as nodeRepo from "../repos/rating-node-repo";
 import * as seasonRepo from "../repos/season-repo";
+import * as userRepo from "../repos/user-repo";
 import { applyDecay } from "./decay-service";
+import { datedEvents } from "./event-dates";
+import { trends } from "./history-service";
 import type { OnboardingResult } from "./onboarding-service";
 
 /** The user's current ratings: leaf values from the ledger, parents rolled up by weight. */
@@ -22,12 +26,15 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
   if (!season) throw notFound("No ratings yet. Finish onboarding first.");
   await applyDecay(db, userId); // catch up if the scheduled job hasn't run yet
 
-  const [nodes, events, archetype, session] = await Promise.all([
+  const [nodes, events, archetype, session, dated, user] = await Promise.all([
     nodeRepo.findActiveBySeason(db, season.id),
     eventRepo.findActiveBySeason(db, season.id),
     seasonRepo.findArchetype(db, season.id),
     onboardingRepo.findBySeason(db, season.id),
+    eventRepo.findActiveWithDates(db, season.id).then(datedEvents),
+    userRepo.findById(db, userId),
   ]);
+  const trend = trends(nodes, dated, localDateIn(user?.timezone ?? "UTC"));
   const leaves = new Set(leafIds(nodes));
   const values = computeNodeValues(nodes, leafValuesFromEvents(events));
   const rules = new Map(
@@ -55,6 +62,7 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
         decay: rule
           ? { graceDays: rule.graceDays, perDay: rule.perDay, floor: rule.floor, notes: rule.notes }
           : null,
+        trend: trend.get(n.id) ?? null,
       };
     }),
   };

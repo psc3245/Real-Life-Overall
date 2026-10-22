@@ -23,6 +23,8 @@ export interface RatedNodeDto extends RatingNodeDto {
   rationale: string | null;
   confidence: Confidence | null;
   decay: DecayRuleDto | null;
+  /** Change over the last 7 days (null without history). */
+  trend: number | null;
 }
 
 export interface RatingsDto {

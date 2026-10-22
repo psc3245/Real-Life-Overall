@@ -1,5 +1,6 @@
 import type { Database } from "./db/client";
 import type { Env } from "./env";
+import type { Auth } from "./auth/auth";
 import type { LlmClient } from "./llm/client";
 
 export interface Deps {
@@ -12,5 +13,5 @@ export interface Deps {
 /** Hono generics shared by every route module. */
 export interface AppEnv {
   Bindings: Record<string, unknown>;
-  Variables: Omit<Deps, "dispose"> & { env: Env; userId: string };
+  Variables: Omit<Deps, "dispose"> & { env: Env; userId: string; auth?: Auth };
 }

@@ -2,6 +2,8 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../context";
 import * as userRepo from "../repos/user-repo";
+import { createAuth, type Auth } from "../auth/auth";
+import type { Context } from "hono";
 
 export const DEV_USER_HEADER = "x-dev-user";
 const USERNAME_PATTERN = /^[a-z0-9_-]{1,32}$/;
@@ -12,7 +14,17 @@ const USERNAME_PATTERN = /^[a-z0-9_-]{1,32}$/;
  */
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   const env = c.get("env");
-  if (env.AUTH_MODE !== "dev") throw new HTTPException(500, { message: "No auth configured" });
+  if (env.AUTH_MODE === "better-auth") {
+    const session = await authFor(c).api.getSession({ headers: c.req.raw.headers });
+    if (!session) throw new HTTPException(401, { message: "Sign in required" });
+    const db = c.get("db");
+    const user =
+      (await userRepo.findByAuthSubject(db, session.user.id)) ??
+      (await userRepo.createForAuth(db, session.user));
+    c.set("userId", user.id);
+    await next();
+    return;
+  }
 
   const username = (c.req.header(DEV_USER_HEADER) ?? "dev").toLowerCase();
   if (!USERNAME_PATTERN.test(username)) {
@@ -22,3 +34,13 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   c.set("userId", user.id);
   await next();
 });
+
+/** One Better Auth instance per request, created on first use. */
+export function authFor(c: Context<AppEnv>): Auth {
+  let auth = c.get("auth");
+  if (!auth) {
+    auth = createAuth(c.get("env"), c.get("db"));
+    c.set("auth", auth);
+  }
+  return auth;
+}

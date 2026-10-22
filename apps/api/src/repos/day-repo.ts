@@ -78,3 +78,15 @@ export async function findBetween(db: Executor, userId: string, from: string, to
     .from(dayLogs)
     .where(and(eq(dayLogs.userId, userId), between(dayLogs.localDate, from, to)));
 }
+
+export async function findWithPromptsBetween(
+  db: Executor,
+  userId: string,
+  from: string,
+  to: string,
+) {
+  return db
+    .select({ localDate: dayLogs.localDate, journal: dayLogs.journal, prompts: dayLogs.prompts })
+    .from(dayLogs)
+    .where(and(eq(dayLogs.userId, userId), between(dayLogs.localDate, from, to)));
+}

@@ -57,6 +57,13 @@
       "when": 1792614705387,
       "tag": "0007_memory_search",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792681927728,
+      "tag": "0008_better_auth",
+      "breakpoints": true
     }
   ]
 }

@@ -59,3 +59,38 @@ export async function findProfileSummary(db: Database, id: string): Promise<stri
 export async function setProfileSummary(db: Executor, id: string, profileSummary: string) {
   await db.update(users).set({ profileSummary }).where(eq(users.id, id));
 }
+
+export async function findByAuthSubject(db: Database, subject: string): Promise<PublicUser | null> {
+  const rows = await db.select(publicUserColumns).from(users).where(eq(users.authSubject, subject));
+  return rows[0] ?? null;
+}
+
+/** Creates the app user for a signed-in identity, deriving a unique username from the email. */
+export async function createForAuth(
+  db: Database,
+  identity: { id: string; email: string; name: string },
+): Promise<PublicUser> {
+  const base =
+    identity.email
+      .split("@")[0]!
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "")
+      .slice(0, 24) || "player";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const username = attempt === 0 ? base : `${base}-${crypto.randomUUID().slice(0, 4)}`;
+    const rows = await db
+      .insert(users)
+      .values({
+        username,
+        email: identity.email,
+        displayName: identity.name.trim() || base,
+        authSubject: identity.id,
+      })
+      .onConflictDoNothing()
+      .returning(publicUserColumns);
+    if (rows[0]) return rows[0];
+    const existing = await findByAuthSubject(db, identity.id); // a concurrent request won
+    if (existing) return existing;
+  }
+  throw new Error("Could not allocate a username");
+}

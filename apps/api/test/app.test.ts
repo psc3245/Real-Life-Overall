@@ -5,7 +5,7 @@ import { createTestApp, testBindings } from "./helpers";
 describe("app", () => {
   it("serves health without auth", async () => {
     const { app } = await createTestApp();
-    const res = await app.request("/health", {}, testBindings);
+    const res = await app.request("/api/health", {}, testBindings);
     expect(await res.json()).toEqual({ ok: true });
   });
 
@@ -18,7 +18,7 @@ describe("app", () => {
 
   it("refuses dev auth in production", async () => {
     const { app } = await createTestApp();
-    const res = await app.request("/health", {}, { ...testBindings, APP_ENV: "production" });
+    const res = await app.request("/api/health", {}, { ...testBindings, APP_ENV: "production" });
     expect(res.status).toBe(500);
   });
 });
