@@ -54,6 +54,7 @@ const review = (over: Record<string, unknown> = {}) =>
       { ref: "n9", value: 50 },
     ],
     archetype: { name: "Desk Athlete", description: "Unchanged." },
+    personalBadge: null,
     ...over,
   });
 

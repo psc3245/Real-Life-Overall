@@ -1,6 +1,7 @@
 import {
   computeNodeValues,
   leafValuesFromEvents,
+  type EarnedBadgeDto,
   type RatingNodeDto,
   type RecapDto,
 } from "@rlo/shared";
@@ -12,6 +13,7 @@ export function toRecapDto(
   recap: RecapRow,
   nodes: RatingNodeDto[],
   seasonEvents: RatingEventRow[],
+  badges: EarnedBadgeDto[] = [],
 ): RecapDto {
   const own = seasonEvents.filter((e) => e.recapId === recap.id);
   const upTo = seasonEvents.filter((e) => e.createdAt <= recap.createdAt);
@@ -40,6 +42,7 @@ export function toRecapDto(
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)),
     overallBefore: overall(before),
     overallAfter: overall(after),
+    badges,
     createdAt: recap.createdAt.toISOString(),
   };
 }

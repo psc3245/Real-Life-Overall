@@ -20,6 +20,7 @@ import * as dayRepo from "../repos/day-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
 import { getDay, requireEditable } from "./day-service";
+import { awardBadges } from "./badge-service";
 import { applyDecay, invalidateDecay } from "./decay-service";
 import { renderMemories, searchMemories } from "./memory-service";
 import { currentFocus } from "./weekly-service";
@@ -156,6 +157,7 @@ export async function runDailyRecap(
   const nextPrompts = normalizePrompts(output.nextPrompts);
   const flags = output.flags.map((f) => f.trim()).filter(Boolean);
 
+  let recapId: string | null = null;
   try {
     await db.transaction(async (tx) => {
       if (existing) {
@@ -172,6 +174,7 @@ export async function runDailyRecap(
         output: { flags, nextPrompts },
         promptVersion: dailyRecapPrompt.version,
       });
+      recapId = recap.id;
       await eventRepo.insertMany(
         tx,
         changes.map((c) => ({
@@ -206,5 +209,6 @@ export async function runDailyRecap(
   // A recap of a past day changes which attributes were active from then on.
   await invalidateDecay(db, userId, day);
   await applyDecay(db, userId);
+  await awardBadges(db, userId, recapId);
   return getDay(db, userId, day);
 }

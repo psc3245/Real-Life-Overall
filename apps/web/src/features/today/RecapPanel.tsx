@@ -2,6 +2,7 @@ import { MAX_RECAPS_PER_DAY, type DayDto, type RecapDto } from "@rlo/shared";
 import { useEffect, useState } from "react";
 import { useEndDay } from "../../api/days";
 import { Button } from "../../components/Button";
+import { EarnedBadges } from "../../components/BadgeChip";
 import { Delta } from "../../components/Delta";
 import { ErrorNote } from "../onboarding/ErrorNote";
 
@@ -89,6 +90,7 @@ export function RecapCard({ recap }: { recap: RecapDto }) {
         )}
       </header>
       <p className="text-court-100">{recap.narrative}</p>
+      <EarnedBadges badges={recap.badges} />
       {recap.changes.length > 0 ? (
         <ul className="divide-y divide-court-800">
           {recap.changes.map((c) => (

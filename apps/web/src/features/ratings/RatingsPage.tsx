@@ -12,6 +12,7 @@ import { Delta } from "../../components/Delta";
 import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { BadgesSection } from "./BadgesSection";
 import { DecayCard } from "./DecayCard";
 import { GoalEditor } from "./GoalEditor";
 
@@ -70,6 +71,8 @@ export function RatingsPage() {
       </div>
 
       <Charts ratings={data} />
+
+      <BadgesSection />
 
       <RecentChanges />
 

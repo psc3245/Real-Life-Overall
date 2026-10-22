@@ -3,6 +3,7 @@ import type { Database } from "../db/client";
 import type { LlmClient } from "../llm/client";
 import * as recapRepo from "../repos/recap-repo";
 import * as seasonRepo from "../repos/season-repo";
+import { awardBadges } from "./badge-service";
 import { getDay } from "./day-service";
 import { applyDecay } from "./decay-service";
 import { hasContent, runDailyRecap } from "./recap-service";
@@ -73,6 +74,7 @@ export async function runForUser(
       console.error(`weekly review failed for ${userId}`, error);
     }
   }
+  await awardBadges(db, userId);
   return result;
 }
 

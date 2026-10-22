@@ -94,6 +94,23 @@ describe("RatingsPage", () => {
       if (path === "/pauses") return [];
       if (path.startsWith("/ratings/history")) return { dates: [], series: [] };
       if (path.startsWith("/ratings/activity")) return [];
+      if (path === "/badges") {
+        return {
+          progress: [
+            {
+              key: "closer",
+              name: "Closer",
+              description: "Finish your days with a recap.",
+              unit: "days recapped",
+              value: 7,
+              tier: "bronze",
+              next: 20,
+            },
+          ],
+          personal: [],
+          recent: [],
+        };
+      }
       if (path === "/days/today") return { today: "2026-10-20" };
       return { displayName: "Peter" };
     });
@@ -108,6 +125,7 @@ describe("RatingsPage", () => {
     expect(screen.getByText("High confidence")).toBeInTheDocument();
     expect(screen.getByText(/Fades 0.3\/day after 3 idle days · floor 50/)).toBeInTheDocument();
     expect(await screen.findByText("You ran 6k.")).toBeInTheDocument();
+    expect(await screen.findByText("7 / 20 days recapped")).toBeInTheDocument();
     expect(screen.getByText("+0.6")).toBeInTheDocument();
   });
 

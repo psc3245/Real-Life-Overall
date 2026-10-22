@@ -5,6 +5,7 @@ import { useMe } from "../../api/hooks";
 import { useRatings } from "../../api/ratings";
 import { useResolveProposal, useRunWeekly, useSetWeekStart, useWeekly } from "../../api/weekly";
 import { Button } from "../../components/Button";
+import { EarnedBadges } from "../../components/BadgeChip";
 import { Delta } from "../../components/Delta";
 import { ErrorNote } from "../onboarding/ErrorNote";
 
@@ -145,6 +146,7 @@ function ReviewCard({ review, names }: { review: WeeklyReviewDto; names: Map<str
         )}
       </header>
       <p className="text-court-100">{review.narrative}</p>
+      <EarnedBadges badges={review.badges} />
       {review.archetypeChange && (
         <p className="rounded-lg border border-neon/40 bg-neon/5 p-3 text-sm">
           <span className="font-display uppercase tracking-wider text-neon">New archetype: </span>

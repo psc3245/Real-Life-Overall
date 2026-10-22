@@ -12,11 +12,13 @@ import {
   MAX_FOCUS_GOALS,
   MAX_HABIT_LINKS,
   MAX_HABIT_PROPOSALS,
+  MAX_PERSONAL_BADGES_PER_SEASON,
   MAX_PROFILE_SUMMARY,
   normalizeHabitConfig,
   WEEKLY_DELTA_CAP,
   weeklyReviewOutputSchema,
   type DecayRevisionDto,
+  type EarnedBadgeDto,
   type FocusGoalDto,
   type HabitConfig,
   type HabitDto,
@@ -36,6 +38,7 @@ import * as decayRepo from "../repos/decay-repo";
 import * as dayRepo from "../repos/day-repo";
 import * as decayRuleRepo from "../repos/decay-rule-repo";
 import * as habitRepo from "../repos/habit-repo";
+import * as badgeRepo from "../repos/badge-repo";
 import * as goalRepo from "../repos/goal-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as seasonRepo from "../repos/season-repo";
@@ -43,6 +46,7 @@ import * as recapRepo from "../repos/recap-repo";
 import type { RecapRow } from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
 import { createHabit, loadLeafContext } from "./habit-service";
+import { awardBadges, badgesByRecap } from "./badge-service";
 import { datedEvents, type DatedEvent } from "./event-dates";
 import { renderMemories, searchMemories } from "./memory-service";
 import { normalizeRecapChanges } from "./recap-changes";
@@ -86,6 +90,7 @@ export function toWeeklyDto(
   recap: RecapRow,
   nodes: RatingNodeDto[],
   events: DatedEvent[],
+  badges: EarnedBadgeDto[] = [],
 ): WeeklyReviewDto {
   const output = recap.output as WeeklyOutput;
   const names = new Map(nodes.map((n) => [n.id, n.name]));
@@ -116,6 +121,7 @@ export function toWeeklyDto(
     focusGoals: output.focusGoals,
     habitProposals: output.habitProposals,
     archetypeChange: output.archetypeChange ?? null,
+    badges,
     createdAt: recap.createdAt.toISOString(),
   };
 }
@@ -131,7 +137,14 @@ export async function getWeeklyState(db: Database, userId: string): Promise<Week
   ]);
   return {
     week,
-    review: current ? toWeeklyDto(current, ctx.nodes, datedEvents(rows)) : null,
+    review: current
+      ? toWeeklyDto(
+          current,
+          ctx.nodes,
+          datedEvents(rows),
+          (await badgesByRecap(db, [current.id])).get(current.id),
+        )
+      : null,
     ready: Boolean(week && !current),
     history: history
       .filter((h) => h.id !== current?.id)
@@ -403,6 +416,7 @@ export async function runWeeklyReview(
     habits.filter((h) => !h.archivedAt).map((h) => h.name),
   );
 
+  let recapId: string | null = null;
   try {
     await db.transaction(async (tx) => {
       const recap = await recapRepo.insert(tx, {
@@ -453,6 +467,24 @@ export async function runWeeklyReview(
           archetypeDescription: normalized.archetype.description,
         });
       }
+      recapId = recap.id;
+      const personal = output.personalBadge;
+      if (
+        personal?.name.trim() &&
+        (await badgeRepo.countPersonal(tx, userId, ctx.season.id)) < MAX_PERSONAL_BADGES_PER_SEASON
+      ) {
+        await badgeRepo.insertNew(tx, [
+          {
+            userId,
+            seasonId: ctx.season.id,
+            kind: "personal",
+            badgeKey: `personal-${recap.id}`,
+            name: personal.name.trim().slice(0, 40),
+            description: personal.description.trim(),
+            recapId: recap.id,
+          },
+        ]);
+      }
       if (normalized.profileSummary) {
         await userRepo.setProfileSummary(tx, userId, normalized.profileSummary);
       }
@@ -461,6 +493,7 @@ export async function runWeeklyReview(
     // A concurrent run already wrote this week's review; theirs stands.
     if (!isUniqueViolation(error)) throw error;
   }
+  await awardBadges(db, userId, recapId);
   return getWeeklyState(db, userId);
 }
 

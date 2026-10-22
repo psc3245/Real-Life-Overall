@@ -7,7 +7,7 @@ import {
 import { CALIBRATION_RUBRIC, NEUTRAL_TONE, PRODUCT_CONTEXT } from "./shared";
 
 export const weeklyReviewPrompt = {
-  version: "weekly-review-v2",
+  version: "weekly-review-v3",
   system: [
     PRODUCT_CONTEXT,
     "You write the user's weekly review. Daily recaps already moved ratings day by day; you see " +
@@ -37,6 +37,8 @@ export const weeklyReviewPrompt = {
         "intent, not evidence.",
       "- archetype: a new 2K-style build name and one-line description only if their overall " +
         "shape has clearly changed since the current archetype; otherwise null.",
+      "- personalBadge: a playful, specific badge only for a genuinely notable achievement this " +
+        "week (a first, a breakthrough, an unusual streak), not routine effort; usually null.",
       "Refs: use the node refs exactly as given; never mention refs in text.",
     ].join("\n"),
     NEUTRAL_TONE,

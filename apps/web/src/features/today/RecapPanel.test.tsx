@@ -36,6 +36,16 @@ const recap: RecapDto = {
   ],
   overallBefore: 70,
   overallAfter: 70.1,
+  badges: [
+    {
+      key: "logged-in",
+      kind: "catalog",
+      name: "Logged In · Bronze",
+      description: "Log something several days in a row.",
+      tier: "bronze",
+      earnedAt: "2026-10-20T22:00:00Z",
+    },
+  ],
   createdAt: "2026-10-20T22:00:00Z",
 };
 
@@ -87,6 +97,7 @@ describe("RecapPanel", () => {
     expect(screen.getByText("You ran.")).toBeInTheDocument();
     expect(screen.getByText("−0.2")).toBeInTheDocument();
     expect(screen.getByText("The 40 km claim seems high.")).toBeInTheDocument();
+    expect(screen.getByText("Logged In · Bronze")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Update recap" })).not.toBeInTheDocument();
   });
 

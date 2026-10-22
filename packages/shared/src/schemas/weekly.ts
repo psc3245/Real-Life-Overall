@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { addDays, dayOfWeek } from "../dates";
 import { HABIT_TYPES, type HabitType } from "./habits";
+import type { EarnedBadgeDto } from "./badges";
 import type { RecapChangeDto } from "./recaps";
 
 /** Largest weekly correction to one attribute (DESIGN.md §5.6). */
@@ -62,6 +63,8 @@ export interface WeeklyReviewDto {
   decayRevisions: DecayRevisionDto[];
   focusGoals: FocusGoalDto[];
   habitProposals: HabitProposalDto[];
+  /** Badges earned with this review (personal and catalog). */
+  badges: EarnedBadgeDto[];
   /** Set when this review renamed the archetype. */
   archetypeChange: { from: string | null; to: string; description: string } | null;
   createdAt: string;
@@ -139,4 +142,11 @@ export const weeklyReviewOutputSchema = z.object({
     .object({ name: z.string(), description: z.string() })
     .nullable()
     .describe("A new archetype only if the user's shape has clearly changed; otherwise null"),
+  personalBadge: z
+    .object({
+      name: z.string().describe("2-4 words, playful but specific, e.g. 'Dawn Patrol'"),
+      description: z.string().describe("One sentence on the specific achievement"),
+    })
+    .nullable()
+    .describe("Only for a genuinely notable, specific achievement this week; usually null"),
 });

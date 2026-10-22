@@ -6,6 +6,7 @@ import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
 import { LlmError } from "./llm/client";
 import { authFor, requireUser } from "./middleware/auth";
+import { badgeRoutes } from "./routes/badges";
 import { dayRoutes } from "./routes/days";
 import { devRoutes } from "./routes/dev";
 import { goalRoutes } from "./routes/goals";
@@ -99,6 +100,7 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/pauses/*", requireUser)
     .use("/dev/*", requireUser)
     .use("/goals/*", requireUser)
+    .use("/badges", requireUser)
     .use("/weekly", requireUser)
     .use("/weekly/*", requireUser)
     .route("/me", meRoutes)
@@ -109,7 +111,8 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/pauses", pauseRoutes)
     .route("/dev", devRoutes)
     .route("/weekly", weeklyRoutes)
-    .route("/goals", goalRoutes);
+    .route("/goals", goalRoutes)
+    .route("/badges", badgeRoutes);
 
   return routes;
 }
