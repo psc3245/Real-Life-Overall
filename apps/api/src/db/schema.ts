@@ -456,3 +456,33 @@ export const authVerifications = pgTable(
   },
   (t) => [index().on(t.identifier)],
 );
+
+export const badgeKind = pgEnum("badge_kind", ["catalog", "personal"]);
+export const badgeTier = pgEnum("badge_tier", ["bronze", "silver", "gold", "hof"]);
+
+/**
+ * Earned badges (DESIGN.md §7.1). Catalog badges have one row per tier reached; personal
+ * badges are awarded by weekly reviews and have no tier.
+ */
+export const userBadges = pgTable(
+  "user_badges",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid().references(() => seasons.id, { onDelete: "set null" }),
+    kind: badgeKind().notNull(),
+    badgeKey: text().notNull(),
+    tier: badgeTier(),
+    name: text().notNull(),
+    description: text().notNull(),
+    /** The recap (daily or weekly) that earned it, for "new badge" moments. */
+    recapId: uuid().references(() => recaps.id, { onDelete: "set null" }),
+    earnedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("user_badges_one_per_tier").on(t.userId, t.badgeKey, t.tier),
+    index().on(t.recapId),
+  ],
+);

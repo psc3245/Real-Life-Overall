@@ -17,6 +17,7 @@ import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
 import { loadLeafContext, toHabitDtos } from "./habit-service";
+import { badgesByRecap } from "./badge-service";
 import { invalidateDecay } from "./decay-service";
 import { toRecapDto } from "./recap-view";
 
@@ -52,7 +53,12 @@ export async function getDay(db: Database, userId: string, date?: string): Promi
   ]);
   const recapDto =
     recap && ctx
-      ? toRecapDto(recap, ctx.nodes, await eventRepo.findActiveBySeason(db, ctx.season.id))
+      ? toRecapDto(
+          recap,
+          ctx.nodes,
+          await eventRepo.findActiveBySeason(db, ctx.season.id),
+          (await badgesByRecap(db, [recap.id])).get(recap.id),
+        )
       : null;
   const entries = new Map(
     (

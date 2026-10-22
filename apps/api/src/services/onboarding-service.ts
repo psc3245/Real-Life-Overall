@@ -43,6 +43,7 @@ import * as seasonRepo from "../repos/season-repo";
 import * as userRepo from "../repos/user-repo";
 import * as decayRuleRepo from "../repos/decay-rule-repo";
 import * as eventRepo from "../repos/rating-event-repo";
+import { awardBadges } from "./badge-service";
 import { initialRatingsSchemaFor, normalizeInitialRatings } from "./initial-ratings";
 import { normalizeQuestions, questionnaireSchemaFor, targetQuestionCount } from "./questionnaire";
 
@@ -415,5 +416,7 @@ export async function rateInitial(
       archetypeDescription: output.archetype.description.trim(),
     });
   });
+  // Badges the starting ratings already qualify for belong to onboarding, not the first recap.
+  await awardBadges(db, userId);
   return getState(db, userId);
 }

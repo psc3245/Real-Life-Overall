@@ -477,7 +477,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Charts: history lines (Overall / Categories, table view), radar, consistency heatmap
 - [x] Archetype updates (weekly review), hot/cold indicators (7-day trend)
 - [x] Goals and potential (user goals plus weekly LLM season-end projection)
-- [ ] Badges: catalog and rule engine, plus LLM personal badges
+- [x] Badges: 8-badge catalog with Bronze→Hall of Fame tiers and a rule engine, plus weekly LLM personal badges (max 6 per season)
 - [ ] Seasons: quarterly rollover, archive card, season setup with structure edits and recalibration
 
 ### Phase 4: Social

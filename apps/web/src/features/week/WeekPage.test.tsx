@@ -54,6 +54,7 @@ const review: WeeklyReviewDto = {
     },
   ],
   archetypeChange: { from: "Desk Athlete", to: "Two-Way Grinder", description: "More balanced." },
+  badges: [],
   createdAt: "2026-10-19T09:00:00Z",
 };
 

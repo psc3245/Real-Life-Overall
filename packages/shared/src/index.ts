@@ -15,3 +15,4 @@ export * from "./rating/decay";
 export * from "./schemas/pauses";
 export * from "./schemas/weekly";
 export * from "./schemas/history";
+export * from "./schemas/badges";

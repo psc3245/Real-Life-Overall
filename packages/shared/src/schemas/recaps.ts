@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { EarnedBadgeDto } from "./badges";
 
 /** Largest move one attribute can make in one daily recap (DESIGN.md §5.6). */
 export const DAILY_DELTA_CAP = 3;
@@ -30,6 +31,8 @@ export interface RecapDto {
   changes: RecapChangeDto[];
   overallBefore: number | null;
   overallAfter: number | null;
+  /** Badges this recap earned. */
+  badges: EarnedBadgeDto[];
   createdAt: string;
 }
 

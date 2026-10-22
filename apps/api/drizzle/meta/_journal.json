@@ -71,6 +71,13 @@
       "when": 1792682752947,
       "tag": "0009_archetype_description",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792683182853,
+      "tag": "0010_user_badges",
+      "breakpoints": true
     }
   ]
 }
