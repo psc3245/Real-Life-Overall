@@ -10,7 +10,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "seed:demo": "tsx --env-file=.env scripts/seed-demo.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.84",
@@ -29,6 +30,7 @@
     "@electric-sql/pglite": "^0.5.10",
     "dotenv": "^18.0.8",
     "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
     "wrangler": "^4.151.3"
   }
 }

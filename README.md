@@ -46,6 +46,19 @@ Sign in at http://localhost:5173/signup (DESIGN.md §8.5). For quick experiments
 set `AUTH_MODE` to `dev` in `apps/api/wrangler.jsonc`: the API then trusts an `x-dev-user` header,
 switchable from the web app's header.
 
+### Demo data
+
+To see the app with a few weeks of history (habits, journals, recaps, decay, a paused flu week,
+weekly reviews, goals, badges and a previous season), seed a demo player:
+
+```bash
+npm run seed:demo -w @rlo/api
+```
+
+It writes straight to the database with no AI calls, is deterministic, and replaces any previous
+demo account. Sign in with the credentials at the top of `apps/api/scripts/seed-demo.ts`, or in
+`AUTH_MODE=dev` switch the dev user to `demo`.
+
 ### Scheduled jobs
 
 The API runs an hourly Cron Trigger: it brings rating decay up to date for every user and, at 4am
