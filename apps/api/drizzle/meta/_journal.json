@@ -50,6 +50,13 @@
       "when": 1792524499133,
       "tag": "0006_decay_and_pauses",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792614705387,
+      "tag": "0007_memory_search",
+      "breakpoints": true
     }
   ]
 }

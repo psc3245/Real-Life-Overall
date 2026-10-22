@@ -1,7 +1,8 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -28,6 +29,9 @@ const updatedAt = () =>
     .$onUpdate(() => new Date());
 const rating = () => numeric({ precision: 5, scale: 2, mode: "number" });
 
+/** Postgres full-text search vector; used for long-term memory retrieval (DESIGN.md §5.5). */
+const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
+
 export const users = pgTable("users", {
   id: id(),
   email: text().notNull().unique(),
@@ -38,6 +42,8 @@ export const users = pgTable("users", {
   weekStart: smallint().notNull().default(1),
   /** Subject id from the auth provider, once one is chosen (DESIGN.md §8.5). */
   authSubject: text().unique(),
+  /** Rolling LLM-maintained profile, refreshed by weekly reviews and fed to every prompt. */
+  profileSummary: text(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -142,6 +148,9 @@ export const recaps = pgTable(
     periodStart: date().notNull(),
     periodEnd: date().notNull(),
     narrative: text().notNull(),
+    narrativeSearch: tsvector().generatedAlwaysAs(
+      (): SQL => sql`to_tsvector('english', ${recaps.narrative})`,
+    ),
     /** The normalized LLM output (flags, prompts, raw reasons). */
     output: jsonb().notNull(),
     promptVersion: text().notNull(),
@@ -153,6 +162,7 @@ export const recaps = pgTable(
     uniqueIndex("recaps_one_active_per_period")
       .on(t.userId, t.kind, t.periodStart)
       .where(sql`${t.status} = 'active'`),
+    index("recaps_narrative_search").using("gin", t.narrativeSearch),
   ],
 );
 
@@ -257,13 +267,19 @@ export const dayLogs = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     localDate: date().notNull(),
     journal: text().notNull().default(""),
+    journalSearch: tsvector().generatedAlwaysAs(
+      (): SQL => sql`to_tsvector('english', ${dayLogs.journal})`,
+    ),
     /** GuidedPromptDto[] written by the previous day's recap. */
     prompts: jsonb().notNull().default([]),
     status: dayStatus().notNull().default("open"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [uniqueIndex().on(t.userId, t.localDate)],
+  (t) => [
+    uniqueIndex().on(t.userId, t.localDate),
+    index("day_logs_journal_search").using("gin", t.journalSearch),
+  ],
 );
 
 export const habitType = pgEnum("habit_type", [

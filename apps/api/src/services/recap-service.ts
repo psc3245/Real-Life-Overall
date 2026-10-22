@@ -12,7 +12,7 @@ import {
   type GuidedPromptDto,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
-import { badRequest, conflict } from "../errors";
+import { badRequest, conflict, isUniqueViolation } from "../errors";
 import type { LlmClient } from "../llm/client";
 import { dailyRecapPrompt } from "../llm/prompts/recaps";
 import { refsFor, renderTree, toPromptNodes } from "../llm/prompts/tree";
@@ -21,6 +21,9 @@ import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
 import { getDay, requireEditable } from "./day-service";
 import { applyDecay, invalidateDecay } from "./decay-service";
+import { renderMemories, searchMemories } from "./memory-service";
+import { currentFocus } from "./weekly-service";
+import * as userRepo from "../repos/user-repo";
 import { loadLeafContext } from "./habit-service";
 import { normalizePrompts, normalizeRecapChanges } from "./recap-changes";
 
@@ -93,13 +96,6 @@ export function renderDay(
     .join("\n\n");
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {
-    if ((e as { code?: string }).code === "23505") return true;
-  }
-  return false;
-}
-
 /**
  * "End my day": the model reviews the day and moves ratings. Re-running an edited day voids
  * the previous recap's changes and replaces them. Running it again on an unchanged day
@@ -129,6 +125,17 @@ export async function runDailyRecap(
   const values = computeNodeValues(ctx.nodes, leafValuesFromEvents(events));
   const { refById, idByRef } = refsFor(ctx.nodes);
   const recent = await recapRepo.findRecentDaily(db, userId, addDays(day, -7), day);
+  // Long-term memory: the profile, older days sharing words with this one, the week's focus.
+  const [profile, focus, memories] = await Promise.all([
+    userRepo.findProfileSummary(db, userId),
+    currentFocus(db, userId),
+    searchMemories(
+      db,
+      userId,
+      [view.journal, ...view.habits.filter((h) => h.entry).map((h) => h.habit.name)].join(" "),
+      { before: addDays(day, -7) },
+    ),
+  ]);
 
   const output = await llm.generateStructured({
     purpose: "recap.daily",
@@ -136,9 +143,12 @@ export async function runDailyRecap(
     schema: dailyRecapOutputSchema,
     system: dailyRecapPrompt.system,
     prompt: [
+      `What you know about the user:\n${profile || "(nothing yet)"}`,
       "Current ratings (Overall is the implicit root):",
       renderTree(toPromptNodes(ctx.nodes, refById, values), true),
+      `This week's focus goals:\n${focus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
       renderDay(view, refById, recent),
+      `Related older days:\n${renderMemories(memories) || "(none)"}`,
     ].join("\n\n"),
     promptVersion: dailyRecapPrompt.version,
   });

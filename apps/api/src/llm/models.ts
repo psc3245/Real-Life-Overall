@@ -7,6 +7,7 @@ export const LLM_PURPOSES = [
   "onboarding.initialRatings",
   "habits.suggestLinks",
   "recap.daily",
+  "recap.weekly",
 ] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
@@ -20,6 +21,7 @@ export const PURPOSE_TIERS: Record<LlmPurpose, ModelTier> = {
   "onboarding.initialRatings": "smart",
   "habits.suggestLinks": "fast",
   "recap.daily": "fast",
+  "recap.weekly": "smart",
 };
 
 /** "provider:modelId". Override per tier with LLM_FAST_MODEL / LLM_SMART_MODEL. */

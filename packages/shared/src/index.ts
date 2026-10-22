@@ -13,3 +13,4 @@ export * from "./schemas/habits";
 export * from "./schemas/recaps";
 export * from "./rating/decay";
 export * from "./schemas/pauses";
+export * from "./schemas/weekly";

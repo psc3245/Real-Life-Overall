@@ -2,11 +2,12 @@ import { DAILY_DELTA_CAP, MAX_GUIDED_PROMPTS } from "@rlo/shared";
 import { CALIBRATION_RUBRIC, NEUTRAL_TONE, PRODUCT_CONTEXT } from "./shared";
 
 export const dailyRecapPrompt = {
-  version: "daily-recap-v2",
+  version: "daily-recap-v3",
   system: [
     PRODUCT_CONTEXT,
     "You review one day of the user's life and decide how their ratings move. You see their " +
-      "current ratings, what they logged, and short summaries of recent days.",
+      "current ratings, what they logged, short summaries of recent days, what you know about " +
+      "them, related older days, and their focus goals for the week.",
     CALIBRATION_RUBRIC,
     [
       "How ratings move:",

@@ -12,6 +12,7 @@ import { Link, useSearchParams } from "react-router";
 import { useDay, useSaveEntry, useSaveJournal } from "../../api/days";
 import { useRatings } from "../../api/ratings";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { FocusCard } from "./FocusCard";
 import { GuidedPrompts } from "./GuidedPrompts";
 import { HabitEntryInput } from "./HabitEntryInput";
 import { RecapPanel } from "./RecapPanel";
@@ -87,6 +88,7 @@ export function TodayPage() {
         </p>
       )}
 
+      {d.date === d.today && <FocusCard />}
       <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
       <Journal key={d.date} day={d} />
       <Habits day={d} leaves={ratings.data?.nodes ?? []} />

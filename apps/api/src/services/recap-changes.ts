@@ -20,6 +20,7 @@ export function normalizeRecapChanges(
   raw: RawChange[],
   idByRef: Map<string, string>,
   leafIds: Set<string>,
+  cap: number = DAILY_DELTA_CAP,
 ): RecapChange[] {
   const byNode = new Map<string, RecapChange>();
   for (const c of raw) {
@@ -36,7 +37,7 @@ export function normalizeRecapChanges(
   return [...byNode.values()]
     .map((c) => ({
       ...c,
-      delta: round2(Math.max(-DAILY_DELTA_CAP, Math.min(DAILY_DELTA_CAP, c.delta))),
+      delta: round2(Math.max(-cap, Math.min(cap, c.delta))),
     }))
     .filter((c) => Math.abs(c.delta) >= 0.01 && c.reason);
 }

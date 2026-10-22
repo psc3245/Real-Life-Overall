@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Database } from "../db/client";
+import type { Database, Executor } from "../db/client";
 import { users } from "../db/schema";
 
 /** Columns safe to send to clients. Never select whole user rows into responses. */
@@ -46,4 +46,16 @@ export async function update(
     .where(eq(users.id, id))
     .returning(publicUserColumns);
   return rows[0] ?? null;
+}
+
+export async function findProfileSummary(db: Database, id: string): Promise<string | null> {
+  const rows = await db
+    .select({ profileSummary: users.profileSummary })
+    .from(users)
+    .where(eq(users.id, id));
+  return rows[0]?.profileSummary ?? null;
+}
+
+export async function setProfileSummary(db: Executor, id: string, profileSummary: string) {
+  await db.update(users).set({ profileSummary }).where(eq(users.id, id));
 }

@@ -1,5 +1,5 @@
 import type { GuidedPromptDto } from "@rlo/shared";
-import { and, eq } from "drizzle-orm";
+import { and, between, eq } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { dayLogs } from "../db/schema";
 
@@ -70,4 +70,11 @@ export async function setPrompts(
     .insert(dayLogs)
     .values({ userId, localDate, prompts })
     .onConflictDoUpdate({ target: [dayLogs.userId, dayLogs.localDate], set: { prompts } });
+}
+
+export async function findBetween(db: Executor, userId: string, from: string, to: string) {
+  return db
+    .select({ localDate: dayLogs.localDate, journal: dayLogs.journal })
+    .from(dayLogs)
+    .where(and(eq(dayLogs.userId, userId), between(dayLogs.localDate, from, to)));
 }

@@ -62,3 +62,14 @@ describe("validateHabitEntry", () => {
     expect(isHabitDone("checknote", cfg("checknote"), { num: 0, text: "skipped" })).toBe(false);
   });
 });
+
+describe("lastCompletedWeek", () => {
+  it("finds the last finished week for the user's first weekday", async () => {
+    const { lastCompletedWeek } = await import("./weekly");
+    // 2026-10-21 is a Wednesday.
+    expect(lastCompletedWeek("2026-10-21", 1)).toEqual({ start: "2026-10-12", end: "2026-10-18" });
+    expect(lastCompletedWeek("2026-10-19", 1)).toEqual({ start: "2026-10-12", end: "2026-10-18" });
+    expect(lastCompletedWeek("2026-10-18", 1)).toEqual({ start: "2026-10-05", end: "2026-10-11" });
+    expect(lastCompletedWeek("2026-10-21", 0)).toEqual({ start: "2026-10-11", end: "2026-10-17" });
+  });
+});
