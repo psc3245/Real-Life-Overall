@@ -87,10 +87,13 @@ describe("RatingsPage", () => {
           },
         ];
       }
+      if (path === "/pauses") return [];
+      if (path === "/days/today") return { today: "2026-10-20" };
       return { displayName: "Peter" };
     });
     renderPage();
     expect(await screen.findByText("Peter")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Pause decay" })).toBeInTheDocument();
     expect(screen.getAllByText(/Desk Athlete/).length).toBeGreaterThan(0);
     expect(screen.queryByText("You run three times a week.")).not.toBeInTheDocument();
 

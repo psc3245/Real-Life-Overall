@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, between, eq, inArray } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { habitEntries, habitLinks, habits } from "../db/schema";
 
@@ -74,4 +74,17 @@ export async function deleteEntry(db: Executor, habitId: string, localDate: stri
   await db
     .delete(habitEntries)
     .where(and(eq(habitEntries.habitId, habitId), eq(habitEntries.localDate, localDate)));
+}
+
+export async function findEntriesBetween(
+  db: Executor,
+  habitIds: string[],
+  from: string,
+  to: string,
+) {
+  if (!habitIds.length) return [];
+  return db
+    .select()
+    .from(habitEntries)
+    .where(and(inArray(habitEntries.habitId, habitIds), between(habitEntries.localDate, from, to)));
 }

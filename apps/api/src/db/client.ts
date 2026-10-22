@@ -7,7 +7,7 @@ import * as schema from "./schema";
 export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /** Anything that can run queries: the database or a transaction inside it. */
-export type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
+export type Executor = Pick<Database, "select" | "selectDistinct" | "insert" | "update" | "delete">;
 
 export const DB_CASING = "snake_case" as const;
 
@@ -17,9 +17,18 @@ export const DB_CASING = "snake_case" as const;
  */
 export function createNeonDb(databaseUrl: string): { db: Database; dispose: () => Promise<void> } {
   const pool = new Pool({ connectionString: databaseUrl });
+  let closed = false;
+  // A dropped socket emits 'error' on the pool; unhandled, it crashes the Worker. The runtime
+  // also tears sockets down after we've ended the pool, which is expected and not logged.
+  pool.on("error", (error: Error) => {
+    if (!closed) console.error("Neon pool error", error);
+  });
   return {
     db: drizzle(pool, { schema, casing: DB_CASING }),
-    dispose: () => pool.end(),
+    dispose: () => {
+      closed = true;
+      return pool.end();
+    },
   };
 }
 

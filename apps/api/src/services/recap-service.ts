@@ -20,6 +20,7 @@ import * as dayRepo from "../repos/day-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
 import { getDay, requireEditable } from "./day-service";
+import { applyDecay, invalidateDecay } from "./decay-service";
 import { loadLeafContext } from "./habit-service";
 import { normalizePrompts, normalizeRecapChanges } from "./recap-changes";
 
@@ -192,5 +193,8 @@ export async function runDailyRecap(
     if (isUniqueViolation(error)) throw conflict("This day is already being recapped");
     throw error;
   }
+  // A recap of a past day changes which attributes were active from then on.
+  await invalidateDecay(db, userId, day);
+  await applyDecay(db, userId);
   return getDay(db, userId, day);
 }

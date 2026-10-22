@@ -1,6 +1,6 @@
 import type { SeasonDto } from "@rlo/shared";
 import { and, desc, eq } from "drizzle-orm";
-import type { seasonStatus } from "../db/schema";
+import { seasons as seasonsTable, users, type seasonStatus } from "../db/schema";
 import type { Executor } from "../db/client";
 import { seasons } from "../db/schema";
 
@@ -63,4 +63,13 @@ export async function update(
   changes: { status?: (typeof seasonStatus.enumValues)[number]; archetype?: string },
 ): Promise<void> {
   await db.update(seasons).set(changes).where(eq(seasons.id, id));
+}
+
+/** Users with an active season: the ones scheduled jobs care about. */
+export async function findActiveUsers(db: Executor) {
+  return db
+    .selectDistinct({ userId: users.id, timezone: users.timezone })
+    .from(seasonsTable)
+    .innerJoin(users, eq(users.id, seasonsTable.userId))
+    .where(eq(seasonsTable.status, "active"));
 }
