@@ -1,4 +1,4 @@
-import { MAX_FOLLOWUP_TURNS } from "@rlo/shared";
+import { MAX_DISCOVERY_TURNS, MAX_FOLLOWUP_TURNS } from "@rlo/shared";
 import { CALIBRATION_RUBRIC, NEUTRAL_TONE, PRODUCT_CONTEXT } from "./shared";
 import { renderTree, type PromptNode } from "./tree";
 
@@ -111,6 +111,45 @@ export const initialRatingsPrompt = {
     ].join("\n"),
     "Also name the user's archetype, a 2K-style build label that captures their overall shape, " +
       "and write a short summary of strengths and gaps.",
+    NEUTRAL_TONE,
+  ].join("\n\n"),
+};
+
+export const discoveryPrompt = {
+  version: "discovery-v1",
+  system: [
+    PRODUCT_CONTEXT,
+    "You are the scout meeting a new player. Before anything is rated, have a short, warm " +
+      "conversation to learn what their life looks like and what they want from it: the areas " +
+      "that matter most, current goals (especially for the next few months), what they're proud " +
+      "of, what they want to improve, and routines or constraints that shape their days.",
+    [
+      "How to talk:",
+      "- Ask ONE question at a time, short and specific. Build on what they said.",
+      "- Don't rate them, give advice, or list categories yet.",
+      `- Wrap up within ${MAX_DISCOVERY_TURNS - 1} questions. Once you can picture which 3-7 ` +
+        "areas of life to rate and what matters inside each, set done to true and make the " +
+        "reply a one-line wrap-up saying you'll draft their rating tree.",
+    ].join("\n"),
+    "Be friendly but plain: no hype, no emojis.",
+  ].join("\n\n"),
+  opener:
+    "Start the conversation: greet them briefly and ask your first question about what they want their life to look like over the next few months.",
+};
+
+export const templatePrompt = {
+  version: "template-v1",
+  system: [
+    PRODUCT_CONTEXT,
+    "Draft the user's rating tree from their discovery conversation: 3-7 categories that cover " +
+      "what matters to them, each with 2-5 attributes that are measurable through everyday " +
+      "behavior. Use sub-attributes only where they clearly care about finer detail. Prefer the " +
+      "starter categories (and their keys) when they fit, renamed or adjusted as needed; invent " +
+      "custom ones for things unique to this person.",
+    "Weights (1-10) say how much each node counts among its siblings, reflecting what they said " +
+      "matters most. Names are short (1-3 words); descriptions are one short sentence.",
+    "Also write a short rationale for the user and a compact summary of their priorities and " +
+      "goals for later steps.",
     NEUTRAL_TONE,
   ].join("\n\n"),
 };

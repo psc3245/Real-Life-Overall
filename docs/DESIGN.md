@@ -143,9 +143,10 @@ All LLM work lives behind one internal module, `apps/api/src/llm/`, with a **pro
 - uses a **cheap model by default**. Which model each purpose uses is config, not code.
 - uses a **neutral tone** for every user-facing text.
 
-### 5.1 Onboarding: form, then chat, then initial ratings (**MVP**)
-1. **Build the tree.** The user picks templates (Fitness, Career, Social, Mind, Finance, Creativity…) and/or custom categories. They can edit attributes, add sub-attributes (≤ depth 3), and describe each node in one line. Optionally the LLM suggests missing attributes for a category.
-2. **Weights.** The user ranks or describes what matters to them. The LLM proposes weights and the user adjusts them.
+### 5.1 Onboarding: discover, draft, scout, clarify, rate
+0. **Discover** (added 2026-10-22). A short chat (one question at a time, up to 8) about the user's goals, what matters in their life, what they want to improve, and their routines. After at least 2 answers the user can ask the scout to **draft a template**: categories (3-7), attributes (2-5 each, sub-attributes only where warranted) and weights, preferring starter templates where they fit, plus a rationale and a priorities summary that feeds every later step. "Skip, I'll build it myself" goes straight to the manual builder.
+1. **Build the tree.** The user edits the drafted tree (or builds one from templates and custom categories): rename, add sub-attributes (≤ depth 3), describe nodes, remove anything. Optionally the LLM suggests missing attributes for a category.
+2. **Weights.** Prefilled from the template; the user adjusts them (or asks the LLM to re-propose from typed priorities).
 3. **Generate the questionnaire.** The LLM returns a structured form, a set of question objects tied to leaf nodes:
    - types: `single_choice`, `multi_choice`, `slider` (with labeled min/max), `number` (with unit), `short_text`;
    - roughly 2–4 questions per leaf, capped overall so onboarding stays under ~10 minutes. *Open: exact cap (§13).*

@@ -1,4 +1,5 @@
 export const ONBOARDING_STEPS = [
+  { key: "discover", label: "Discover" },
   { key: "tree", label: "Build" },
   { key: "weights", label: "Weights" },
   { key: "questionnaire", label: "Scouting" },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOnboarding, useSaveTree } from "../../api/onboarding";
+import { DiscoveryChat } from "./DiscoveryChat";
 import { ErrorNote } from "./ErrorNote";
 import { nodesToDraft } from "./draft";
 import { RevealStep } from "./RevealStep";
@@ -9,6 +10,7 @@ import { TreeBuilder } from "./TreeBuilder";
 import { WeightsStep } from "./WeightsStep";
 
 const STAGE_TO_STEP: Record<string, StepKey> = {
+  discovery: "discover",
   tree: "tree",
   weights: "weights",
   questionnaire: "questionnaire",
@@ -16,7 +18,7 @@ const STAGE_TO_STEP: Record<string, StepKey> = {
   rating: "reveal",
   complete: "reveal",
 };
-const STEP_ORDER: StepKey[] = ["tree", "weights", "questionnaire", "reveal"];
+const STEP_ORDER: StepKey[] = ["discover", "tree", "weights", "questionnaire", "reveal"];
 
 export function OnboardingPage() {
   const onboarding = useOnboarding();
@@ -34,8 +36,12 @@ export function OnboardingPage() {
 
   const state = onboarding.data;
   const reached = STAGE_TO_STEP[state.stage] ?? "tree";
-  // Once questions exist the build and weights are locked for the season.
-  const firstOpen = state.questionnaire ? STEP_ORDER.indexOf("questionnaire") : 0;
+  // Discovery is one-way, and once questions exist the build and weights lock too.
+  const firstOpen = state.questionnaire
+    ? STEP_ORDER.indexOf("questionnaire")
+    : state.stage === "discovery"
+      ? 0
+      : STEP_ORDER.indexOf("tree");
   const reachable = STEP_ORDER.slice(firstOpen, STEP_ORDER.indexOf(reached) + 1);
   const step = viewing && reachable.includes(viewing) ? viewing : reached;
 
@@ -49,6 +55,13 @@ export function OnboardingPage() {
         <StepIndicator current={step} reachable={reachable} onSelect={setViewing} />
       </header>
 
+      {step === "discover" && <DiscoveryChat state={state} />}
+      {step === "tree" && state.templateRationale && (
+        <p className="rounded-xl border border-neon/30 bg-neon/5 p-4 text-sm text-court-300">
+          <span className="font-display uppercase tracking-wider text-neon">Drafted for you. </span>
+          {state.templateRationale} Rename, add or remove anything; weights come next.
+        </p>
+      )}
       {step === "tree" && (
         <TreeBuilder
           // Remount when the saved tree changes so the draft starts from the server copy.

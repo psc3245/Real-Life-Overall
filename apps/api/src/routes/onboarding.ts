@@ -58,4 +58,16 @@ export const onboardingRoutes = new Hono<AppEnv>()
   )
   .post("/rate", async (c) =>
     c.json(await onboarding.rateInitial(c.get("db"), c.get("llm"), c.get("userId"))),
+  )
+  .post("/discovery", async (c) => {
+    const body = await parseOptionalJson(c, followupMessageBodySchema);
+    return c.json(
+      await onboarding.continueDiscovery(c.get("db"), c.get("llm"), c.get("userId"), body?.message),
+    );
+  })
+  .post("/discovery/skip", async (c) =>
+    c.json(await onboarding.skipDiscovery(c.get("db"), c.get("userId"))),
+  )
+  .post("/template", async (c) =>
+    c.json(await onboarding.draftTemplate(c.get("db"), c.get("llm"), c.get("userId"))),
   );

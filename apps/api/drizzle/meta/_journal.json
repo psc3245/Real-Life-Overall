@@ -85,6 +85,13 @@
       "when": 1792683647780,
       "tag": "0011_season_rollover",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792684284885,
+      "tag": "0012_onboarding_discovery",
+      "breakpoints": true
     }
   ]
 }

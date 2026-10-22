@@ -1,4 +1,8 @@
 import {
+  CATEGORY_TEMPLATES,
+  discoveryOutputSchema,
+  MAX_DISCOVERY_TURNS,
+  MIN_DISCOVERY_ANSWERS,
   followupOutputSchema,
   leafIds,
   MAX_FOLLOWUP_TURNS,
@@ -29,7 +33,9 @@ import type { LlmClient } from "../llm/client";
 import type { ModelMessage } from "ai";
 import { renderAnswers } from "../llm/prompts/answers";
 import {
+  discoveryPrompt,
   followupPrompt,
+  templatePrompt,
   initialRatingsPrompt,
   questionnairePrompt,
   suggestAttributesPrompt,
@@ -46,11 +52,13 @@ import * as eventRepo from "../repos/rating-event-repo";
 import { awardBadges } from "./badge-service";
 import { ensureCurrentSeason } from "./season-service";
 import { initialRatingsSchemaFor, normalizeInitialRatings } from "./initial-ratings";
+import { templateSchema, templateToDraft } from "./template";
 import { normalizeQuestions, questionnaireSchemaFor, targetQuestionCount } from "./questionnaire";
 
 /** The tree and weights stay editable until the questionnaire is generated (structure locks). */
 function isStructureEditable(session: OnboardingSessionRow): boolean {
   return (
+    session.stage === "discovery" ||
     session.stage === "tree" ||
     session.stage === "weights" ||
     (session.stage === "questionnaire" && session.questionnaire === null)
@@ -79,8 +87,13 @@ export async function getState(db: Database, userId: string): Promise<Onboarding
     questionnaire: questionsOf(session),
     answers: answersOf(session),
     chat: chatOf(session),
+    discovery: discoveryOf(session),
+    templateRationale: session.templateRationale,
   };
 }
+
+const discoveryOf = (s: OnboardingSessionRow) =>
+  (s.discovery ?? { messages: [], done: false }) as OnboardingStateDto["discovery"];
 
 // jsonb columns are written only by this service, so their shapes are trusted on read.
 const questionsOf = (s: OnboardingSessionRow) => s.questionnaire as QuestionDto[] | null;
@@ -95,23 +108,38 @@ export async function saveTree(
 ): Promise<OnboardingStateDto> {
   const { season, session } = await loadSession(db, userId);
   if (!isStructureEditable(session)) throw conflict("The rating tree is locked for this season");
+  await writeTree(db, userId, season.id, session.id, draft.nodes, {
+    stage: "weights",
+    weightRationale: null,
+  });
+  return getState(db, userId);
+}
 
+/** Replaces the season's tree (with a fresh Overall root) and updates the session, atomically. */
+async function writeTree(
+  db: Database,
+  userId: string,
+  seasonId: string,
+  sessionId: string,
+  nodes: TreeDraft["nodes"],
+  sessionChanges: Parameters<typeof onboardingRepo.update>[2],
+) {
   const ids = new Map<string, string>([[DRAFT_ROOT_KEY, crypto.randomUUID()]]);
-  for (const node of draft.nodes) ids.set(node.key, crypto.randomUUID());
-  const depths = new Map(draftToRatingNodes(draft.nodes).map((n) => [n.id, n.depth]));
+  for (const node of nodes) ids.set(node.key, crypto.randomUUID());
+  const depths = new Map(draftToRatingNodes(nodes).map((n) => [n.id, n.depth]));
 
   const rows = [
     {
       id: ids.get(DRAFT_ROOT_KEY)!,
-      seasonId: season.id,
+      seasonId: seasonId,
       userId,
       parentId: null,
       name: "Overall",
       depth: 0,
     },
-    ...draft.nodes.map((n, i) => ({
+    ...nodes.map((n, i) => ({
       id: ids.get(n.key)!,
-      seasonId: season.id,
+      seasonId: seasonId,
       userId,
       parentId: ids.get(n.parentKey ?? DRAFT_ROOT_KEY)!,
       name: n.name,
@@ -124,11 +152,10 @@ export async function saveTree(
   ].sort((a, b) => a.depth - b.depth);
 
   await db.transaction(async (tx) => {
-    await nodeRepo.deleteBySeason(tx, season.id);
+    await nodeRepo.deleteBySeason(tx, seasonId);
     await nodeRepo.insertMany(tx, rows);
-    await onboardingRepo.update(tx, session.id, { stage: "weights", weightRationale: null });
+    await onboardingRepo.update(tx, sessionId, sessionChanges);
   });
-  return getState(db, userId);
 }
 
 export async function suggestAttributes(
@@ -421,5 +448,92 @@ export async function rateInitial(
   });
   // Badges the starting ratings already qualify for belong to onboarding, not the first recap.
   await awardBadges(db, userId);
+  return getState(db, userId);
+}
+
+/**
+ * The discovery conversation. With no messages yet this opens it (no message needed);
+ * afterwards each call carries the user's reply. Nothing is saved if the model call fails.
+ */
+export async function continueDiscovery(
+  db: Database,
+  llm: LlmClient,
+  userId: string,
+  message: string | undefined,
+): Promise<OnboardingStateDto> {
+  const { session } = await loadSession(db, userId);
+  if (session.stage !== "discovery") throw conflict("The discovery conversation is over");
+  const { messages } = discoveryOf(session);
+  if (messages.length === 0 && message) throw badRequest("The conversation has not started yet");
+  if (messages.length > 0 && !message) throw badRequest("A message is required");
+
+  const updated: ChatMessageDto[] = message
+    ? [...messages, { role: "user", content: message }]
+    : messages;
+  const output = await llm.generateStructured({
+    purpose: "onboarding.discovery",
+    userId,
+    schema: discoveryOutputSchema,
+    system: discoveryPrompt.system,
+    prompt: [
+      { role: "user", content: discoveryPrompt.opener },
+      ...updated.map((m): ModelMessage => ({ role: m.role, content: m.content })),
+    ],
+    promptVersion: discoveryPrompt.version,
+  });
+  const final = [...updated, { role: "assistant" as const, content: output.reply.trim() }];
+  const done =
+    output.done || final.filter((m) => m.role === "assistant").length >= MAX_DISCOVERY_TURNS;
+  await onboardingRepo.update(db, session.id, { discovery: { messages: final, done } });
+  return getState(db, userId);
+}
+
+/** Leave discovery and build the tree by hand from the starter templates. */
+export async function skipDiscovery(db: Database, userId: string): Promise<OnboardingStateDto> {
+  const { session } = await loadSession(db, userId);
+  if (session.stage !== "discovery") throw conflict("The discovery conversation is over");
+  await onboardingRepo.update(db, session.id, { stage: "tree" });
+  return getState(db, userId);
+}
+
+/**
+ * Drafts the rating tree (with weights) from the discovery conversation. The user edits it on
+ * the build step; the summary of their priorities feeds every later onboarding prompt.
+ */
+export async function draftTemplate(
+  db: Database,
+  llm: LlmClient,
+  userId: string,
+): Promise<OnboardingStateDto> {
+  const { season, session } = await loadSession(db, userId);
+  if (session.stage !== "discovery") throw conflict("The template has already been drafted");
+  const { messages } = discoveryOf(session);
+  const answers = messages.filter((m) => m.role === "user").length;
+  if (answers < MIN_DISCOVERY_ANSWERS) {
+    throw badRequest(`Answer at least ${MIN_DISCOVERY_ANSWERS} questions first`);
+  }
+
+  const output = await llm.generateStructured({
+    purpose: "onboarding.template",
+    userId,
+    schema: templateSchema,
+    system: templatePrompt.system,
+    prompt: [
+      "Starter categories (key: name — attributes):",
+      CATEGORY_TEMPLATES.map(
+        (t) => `- ${t.key}: ${t.name} — ${t.attributes.map((a) => a.name).join(", ")}`,
+      ).join("\n"),
+      "Discovery conversation:",
+      messages.map((m) => `${m.role === "user" ? "User" : "Scout"}: ${m.content}`).join("\n"),
+    ].join("\n\n"),
+    promptVersion: templatePrompt.version,
+    maxOutputTokens: 8_000,
+  });
+  await writeTree(db, userId, season.id, session.id, templateToDraft(output), {
+    stage: "tree",
+    priorities: output.priorities.trim() || null,
+    templateRationale: output.rationale.trim() || null,
+    weightRationale: null,
+  });
   return getState(db, userId);
 }
