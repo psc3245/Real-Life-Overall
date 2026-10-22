@@ -18,6 +18,8 @@ const node = (id: string, parentId: string | null, name: string): RatedNodeDto =
   confidence: null,
   decay: null,
   trend: null,
+  goal: null,
+  projection: null,
 });
 
 describe("ActivityHeatmap", () => {

@@ -14,6 +14,8 @@ import * as onboardingRepo from "../repos/onboarding-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as nodeRepo from "../repos/rating-node-repo";
 import * as seasonRepo from "../repos/season-repo";
+import * as goalRepo from "../repos/goal-repo";
+import * as recapRepo from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
 import { applyDecay } from "./decay-service";
 import { datedEvents } from "./event-dates";
@@ -43,12 +45,27 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
   // The most recent event explains each leaf's current value.
   const latest = new Map(events.map((e) => [e.nodeId, e]));
   const result = session?.result as OnboardingResult | null | undefined;
+  const [goals, latestWeekly] = await Promise.all([
+    goalRepo.findByNodes(
+      db,
+      nodes.map((n) => n.id),
+    ),
+    recapRepo.findWeeklyHistory(db, userId, 1),
+  ]);
+  const goalByNode = new Map(goals.map((g) => [g.nodeId, g.targetValue]));
+  const weeklyOutput = latestWeekly[0]?.output as
+    { projections?: { nodeId: string; value: number }[] } | undefined;
+  const projections = new Map((weeklyOutput?.projections ?? []).map((p) => [p.nodeId, p.value]));
 
   return {
     season,
     archetype: archetype
-      ? { name: archetype, description: result?.archetypeDescription ?? "" }
+      ? {
+          name: archetype.name,
+          description: archetype.description || result?.archetypeDescription || "",
+        }
       : null,
+    projectedThrough: projections.size ? (latestWeekly[0]?.periodEnd ?? null) : null,
     summary: result?.summary ?? null,
     nodes: nodes.map((n) => {
       const event = leaves.has(n.id) ? latest.get(n.id) : undefined;
@@ -63,6 +80,8 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
           ? { graceDays: rule.graceDays, perDay: rule.perDay, floor: rule.floor, notes: rule.notes }
           : null,
         trend: trend.get(n.id) ?? null,
+        goal: goalByNode.get(n.id) ?? null,
+        projection: projections.get(n.id) ?? null,
       };
     }),
   };

@@ -62,6 +62,7 @@ export const seasons = pgTable(
     endsOn: date().notNull(),
     status: seasonStatus().notNull().default("setup"),
     archetype: text(),
+    archetypeDescription: text(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

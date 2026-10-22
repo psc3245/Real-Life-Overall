@@ -62,6 +62,8 @@ export interface WeeklyReviewDto {
   decayRevisions: DecayRevisionDto[];
   focusGoals: FocusGoalDto[];
   habitProposals: HabitProposalDto[];
+  /** Set when this review renamed the archetype. */
+  archetypeChange: { from: string | null; to: string; description: string } | null;
   createdAt: string;
 }
 
@@ -125,4 +127,16 @@ export const weeklyReviewOutputSchema = z.object({
   profileSummary: z
     .string()
     .describe("Updated rolling profile of the user: goals, context, patterns. Under 120 words"),
+  projections: z
+    .array(
+      z.object({
+        ref: z.string().describe('A category ref, or "overall"'),
+        value: z.number().describe("Expected rating at season end, 0-100"),
+      }),
+    )
+    .describe("Season-end projection for Overall and every category, from the current trajectory"),
+  archetype: z
+    .object({ name: z.string(), description: z.string() })
+    .nullable()
+    .describe("A new archetype only if the user's shape has clearly changed; otherwise null"),
 });

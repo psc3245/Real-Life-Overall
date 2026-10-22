@@ -8,6 +8,7 @@ import { LlmError } from "./llm/client";
 import { authFor, requireUser } from "./middleware/auth";
 import { dayRoutes } from "./routes/days";
 import { devRoutes } from "./routes/dev";
+import { goalRoutes } from "./routes/goals";
 import { habitRoutes } from "./routes/habits";
 import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
@@ -97,6 +98,7 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/pauses", requireUser)
     .use("/pauses/*", requireUser)
     .use("/dev/*", requireUser)
+    .use("/goals/*", requireUser)
     .use("/weekly", requireUser)
     .use("/weekly/*", requireUser)
     .route("/me", meRoutes)
@@ -106,7 +108,8 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/days", dayRoutes)
     .route("/pauses", pauseRoutes)
     .route("/dev", devRoutes)
-    .route("/weekly", weeklyRoutes);
+    .route("/weekly", weeklyRoutes)
+    .route("/goals", goalRoutes);
 
   return routes;
 }

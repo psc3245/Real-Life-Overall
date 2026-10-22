@@ -412,6 +412,7 @@ export async function rateInitial(
     await seasonRepo.update(tx, season.id, {
       status: "active",
       archetype: output.archetype.name.trim(),
+      archetypeDescription: output.archetype.description.trim(),
     });
   });
   return getState(db, userId);

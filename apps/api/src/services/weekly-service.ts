@@ -36,7 +36,9 @@ import * as decayRepo from "../repos/decay-repo";
 import * as dayRepo from "../repos/day-repo";
 import * as decayRuleRepo from "../repos/decay-rule-repo";
 import * as habitRepo from "../repos/habit-repo";
+import * as goalRepo from "../repos/goal-repo";
 import * as eventRepo from "../repos/rating-event-repo";
+import * as seasonRepo from "../repos/season-repo";
 import * as recapRepo from "../repos/recap-repo";
 import type { RecapRow } from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
@@ -53,11 +55,16 @@ interface WeeklyOutput {
   focusGoals: FocusGoalDto[];
   habitProposals: HabitProposalDto[];
   decayRevisions: Omit<DecayRevisionDto, "nodeName">[];
+  /** Season-end projections for Overall and categories (absent on older reviews). */
+  projections?: { nodeId: string; value: number }[];
+  archetypeChange?: WeeklyReviewDto["archetypeChange"];
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
+const daysBetween = (from: string, to: string) =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
 /** The last finished week, if the user had been onboarded by its end. */
 async function reviewableWeek(db: Database, userId: string, ctx: LeafContext) {
@@ -108,6 +115,7 @@ export function toWeeklyDto(
     })),
     focusGoals: output.focusGoals,
     habitProposals: output.habitProposals,
+    archetypeChange: output.archetypeChange ?? null,
     createdAt: recap.createdAt.toISOString(),
   };
 }
@@ -295,11 +303,34 @@ function normalizeOutput(
       };
     });
 
+  // Projections cover Overall ("overall") and categories; leaves are too fine-grained.
+  const root = ctx.nodes.find((n) => n.parentId === null);
+  const categories = new Set(ctx.nodes.filter((n) => n.parentId === root?.id).map((n) => n.id));
+  const projected = new Map<string, number>();
+  for (const p of output.projections) {
+    const ref = p.ref.trim().toLowerCase();
+    const nodeId = ref === "overall" ? root?.id : idByRef.get(p.ref.trim());
+    if (!nodeId || (nodeId !== root?.id && !categories.has(nodeId)) || !Number.isFinite(p.value)) {
+      continue;
+    }
+    projected.set(nodeId, round(clamp(p.value, 0, 100), 1));
+  }
+
+  const archetype =
+    output.archetype && output.archetype.name.trim()
+      ? {
+          name: output.archetype.name.trim().slice(0, 60),
+          description: output.archetype.description.trim(),
+        }
+      : null;
+
   return {
     corrections,
     decayRevisions,
     focusGoals,
     habitProposals,
+    projections: [...projected].map(([nodeId, value]) => ({ nodeId, value })),
+    archetype,
     profileSummary: output.profileSummary.trim().slice(0, MAX_PROFILE_SUMMARY),
   };
 }
@@ -323,13 +354,20 @@ export async function runWeeklyReview(
   const values = leafValuesFromEvents(events);
   const nodeValues = computeNodeValues(ctx.nodes, values);
   const { refById, idByRef } = refsFor(ctx.nodes);
-  const [profile, lastFocus, habits, weekRecaps, weekLogs] = await Promise.all([
+  const [profile, lastFocus, habits, weekRecaps, weekLogs, goals, archetype] = await Promise.all([
     userRepo.findProfileSummary(db, userId),
     currentFocus(db, userId),
     habitRepo.findAllByUser(db, userId),
     recapRepo.findDailyBetween(db, userId, week.start, week.end),
     dayRepo.findBetween(db, userId, week.start, week.end),
+    goalRepo.findByNodes(
+      db,
+      ctx.nodes.map((n) => n.id),
+    ),
+    seasonRepo.findArchetype(db, ctx.season.id),
   ]);
+  const names = new Map(ctx.nodes.map((n) => [n.id, n.name]));
+  const goalLines = goals.map((g) => `- ${names.get(g.nodeId)}: ${g.targetValue}`);
   // Older days related to this week, matched on both journals and recap narratives.
   const memories = await searchMemories(
     db,
@@ -349,6 +387,9 @@ export async function runWeeklyReview(
       renderTree(toPromptNodes(ctx.nodes, refById, nodeValues), true),
       await renderWeek(db, userId, ctx, week, refById, events),
       `Last week's focus goals:\n${lastFocus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
+      `The user's goal ratings:\n${goalLines.join("\n") || "(none set)"}`,
+      `Season: ${ctx.season.label}, ends ${ctx.season.endsOn} (${daysBetween(week.end, ctx.season.endsOn)} days after this week).`,
+      `Current archetype: ${archetype ? `${archetype.name}: ${archetype.description}` : "(none)"}`,
       `Related older days:\n${renderMemories(memories) || "(none)"}`,
     ].join("\n\n"),
     promptVersion: weeklyReviewPrompt.version,
@@ -375,6 +416,15 @@ export async function runWeeklyReview(
           focusGoals: normalized.focusGoals,
           habitProposals: normalized.habitProposals,
           decayRevisions: normalized.decayRevisions,
+          projections: normalized.projections,
+          archetypeChange:
+            normalized.archetype && normalized.archetype.name !== archetype?.name
+              ? {
+                  from: archetype?.name ?? null,
+                  to: normalized.archetype.name,
+                  description: normalized.archetype.description,
+                }
+              : null,
         } satisfies WeeklyOutput,
         promptVersion: weeklyReviewPrompt.version,
       });
@@ -395,6 +445,12 @@ export async function runWeeklyReview(
           perDay: d.perDay,
           floor: d.floor,
           notes: d.reason,
+        });
+      }
+      if (normalized.archetype && normalized.archetype.name !== archetype?.name) {
+        await seasonRepo.update(tx, ctx.season.id, {
+          archetype: normalized.archetype.name,
+          archetypeDescription: normalized.archetype.description,
         });
       }
       if (normalized.profileSummary) {
