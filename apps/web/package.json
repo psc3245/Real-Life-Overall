@@ -13,6 +13,7 @@
   "dependencies": {
     "@rlo/shared": "*",
     "@tanstack/react-query": "^5.104.5",
+    "better-auth": "^1.7.12",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router": "^8.5.0"

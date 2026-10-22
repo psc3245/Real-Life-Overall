@@ -5,7 +5,7 @@ import { ZodError } from "zod";
 import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
 import { LlmError } from "./llm/client";
-import { requireUser } from "./middleware/auth";
+import { authFor, requireUser } from "./middleware/auth";
 import { dayRoutes } from "./routes/days";
 import { devRoutes } from "./routes/dev";
 import { habitRoutes } from "./routes/habits";
@@ -26,7 +26,8 @@ function hasExecutionCtx(c: Context): boolean {
 }
 
 export function createApp(makeDeps: DepsFactory) {
-  const app = new Hono<AppEnv>();
+  // Everything lives under /api so the web app and API can share one origin (and cookies).
+  const app = new Hono<AppEnv>().basePath("/api");
 
   app.use("*", async (c, next) => {
     const env = parseEnv(c.env ?? {});
@@ -52,6 +53,7 @@ export function createApp(makeDeps: DepsFactory) {
         .CORS_ORIGINS.split(",")
         .map((o) => o.trim()),
       allowHeaders: ["Content-Type", "x-dev-user"],
+      credentials: true,
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     })(c, next),
   );
@@ -73,6 +75,16 @@ export function createApp(makeDeps: DepsFactory) {
 
   const routes = app
     .get("/health", (c) => c.json({ ok: true }))
+    // Better Auth's own endpoints: sign-up, sign-in, sign-out, session, OAuth callbacks.
+    .on(["GET", "POST"], "/auth/*", (c) => authFor(c).handler(c.req.raw))
+    // Tells the web app which sign-in options exist.
+    .get("/auth-config", (c) => {
+      const env = c.get("env");
+      return c.json({
+        mode: env.AUTH_MODE,
+        google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
+      });
+    })
     .use("/me", requireUser)
     .use("/me/*", requireUser)
     .use("/onboarding", requireUser)

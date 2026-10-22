@@ -63,7 +63,7 @@ export async function createTestApp(options: { doGenerate?: MockGenerate } = {})
     const headers = new Headers(init.headers);
     headers.set("x-dev-user", init.user ?? "tester");
     if (init.body) headers.set("content-type", "application/json");
-    return app.request(path, { ...init, headers }, testBindings);
+    return app.request(`/api${path}`, { ...init, headers }, testBindings);
   };
   return { app, db, llm, model, request };
 }

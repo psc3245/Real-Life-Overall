@@ -1,15 +1,20 @@
-import { Link, NavLink, Outlet } from "react-router";
+import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { useHealth } from "../api/hooks";
+import { useAuthState, useSignOut } from "../api/auth";
+import { Button } from "../components/Button";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
 import { TimezoneSync } from "../components/TimezoneSync";
 
 export function RootLayout() {
   const health = useHealth();
+  const auth = useAuthState();
+  const signOut = useSignOut();
+  const navigate = useNavigate();
   const apiUp = health.data?.ok === true;
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col px-4">
-      <TimezoneSync />
+      {auth.signedIn && <TimezoneSync />}
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-5">
         <Link to="/" className="font-display text-2xl font-bold tracking-wider">
           <span className="text-neon">OVR</span>
@@ -18,7 +23,11 @@ export function RootLayout() {
           </span>
         </Link>
         {/* On phones the nav drops to its own full-width row below the logo and status. */}
-        <nav className="order-last flex w-full gap-5 sm:order-none sm:w-auto" aria-label="Main">
+        <nav
+          className={`order-last flex w-full gap-5 sm:order-none sm:w-auto ${auth.signedIn ? "" : "invisible"}`}
+          aria-label="Main"
+          aria-hidden={!auth.signedIn}
+        >
           {[
             ["/today", "Today"],
             ["/habits", "Habits"],
@@ -44,7 +53,26 @@ export function RootLayout() {
             <span className={`h-2 w-2 rounded-full ${apiUp ? "bg-neon" : "bg-flare"}`} />
             API
           </span>
-          <DevUserSwitcher />
+          {auth.mode === "dev" && <DevUserSwitcher />}
+          {auth.mode === "better-auth" &&
+            (auth.signedIn ? (
+              <span className="flex items-center gap-2 text-sm text-court-300">
+                <span className="hidden sm:inline">{auth.name}</span>
+                <Button
+                  variant="ghost"
+                  onClick={async () => {
+                    await signOut();
+                    navigate("/");
+                  }}
+                >
+                  Sign out
+                </Button>
+              </span>
+            ) : (
+              <Link to="/signin" className="text-sm text-neon hover:underline">
+                Sign in
+              </Link>
+            ))}
         </div>
       </header>
       <main className="flex-1 pb-16">

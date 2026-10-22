@@ -7,8 +7,9 @@ export const ratingsKey = ["ratings"] as const;
 export const changesKey = ["rating-changes"] as const;
 
 /** Resolves to null (not an error) when the user has no ratings yet. */
-export function useRatings() {
+export function useRatings(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ratingsKey,
     queryFn: async () => {
       try {

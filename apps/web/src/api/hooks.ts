@@ -19,6 +19,6 @@ export function useHealth() {
   return useQuery({ queryKey: queryKeys.health, queryFn: () => api<{ ok: boolean }>("/health") });
 }
 
-export function useMe() {
-  return useQuery({ queryKey: queryKeys.me, queryFn: () => api<Me>("/me") });
+export function useMe(enabled = true) {
+  return useQuery({ queryKey: queryKeys.me, queryFn: () => api<Me>("/me"), enabled });
 }

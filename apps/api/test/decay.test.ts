@@ -150,7 +150,7 @@ describe("scheduled job", () => {
     const t = await onboardedDaysAgo(1);
     expect((await t.request("/dev/run-scheduled", { method: "POST" })).status).toBe(404);
     const dev = await t.app.request(
-      "/dev/run-scheduled",
+      "/api/dev/run-scheduled",
       { method: "POST", headers: { "x-dev-user": "tester" } },
       { ...testBindings, APP_ENV: "development" },
     );

@@ -1,6 +1,12 @@
 # Copy to .dev.vars (used by `wrangler dev`) and .env (used by drizzle-kit).
 DATABASE_URL=postgresql://user:password@your-neon-host/neondb?sslmode=require
 ANTHROPIC_API_KEY=
+# Signs session cookies (32+ chars): openssl rand -base64 32
+BETTER_AUTH_SECRET=
+# Optional Google sign-in (Google Cloud console → OAuth client, redirect URI
+# http://localhost:5173/api/auth/callback/google):
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
 # Only if your key is not scoped to a workspace (Console → Settings → Workspaces):
 # ANTHROPIC_WORKSPACE_ID=
 # Optional overrides, "provider:modelId":

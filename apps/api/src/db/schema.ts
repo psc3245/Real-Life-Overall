@@ -389,3 +389,69 @@ export const pauses = pgTable(
   },
   (t) => [index().on(t.userId)],
 );
+
+// Better Auth tables (DESIGN.md §8.5). Kept separate from `users`: an app user is linked to its
+// auth identity via users.auth_subject, so the domain model doesn't depend on the auth library.
+
+export const authUsers = pgTable("auth_users", {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  email: text().notNull().unique(),
+  emailVerified: boolean().notNull().default(false),
+  image: text(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+export const authSessions = pgTable(
+  "auth_sessions",
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    token: text().notNull().unique(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    ipAddress: text(),
+    userAgent: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const authAccounts = pgTable(
+  "auth_accounts",
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    accountId: text().notNull(),
+    providerId: text().notNull(),
+    accessToken: text(),
+    refreshToken: text(),
+    idToken: text(),
+    accessTokenExpiresAt: timestamp({ withTimezone: true }),
+    refreshTokenExpiresAt: timestamp({ withTimezone: true }),
+    scope: text(),
+    /** Password hash for email/password accounts. */
+    password: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const authVerifications = pgTable(
+  "auth_verifications",
+  {
+    id: text().primaryKey(),
+    identifier: text().notNull(),
+    value: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.identifier)],
+);
