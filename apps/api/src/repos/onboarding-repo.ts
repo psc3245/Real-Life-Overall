@@ -16,7 +16,7 @@ export async function findOrCreate(
   if (existing) return existing;
   await db
     .insert(onboardingSessions)
-    .values({ userId, seasonId })
+    .values({ userId, seasonId, stage: "discovery" })
     .onConflictDoNothing({ target: onboardingSessions.seasonId });
   const rows = await db.select().from(onboardingSessions).where(bySeason);
   return rows[0]!;
@@ -28,7 +28,13 @@ export async function update(
   changes: Partial<
     Pick<
       OnboardingSessionRow,
-      "priorities" | "weightRationale" | "questionnaire" | "answers" | "chat"
+      | "priorities"
+      | "weightRationale"
+      | "questionnaire"
+      | "answers"
+      | "chat"
+      | "discovery"
+      | "templateRationale"
     > & {
       stage: OnboardingStage;
     }

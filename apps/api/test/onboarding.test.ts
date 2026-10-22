@@ -16,11 +16,12 @@ const tree = {
 const json = (body: unknown) => ({ body: JSON.stringify(body) });
 
 describe("onboarding", () => {
-  it("starts in the tree stage with a current-quarter season", async () => {
+  it("starts in discovery with a current-quarter season", async () => {
     const { request } = await createTestApp();
     const res = await request("/onboarding");
     const state = (await res.json()) as OnboardingStateDto;
-    expect(state.stage).toBe("tree");
+    expect(state.stage).toBe("discovery");
+    expect(state.discovery).toEqual({ messages: [], done: false });
     expect(state.season.label).toMatch(/^\d{4}-Q[1-4]$/);
     expect(state.season.status).toBe("setup");
     expect(state.nodes).toEqual([]);

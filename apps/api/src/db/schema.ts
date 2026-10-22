@@ -207,6 +207,7 @@ export const goals = pgTable(
 );
 
 export const onboardingStage = pgEnum("onboarding_stage", [
+  "discovery",
   "tree",
   "weights",
   "questionnaire",
@@ -225,9 +226,15 @@ export const onboardingSessions = pgTable(
     seasonId: uuid()
       .notNull()
       .references(() => seasons.id, { onDelete: "cascade" }),
+    // New sessions start at "discovery" (set by the repo); the column default stays "tree"
+    // because a migration can't use an enum value it adds in the same transaction.
     stage: onboardingStage().notNull().default("tree"),
-    /** Free-text priorities the user gives when weighting categories. */
+    /** What matters to the user: summarized from discovery, or typed on the weights step. */
     priorities: text(),
+    /** ChatMessageDto[] of the discovery conversation. */
+    discovery: jsonb(),
+    /** The scout's explanation of the tree it drafted. */
+    templateRationale: text(),
     /** The LLM's explanation of its proposed weights, shown on the weights step. */
     weightRationale: text(),
     questionnaire: jsonb(),

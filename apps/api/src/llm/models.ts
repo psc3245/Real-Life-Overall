@@ -1,5 +1,7 @@
 /** Every LLM call is tagged with a purpose; config maps purposes to a model tier. */
 export const LLM_PURPOSES = [
+  "onboarding.discovery",
+  "onboarding.template",
   "onboarding.suggestAttributes",
   "onboarding.weights",
   "onboarding.questionnaire",
@@ -15,6 +17,8 @@ export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 export type ModelTier = "fast" | "smart";
 
 export const PURPOSE_TIERS: Record<LlmPurpose, ModelTier> = {
+  "onboarding.discovery": "fast",
+  "onboarding.template": "smart",
   "onboarding.suggestAttributes": "fast",
   "onboarding.weights": "fast",
   "onboarding.questionnaire": "fast",

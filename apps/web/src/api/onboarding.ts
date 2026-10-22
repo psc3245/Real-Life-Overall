@@ -96,3 +96,18 @@ export function useFollowup() {
 export function useFinishFollowup() {
   return useStateMutation(() => post("/onboarding/followup/finish")());
 }
+
+/** No message opens the discovery conversation; afterwards each call sends the user's reply. */
+export function useDiscovery() {
+  return useStateMutation((message: string | undefined) =>
+    post("/onboarding/discovery", message === undefined ? undefined : { message })(),
+  );
+}
+
+export function useSkipDiscovery() {
+  return useStateMutation(() => post("/onboarding/discovery/skip")());
+}
+
+export function useDraftTemplate() {
+  return useStateMutation(() => post("/onboarding/template")());
+}
