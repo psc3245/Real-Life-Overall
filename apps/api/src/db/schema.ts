@@ -1,3 +1,4 @@
+import { RATING_EVENT_SOURCES } from "@rlo/shared";
 import { sql, type SQL } from "drizzle-orm";
 import {
   boolean,
@@ -109,13 +110,7 @@ export const ratingNodes = pgTable(
   ],
 );
 
-export const ratingEventSource = pgEnum("rating_event_source", [
-  "onboarding",
-  "daily_recap",
-  "weekly_review",
-  "decay",
-  "recalibration",
-]);
+export const ratingEventSource = pgEnum("rating_event_source", RATING_EVENT_SOURCES);
 
 /** Append-only ledger: a leaf's value is the clamped sum of its non-voided deltas. */
 export const ratingEvents = pgTable(

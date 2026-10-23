@@ -1,13 +1,5 @@
-import { dayOfWeek, type HabitDayStat, type HabitStatRange } from "@rlo/shared";
-
-const DAY_LETTER = ["S", "M", "T", "W", "T", "F", "S"];
-
-export const shortDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+import { dayOfWeek, WEEKDAY_LETTERS, type HabitDayStat, type HabitStatRange } from "@rlo/shared";
+import { shortDate } from "../../lib/format";
 
 function dayClass(d: HabitDayStat, today: string) {
   if (d.done) return "border-neon bg-neon text-court-950";
@@ -50,7 +42,7 @@ export function DayStrip({
         {days.map((d) => (
           <li key={d.date} title={dayTitle(d, today)} className="space-y-1 text-center">
             <span className="block text-[10px] uppercase text-court-500">
-              {DAY_LETTER[dayOfWeek(d.date)]}
+              {WEEKDAY_LETTERS[dayOfWeek(d.date)]}
             </span>
             <span
               className={`flex h-8 items-center justify-center rounded-md border text-xs ${dayClass(d, today)}`}

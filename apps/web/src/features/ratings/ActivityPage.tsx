@@ -4,6 +4,7 @@ import { useChangeFeed, useRatings, type ChangeSource } from "../../api/ratings"
 import { Button } from "../../components/Button";
 import { Delta } from "../../components/Delta";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { dayLabel } from "../../lib/format";
 
 export const SOURCE_LABEL: Record<ChangeSource, string> = {
   onboarding: "Scouting",
@@ -20,14 +21,6 @@ const FILTERS: { key: string; label: string; sources?: ChangeSource[] }[] = [
   { key: "decay", label: "Decay", sources: ["decay"] },
   { key: "setup", label: "Scouting & seasons", sources: ["onboarding", "recalibration"] },
 ];
-
-export const dayLabel = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
 
 /** Every rating change this season, newest first, filterable by source and category. */
 export function ActivityPage() {

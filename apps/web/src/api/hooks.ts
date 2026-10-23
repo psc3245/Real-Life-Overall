@@ -1,17 +1,8 @@
-import type { ProfileVisibility } from "@rlo/shared";
+import type { MeDto } from "@rlo/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./client";
 
-export interface Me {
-  id: string;
-  username: string;
-  displayName: string;
-  timezone: string;
-  weekStart: number;
-  profileVisibility: ProfileVisibility;
-  leaderboardOptIn: boolean;
-  createdAt: string;
-}
+export type Me = MeDto;
 
 export const queryKeys = {
   health: ["health"] as const,

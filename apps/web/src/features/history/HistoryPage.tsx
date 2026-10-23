@@ -3,16 +3,7 @@ import { useRatings } from "../../api/ratings";
 import { useSeasonCards } from "../../api/seasons";
 import { OvrBadge } from "../../components/OvrBadge";
 import { ErrorNote } from "../onboarding/ErrorNote";
-
-export const seasonDates = (start: string, end: string) => {
-  const f = (d: string) =>
-    new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    });
-  return `${f(start)} – ${f(end)}, ${end.slice(0, 4)}`;
-};
+import { seasonDates } from "../../lib/format";
 
 /** Every season: the one in progress first, then archived ones, newest first. */
 export function HistoryPage() {

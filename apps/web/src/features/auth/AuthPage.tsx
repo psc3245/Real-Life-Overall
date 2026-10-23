@@ -4,9 +4,8 @@ import { Link, Navigate, useNavigate } from "react-router";
 import { authClient, useAuthConfig, useAuthState } from "../../api/auth";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { fieldClass } from "../../components/form";
 
-const field =
-  "w-full rounded-lg border border-court-700 bg-court-950 px-3 py-2.5 outline-none focus:border-neon";
 const MIN_PASSWORD = 8;
 
 /** Sign in and sign up share one form; `mode` picks which. */
@@ -70,7 +69,7 @@ export function AuthPage({ mode }: { mode: "signin" | "signup" }) {
               maxLength={40}
               autoComplete="name"
               onChange={(e) => setName(e.target.value)}
-              className={field}
+              className={fieldClass}
             />
           </label>
         )}
@@ -82,7 +81,7 @@ export function AuthPage({ mode }: { mode: "signin" | "signup" }) {
             required
             autoComplete="email"
             onChange={(e) => setEmail(e.target.value)}
-            className={field}
+            className={fieldClass}
           />
         </label>
         <label className="block space-y-1">
@@ -94,7 +93,7 @@ export function AuthPage({ mode }: { mode: "signin" | "signup" }) {
             minLength={signup ? MIN_PASSWORD : undefined}
             autoComplete={signup ? "new-password" : "current-password"}
             onChange={(e) => setPassword(e.target.value)}
-            className={field}
+            className={fieldClass}
           />
           {signup && (
             <span className="text-xs text-court-500">At least {MIN_PASSWORD} characters.</span>

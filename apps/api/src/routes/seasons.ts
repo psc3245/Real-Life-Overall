@@ -4,7 +4,7 @@ import type { AppEnv } from "../context";
 import { getRatings } from "../services/ratings-service";
 import { editSeasonTree, getSeasonSetup, listSeasonCards } from "../services/season-service";
 import { getSeasonDetail } from "../services/season-history-service";
-import { parseJson } from "../validation";
+import { idParam, parseJson } from "../validation";
 
 export const seasonRoutes = new Hono<AppEnv>()
   .get("/", async (c) => c.json(await listSeasonCards(c.get("db"), c.get("userId"))))
@@ -15,5 +15,5 @@ export const seasonRoutes = new Hono<AppEnv>()
     return c.json(await getRatings(c.get("db"), c.get("userId")));
   })
   .get("/:id", async (c) =>
-    c.json(await getSeasonDetail(c.get("db"), c.get("userId"), c.req.param("id"))),
+    c.json(await getSeasonDetail(c.get("db"), c.get("userId"), idParam(c, "id", "Season"))),
   );

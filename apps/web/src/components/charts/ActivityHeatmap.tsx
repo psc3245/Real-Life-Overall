@@ -2,6 +2,7 @@ import { dayOfWeek, type ActivityDayDto } from "@rlo/shared";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Delta } from "../Delta";
+import { dayLabel } from "../../lib/format";
 
 const CELL = 13;
 const GAP = 3;
@@ -29,14 +30,6 @@ export function describe(day: ActivityDayDto) {
   if (day.loss) parts.push(`${day.loss.toFixed(1)} lost`);
   return parts.join(" · ");
 }
-
-const longDay = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
 
 interface Hover {
   day: ActivityDayDto;
@@ -139,7 +132,7 @@ function DayCard({ hover: { day, left, top } }: { hover: Hover }) {
       style={{ left: `clamp(7rem, ${left}px, calc(100% - 7rem))`, top: top - 6 }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-display uppercase tracking-wider">{longDay(day.date)}</span>
+        <span className="font-display uppercase tracking-wider">{dayLabel(day.date)}</span>
         {day.gain || day.loss ? <Delta value={net} /> : <span className="text-court-500">±0</span>}
       </div>
       <p className="text-xs text-court-500">

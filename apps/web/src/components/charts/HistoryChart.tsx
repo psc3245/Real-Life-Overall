@@ -11,13 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { AXIS_TEXT, CATEGORY_COLORS, GRID_COLOR, OVERALL_COLOR } from "./palette";
-
-const shortDate = (d: string) =>
-  new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+import { shortDate } from "../../lib/format";
 
 /**
  * Overall over time by default; "Categories" shows each category in its fixed color. With `only`,

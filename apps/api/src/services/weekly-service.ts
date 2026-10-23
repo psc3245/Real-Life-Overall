@@ -1,4 +1,5 @@
 import {
+  WEEKDAY_SHORT,
   addDays,
   computeNodeValues,
   dayOfWeek,
@@ -66,7 +67,6 @@ interface WeeklyOutput {
   archetypeChange?: WeeklyReviewDto["archetypeChange"];
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
 const daysBetween = (from: string, to: string) =>
@@ -160,15 +160,13 @@ export async function getWeeklyState(db: Database, userId: string): Promise<Week
   };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** One weekly review in full (earlier weeks on the Week page), from whichever season it's in. */
 export async function getWeeklyReview(
   db: Database,
   userId: string,
   id: string,
 ): Promise<WeeklyReviewDto> {
-  const recap = UUID.test(id) ? await recapRepo.findById(db, userId, id) : null;
+  const recap = await recapRepo.findById(db, userId, id);
   if (!recap || recap.kind !== "weekly") throw notFound("Weekly review not found");
   const [nodes, rows, badges] = await Promise.all([
     nodeRepo.findActiveBySeason(db, recap.seasonId),
@@ -211,7 +209,7 @@ async function renderWeek(
       .map((e) => `${names.get(e.nodeId)} ${e.delta > 0 ? "+" : ""}${e.delta}`);
     const journal = journalByDate.get(d);
     lines.push(
-      `- ${d} (${WEEKDAYS[dayOfWeek(d)]}): ` +
+      `- ${d} (${WEEKDAY_SHORT[dayOfWeek(d)]}): ` +
         (recap
           ? `${recap.narrative} [${changes.join(", ") || "no changes"}]`
           : journal

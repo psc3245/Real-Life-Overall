@@ -1,4 +1,5 @@
 import {
+  WEEKDAY_NAMES,
   addDays,
   computeNodeValues,
   dailyRecapOutputSchema,
@@ -31,8 +32,6 @@ import { currentFocus } from "./weekly-service";
 import * as userRepo from "../repos/user-repo";
 import { loadLeafContext } from "./habit-service";
 import { normalizePrompts, normalizeRecapChanges } from "./recap-changes";
-
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function describeEntry({ habit, entry }: DayHabitDto): string {
   const { config } = habit;
@@ -103,7 +102,7 @@ export function renderDay(
     );
   const answered = day.prompts.filter((p) => p.answer?.trim());
   return [
-    `Day: ${day.date} (${WEEKDAYS[dayOfWeek(day.date)]})`,
+    `Day: ${day.date} (${WEEKDAY_NAMES[dayOfWeek(day.date)]})`,
     `Journal:\n${day.journal.trim() || "(empty)"}`,
     `Habits:\n${habits.join("\n") || "(none)"}`,
     answered.length

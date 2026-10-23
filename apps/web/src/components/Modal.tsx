@@ -5,11 +5,13 @@ export function Modal({
   open,
   onClose,
   label,
+  size = "md",
   children,
 }: {
   open: boolean;
   onClose: () => void;
   label: string;
+  size?: "sm" | "md";
   children: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -25,7 +27,7 @@ export function Modal({
       aria-label={label}
       onClose={onClose}
       onClick={(e) => e.target === dialog.current && onClose()}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-court-700 bg-court-900 p-5 text-court-100 shadow-2xl backdrop:bg-black/60"
+      className={`m-auto rounded-2xl border border-court-700 bg-court-900 text-court-100 shadow-2xl backdrop:bg-black/60 ${size === "sm" ? "w-[min(22rem,calc(100vw-2rem))] p-4" : "w-[min(28rem,calc(100vw-2rem))] p-5"}`}
     >
       {open && children}
     </dialog>

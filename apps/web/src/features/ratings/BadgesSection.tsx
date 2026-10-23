@@ -8,11 +8,7 @@ import { useState } from "react";
 import { useBadges } from "../../api/badges";
 import { Medallion, TIER_COLORS } from "../../components/BadgeChip";
 import { Modal } from "../../components/Modal";
-
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
-
-const earnedOn = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+import { formatNumber, instantDate } from "../../lib/format";
 
 export function BadgesSection() {
   const badges = useBadges();
@@ -61,8 +57,8 @@ export function BadgesSection() {
                 </div>
                 <p className="text-xs tabular-nums text-court-500">
                   {b.next
-                    ? `${fmt(b.value)} / ${fmt(b.next)} ${b.unit}`
-                    : `${fmt(b.value)} ${b.unit} · maxed`}
+                    ? `${formatNumber(b.value)} / ${formatNumber(b.next)} ${b.unit}`
+                    : `${formatNumber(b.value)} ${b.unit} · maxed`}
                 </p>
               </button>
             </li>
@@ -151,7 +147,7 @@ function CatalogDetail({ badge: b, onClose }: { badge: BadgeProgressDto; onClose
       />
       <p className="text-court-300">{b.description}</p>
       <p className="font-display text-3xl tabular-nums">
-        {fmt(b.value)} <span className="text-base text-court-500">{b.unit}</span>
+        {formatNumber(b.value)} <span className="text-base text-court-500">{b.unit}</span>
       </p>
       <ol className="space-y-3" aria-label="Tiers">
         {BADGE_TIERS.map((tier, i) => {
@@ -165,15 +161,15 @@ function CatalogDetail({ badge: b, onClose }: { badge: BadgeProgressDto; onClose
                 <Medallion tier={tier} size={22} locked={!done} />
                 <span className="font-medium">{BADGE_TIER_LABELS[tier]}</span>
                 <span className="tabular-nums text-court-500">
-                  {fmt(threshold)} {b.unit}
+                  {formatNumber(threshold)} {b.unit}
                 </span>
                 <span className="ml-auto text-xs text-court-300">
                   {done
                     ? earned.get(tier)
-                      ? `Earned ${earnedOn(earned.get(tier)!)}`
+                      ? `Earned ${instantDate(earned.get(tier)!)}`
                       : "Earned"
                     : isNext
-                      ? `${fmt(Math.max(0, threshold - b.value))} to go`
+                      ? `${formatNumber(Math.max(0, threshold - b.value))} to go`
                       : "Locked"}
                 </span>
               </div>
@@ -201,7 +197,7 @@ function PersonalDetail({ badge: b, onClose }: { badge: EarnedBadgeDto; onClose:
       <DetailHeader
         tier={null}
         title={b.name}
-        subtitle={`Personal badge · earned ${earnedOn(b.earnedAt)}`}
+        subtitle={`Personal badge · earned ${instantDate(b.earnedAt)}`}
         onClose={onClose}
       />
       <p className="text-court-300">{b.description}</p>

@@ -3,7 +3,7 @@ import { toPng } from "html-to-image";
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { useMe } from "../../api/hooks";
-import { useActivity, useChanges, useHistory, useRatings } from "../../api/ratings";
+import { useActivity, useChangeFeed, useHistory, useRatings } from "../../api/ratings";
 import { ActivityHeatmap } from "../../components/charts/ActivityHeatmap";
 import { HistoryChart } from "../../components/charts/HistoryChart";
 import { ShapeRadar } from "../../components/charts/ShapeRadar";
@@ -17,12 +17,7 @@ import { BadgesSection } from "./BadgesSection";
 import { DecayCard } from "./DecayCard";
 import { NewSeasonBanner, PastSeasons } from "./SeasonSections";
 import { GoalEditor } from "./GoalEditor";
-
-const CONFIDENCE_LABEL = {
-  low: "Low confidence",
-  medium: "Medium confidence",
-  high: "High confidence",
-};
+import { CONFIDENCE_LABEL } from "./labels";
 
 const RATINGS_SECTIONS = [
   { id: "card", label: "Card" },
@@ -204,8 +199,11 @@ function Detail({ node }: { node: RatedNodeDto }) {
 
 /** The latest few changes; the full feed is its own page. */
 function RecentChanges() {
-  const changes = useChanges(5);
-  const items = (changes.data ?? []).filter((c) => c.source !== "onboarding").slice(0, 3);
+  const changes = useChangeFeed({
+    sources: ["daily_recap", "weekly_review", "decay", "recalibration"],
+    pageSize: 3,
+  });
+  const items = changes.data?.pages[0] ?? [];
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">

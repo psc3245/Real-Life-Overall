@@ -7,6 +7,7 @@ import { PublicCard } from "../../components/PlayerCard";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { CopyLink } from "./CopyLink";
 import { FriendButtons } from "./FriendButtons";
+import { instantMonthYear } from "../../lib/format";
 
 export const VISIBILITY_LABEL = {
   private: "Private: only you",
@@ -67,11 +68,7 @@ export function ProfilePage() {
           <div>
             <h1 className="font-display text-4xl font-bold uppercase">{p.displayName}</h1>
             <p className="text-court-500">
-              @{p.username} · joined{" "}
-              {new Date(p.memberSince).toLocaleDateString(undefined, {
-                month: "long",
-                year: "numeric",
-              })}
+              @{p.username} · joined {instantMonthYear(p.memberSince)}
             </p>
           </div>
           {p.friendship && (

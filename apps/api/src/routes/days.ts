@@ -8,7 +8,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../context";
 import * as days from "../services/day-service";
 import { runDailyRecap } from "../services/recap-service";
-import { parseJson } from "../validation";
+import { idParam, parseJson } from "../validation";
 
 export const dayRoutes = new Hono<AppEnv>()
   .get("/today", async (c) => c.json(await days.getDay(c.get("db"), c.get("userId"))))
@@ -25,7 +25,13 @@ export const dayRoutes = new Hono<AppEnv>()
     const date = dateParamSchema.parse(c.req.param("date"));
     const value = await parseJson(c, saveEntryBodySchema);
     return c.json(
-      await days.saveEntry(c.get("db"), c.get("userId"), date, c.req.param("habitId"), value),
+      await days.saveEntry(
+        c.get("db"),
+        c.get("userId"),
+        date,
+        idParam(c, "habitId", "Habit"),
+        value,
+      ),
     );
   })
   .put("/:date/prompts", async (c) => {

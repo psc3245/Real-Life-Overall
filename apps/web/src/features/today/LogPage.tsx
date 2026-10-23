@@ -21,16 +21,12 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { GuidedPrompts } from "./GuidedPrompts";
 import { HabitEntryInput } from "./HabitEntryInput";
 import { RecapPanel } from "./RecapPanel";
+import { weekdayDate } from "../../lib/format";
 
 function dayTitle(date: string, today: string) {
   if (date === today) return "Today";
   if (date === addDays(today, -1)) return "Yesterday";
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+  return weekdayDate(date);
 }
 
 /** Logging one day: guided prompts, journal, habits and the recap. `?date=` picks a past day. */

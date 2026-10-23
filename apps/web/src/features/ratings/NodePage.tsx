@@ -10,8 +10,7 @@ import { tierColor } from "../../components/tier";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { ChangeList } from "./ActivityPage";
 import { GoalEditor } from "./GoalEditor";
-
-const CONFIDENCE_LABEL = { low: "Low", medium: "Medium", high: "High" } as const;
+import { CONFIDENCE_LABEL } from "./labels";
 
 /** Everything about one attribute or category: value, history, why it moved, what feeds it. */
 export function NodePage() {
@@ -99,8 +98,8 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
           {node.rationale && <p className="text-court-100">{node.rationale}</p>}
           <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
             {node.confidence && (
-              <div className="flex gap-1.5">
-                <dt className="text-court-500">Confidence</dt>
+              <div>
+                <dt className="sr-only">Confidence</dt>
                 <dd>{CONFIDENCE_LABEL[node.confidence]}</dd>
               </div>
             )}

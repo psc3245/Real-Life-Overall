@@ -1,7 +1,7 @@
 # Real Life Overall: Design & Development Guide
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
-> **Status:** Pre-development. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
+> **Status:** In development: Phases 0–4 built, web refinements done, mobile next. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
 > **Last updated:** 2026-10-22
 
 ---
@@ -63,7 +63,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Hosting | **Must be free to host** (LLM API spend aside). |
 | Repo layout | **Monorepo** (this repo). |
 | ORM | **Drizzle.** |
-| Auth | **Deferred.** Decide before public launch (§13). |
+| Auth | **Better Auth** (email + password, Google), decided 2026-10-22 (§8.5). |
 | LLM provider | **Provider-agnostic layer.** |
 | LLM cost control | **Cheap model by default.** Monetization model decided later. |
 | Testing | **Unit and integration tests, with CI.** |
@@ -299,9 +299,9 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 | Frontend | **React + Vite + TypeScript** | Same as Habit Tracker, now typed |
 | Routing | **React Router** | Real URLs for profiles and shareable cards |
 | Server state | **TanStack Query** | Replaces the Helpers + `useEffect` fetch pattern |
-| Styling | **Tailwind CSS + shadcn/ui** (Radix-based) | Fast, consistent, themeable for the 2K-menu look |
+| Styling | **Tailwind CSS** with theme tokens; small in-house components (no component library yet) | Fast, consistent, themeable for the 2K-menu look |
 | Charts | **Recharts** (or visx if more control is needed) | Line, radar, heatmap |
-| Animation | **Motion** (Framer Motion) | Stat-bar fills, OVR reveal |
+| Animation | **CSS** transitions and keyframes (Motion if it's ever needed) | Stat-bar fills, OVR reveal |
 | API framework | **Hono** | TS-native, tiny, runs on Cloudflare Workers **and** Node (portable if hosting changes) |
 | Validation | **Zod** (shared package) | Request bodies **and** LLM structured outputs |
 | DB | **Neon Postgres** (free tier) | Same provider as before; full-text search for memory |
@@ -321,9 +321,11 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 ├── apps/
 │   ├── web/                 # React + Vite SPA
 │   │   └── src/
-│   │       ├── routes/      # React Router route modules
-│   │       ├── features/    # onboarding/, ratings/, daylog/, habits/, card/ ...
-│   │       ├── components/  # shared UI (shadcn components live in components/ui)
+│   │       ├── router.tsx   # React Router routes
+│   │       ├── routes/      # layout, home and 404
+│   │       ├── features/    # pages by area: today/, habits/, week/, ratings/, history/, social/ ...
+│   │       ├── components/  # shared UI (cards, stat bars, charts, modal, section nav, form styles)
+│   │       ├── lib/         # formatting helpers
 │   │       ├── api/         # typed API client + TanStack Query hooks
 │   │       └── styles/
 │   └── api/                 # Hono API
@@ -332,9 +334,9 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 │           ├── services/    # business logic (rating math, recaps, decay, seasons)
 │           ├── repos/       # Drizzle queries
 │           ├── db/          # Drizzle schema + migrations
-│           ├── llm/         # provider-agnostic client, prompts/, schemas, cost tracking
-│           ├── jobs/        # cron handlers (auto-recap, decay, weekly review, season rollover)
-│           └── index.ts
+│           ├── llm/         # provider-agnostic client, models.ts, prompts/, cost tracking
+│           ├── middleware/  # auth (requireUser, optionalUser)
+│           └── index.ts     # Worker entry: fetch + the hourly scheduled job (services/scheduler.ts)
 ├── packages/
 │   └── shared/              # Zod schemas, TS types, constants (MAX_RATING_DEPTH, caps), rating math
 ├── docs/
@@ -347,7 +349,7 @@ The layering carries over from Habit Tracker (Routes → Controllers → Service
 
 ### 8.4 LLM module interface (sketch)
 ```ts
-// apps/api/src/llm/index.ts
+// apps/api/src/llm/client.ts
 type LlmPurpose =
   | 'onboarding.questionnaire' | 'onboarding.followup' | 'onboarding.initialRatings'
   | 'onboarding.suggestAttributes' | 'onboarding.weights'
@@ -364,7 +366,7 @@ generateStructured<T>(opts: {
 
 embed(texts: string[], ctx): Promise<number[][]>
 ```
-`config/models.ts` maps each purpose to `{ provider, model }`. Defaults are cheap models, and the weekly review and initial ratings can be upgraded.
+`llm/models.ts` maps each purpose to `{ provider, model }`. Defaults are cheap models, and the weekly review and initial ratings can be upgraded.
 
 ### 8.5 Auth
 - **Better Auth** (decided 2026-10-22), running in the API Worker with users and sessions in Neon via the Drizzle adapter. Sign-in: **email + password** and **Google** (enabled when `GOOGLE_CLIENT_ID/SECRET` are set). Session cookies are first-party: the API lives under `/api` on the same origin as the web app (Vite proxy in dev; one Worker serving both in production).
@@ -374,46 +376,46 @@ embed(texts: string[], ctx): Promise<number[][]>
 - *Later:* email verification and password reset need an email provider (e.g. Resend).
 
 ### 8.6 Scheduled jobs (Cloudflare Cron Triggers)
-| Job | Schedule | Does |
+One hourly Cron Trigger (`runHourly` in `services/scheduler.ts`) visits every user with an active season and, in order:
+
+| Step | When | Does |
 |---|---|---|
-| `autoRecap` | hourly | For users whose local time just passed 04:00: if yesterday isn't recapped, run the daily recap (or decay only if empty) |
-| `weeklyReview` | hourly | For users whose local week just ended and whose last daily recap is done |
-| `seasonRollover` | daily | At the quarter boundary, archive the season and prompt season setup |
-| `snapshots` | daily | Write per-node daily value snapshots (chart optimization) |
-| card refresh | hourly (end of each user's run) | Rewrite the user's `player_cards` row so profiles and leaderboards stay current |
+| Season rollover | any request, lazily | `ensureCurrentSeason` archives an ended season and starts the new quarter on the user's next request or job run |
+| Auto-recap | the user's local 04:00 | Recaps days in the backfill window that have content but no current recap |
+| Decay | every run | Brings decay up to date |
+| Weekly review | the user's local 04:00, once a week has finished | Runs the review when the week's days are recapped |
+| Badges | every run | Awards catalog badges |
+| Card refresh | every run | Rewrites the user's `player_cards` row so profiles and leaderboards stay current |
+
+There is no snapshot job: charts replay the ledger (`node_snapshots` stays a possible optimization).
 
 Jobs must be **idempotent**: unique constraints on `(user_id, local_date, kind)` for recaps, plus status columns.
 
 ---
 
-## 9. Data Model (initial draft)
+## 9. Data Model
 
 Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `created_at` and `updated_at` unless noted.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `users` | `email`, `username`, `display_name`, `timezone` (IANA), `week_start`, `auth_subject` (nullable, for the future auth provider) | **Never return the full row from the API** (see §11) |
-| `seasons` | `user_id`, `label` (e.g. `2026-Q4`), `starts_on`, `ends_on`, `status` (`setup`/`active`/`archived`) | |
+| `users` | `email`, `username`, `display_name`, `timezone` (IANA), `week_start`, `auth_subject` (links the Better Auth identity), `profile_summary` | **Never return the full row from the API** (see §11) |
+| `seasons` | `user_id`, `label` (e.g. `2026-Q4`), `starts_on`, `ends_on`, `status` (`setup`/`active`/`archived`), `archetype`, `final_snapshot` jsonb, `setup_ends_on` | Archived seasons keep their tree and ledger (the History page replays them) |
 | `rating_nodes` | `season_id`, `user_id`, `parent_id` (null for Overall), `name`, `description`, `depth` (0–3), `weight`, `sort_order`, `template_key` (nullable), `lineage_id` | `lineage_id` links "the same" node across seasons for long-term charts |
 | `rating_events` | `node_id` (leaf), `season_id`, `delta` numeric(6,2), `source` (`onboarding`/`daily_recap`/`weekly_review`/`decay`/`recalibration`), `recap_id` (nullable), `reason`, `evidence` (jsonb), `voided_at` (nullable) | Append-only ledger; re-runs set `voided_at` |
-| `node_values` | `node_id` pk, `value` numeric(5,2) | Cache of current leaf and parent values |
-| `node_snapshots` | `node_id`, `date`, `value` | Daily, for charts |
 | `decay_rules` | `node_id`, `grace_days`, `per_day`, `floor`, `notes`, `version`, `active`, `authored_by` (`llm`/`user`) | |
-| `pauses` | `user_id`, `starts_on`, `ends_on`, `reason` | |
+| `pauses` | `user_id`, `starts_on`, `ends_on`, `reason` | Vacation / illness |
 | `onboarding_sessions` | `user_id`, `season_id`, `stage`, `questionnaire` jsonb, `answers` jsonb, `chat` jsonb, `result` jsonb | Resumable |
-| `day_logs` | `user_id`, `local_date`, `journal` text, `status` (`open`/`submitted`/`recapped`) | Unique `(user_id, local_date)` |
-| `guided_prompts` | `day_log_id`, `question`, `answer` | |
-| `habits` | `user_id`, `name`, `type` (8 types + `group`), `config` jsonb (target, slider min/max, group rule…), `recurrence_interval`, `recurrence_days`, `parent_id`, `archived` | Ported from Habit Tracker, with the type-specific columns folded into `config`. **Groups** (`type = group`) hold sub-habits (`parent_id`): done by a rule (all / any / at least N), no entries of their own, sub-habits share the group's schedule and carry the links. One level for now; the parent link leaves room for richer habits later. |
-| `habit_links` | `habit_id`, `node_lineage_id`, `status` (`suggested`/`confirmed`/`rejected`) | Linked by lineage so links survive seasons |
+| `day_logs` | `user_id`, `local_date`, `journal` text, `prompts` jsonb (guided questions and answers), `status` (`open`/`recapped`/`stale`) | Unique `(user_id, local_date)` |
+| `habits` | `user_id`, `name`, `type` (8 types + `group`), `config` jsonb (target, slider min/max, group rule…), `days` (weekdays), `starts_on`, `sort_order`, `parent_id`, `archived_at` | Ported from Habit Tracker, with the type-specific columns folded into `config`. **Groups** (`type = group`) hold sub-habits (`parent_id`): done by a rule (all / any / at least N), no entries of their own, sub-habits share the group's schedule and carry the links. One level for now; the parent link leaves room for richer habits later. |
+| `habit_links` | `habit_id`, `node_lineage_id` | Confirmed links only (suggestions live in the editor); by lineage so links survive seasons |
 | `habit_entries` | `habit_id`, `local_date`, `value_num`, `value_text` | |
-| `recaps` | `user_id`, `kind` (`daily`/`weekly`/`onboarding`/`recalibration`), `period_start`, `period_end`, `narrative`, `output` jsonb, `prompt_version`, `model`, `status`, `superseded_by` | |
+| `recaps` | `user_id`, `season_id`, `kind` (`daily`/`weekly`), `period_start`, `period_end`, `narrative`, `output` jsonb, `prompt_version`, `status` (`active`/`superseded`) | One active recap per period. Weekly `output` also holds focus goals, habit proposals, decay revisions, projections and archetype changes |
 | `goals` | `node_id`, `target_value` | User half of Potential |
-| `projections` | `node_id`, `recap_id`, `projected_value` | LLM half of Potential |
-| `focus_goals` / `habit_proposals` | from weekly reviews | Phase 2–3 |
+| `decay_runs` | `user_id`, `season_id`, `local_date`, `paused`, `voided_at` | One active run per day; backfills void later runs |
 | (memory) | `day_logs.journal_search`, `recaps.narrative_search` (generated `tsvector`, GIN) | Full-text search; no embeddings table (§5.5) |
 | `llm_calls` | `user_id`, `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`, `error` | **From day one** |
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
-| `settings` | per-user UI prefs | Carried over pattern |
 | `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
 | `friendships` | `requester_id`, `addressee_id`, `status` (`pending`/`accepted`), `responded_at` | One row per pair (unique on least/greatest), Phase 4 |
 | `player_cards` | `user_id` pk, `season_id`, `season_label`, `overall`, `archetype`, `categories` jsonb, `recapped_days`, `flagged_days` | Shareable card cache, Phase 4 |
