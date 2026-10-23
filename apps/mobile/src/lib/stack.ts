@@ -20,7 +20,7 @@ export const tabStackOptions: Options = {
 /** Screens pushed over the tabs (a day's log, an attribute page…): a plain dark header. */
 export const pushedOptions: Options = {
   headerShown: true,
-  headerTitle: "",
+  title: "",
   headerTitleStyle: { fontFamily: fonts.display, color: colors.court100 },
   headerStyle: { backgroundColor: colors.court950 },
   headerTintColor: colors.neon,

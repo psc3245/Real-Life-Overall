@@ -1,5 +1,5 @@
 import { Link, type Href } from "expo-router";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -14,7 +14,11 @@ import {
   type ViewStyle,
 } from "react-native";
 import { TextInput } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, space } from "@/lib/theme";
+
+/** True inside a tab's own stack, where screens have no header to cover the status bar. */
+export const TabRootContext = createContext(false);
 
 /** A scrolling page with a big 2K-style title and pull to refresh. Insets come from the tab bar. */
 export function Screen({
@@ -32,28 +36,33 @@ export function Screen({
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
+  const tabRoot = useContext(TabRootContext);
+  const insets = useSafeAreaInsets();
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      contentInsetAdjustmentBehavior="automatic"
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.neon} />
-        ) : undefined
-      }
-    >
-      {title && (
-        <View>
-          {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-          <Text accessibilityRole="header" style={styles.title}>
-            {title}
-          </Text>
-          {subtitle && <Label>{subtitle}</Label>}
-        </View>
-      )}
-      {children}
-    </ScrollView>
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        contentInsetAdjustmentBehavior="automatic"
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.neon} />
+          ) : undefined
+        }
+      >
+        {title && (
+          <View>
+            {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+            <Text accessibilityRole="header" style={styles.title}>
+              {title}
+            </Text>
+            {subtitle && <Label>{subtitle}</Label>}
+          </View>
+        )}
+        {children}
+      </ScrollView>
+      {tabRoot && <View style={[styles.scrim, { height: insets.top }]} />}
+    </View>
   );
 }
 
@@ -206,6 +215,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     fontSize: 40,
     textTransform: "uppercase",
+  },
+  scrim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(7,9,13,0.92)",
   },
   card: {
     backgroundColor: colors.court900,
