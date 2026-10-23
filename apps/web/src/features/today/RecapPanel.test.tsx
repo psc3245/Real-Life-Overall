@@ -1,6 +1,7 @@
 import type { DayDto, RecapDto } from "@rlo/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../api/client";
 import { RecapPanel } from "./RecapPanel";
@@ -65,7 +66,9 @@ function renderPanel(d: DayDto) {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <RecapPanel day={d} />
+      <MemoryRouter>
+        <RecapPanel day={d} />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

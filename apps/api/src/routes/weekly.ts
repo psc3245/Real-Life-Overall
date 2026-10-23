@@ -6,6 +6,9 @@ import * as weekly from "../services/weekly-service";
 export const weeklyRoutes = new Hono<AppEnv>()
   .get("/", async (c) => c.json(await weekly.getWeeklyState(c.get("db"), c.get("userId"))))
   .get("/focus", async (c) => c.json(await weekly.currentFocus(c.get("db"), c.get("userId"))))
+  .get("/:id", async (c) =>
+    c.json(await weekly.getWeeklyReview(c.get("db"), c.get("userId"), c.req.param("id"))),
+  )
   .post("/run", async (c) =>
     c.json(await weekly.runWeeklyReview(c.get("db"), c.get("llm"), c.get("userId"))),
   )

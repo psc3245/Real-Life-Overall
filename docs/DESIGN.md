@@ -429,6 +429,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - **Phase 2:** Today (journal, habits, guided prompts, "End my day") → Recap view (narrative + itemized changes) → Weekly review → Change feed → Pause and backfill controls.
   - **Phase 3:** Player card, charts, badges, goals and potential, season setup and archive.
   - **Phase 4:** Profile, friends, compare, leaderboards.
+  - **Refinements (before mobile):** Today is an at-a-glance overview and logging lives at `/log`; `/habits` is the habit stats glance (week / month / season; management at `/habits/manage`); the Week page adds day-by-day detail and opens earlier reviews; `/ratings/activity` holds the full change feed; every attribute and category has a page (`/ratings/node/:id`: history, changes, children, linked habits) and is linked wherever it appears; long pages get sticky section nav; heatmap days show a hover card and open their log.
 - Responsive from the start (web first, mobile later). Consider making it an installable **PWA** before going native.
 - Light mode is optional. The 2K look is dark-first.
 

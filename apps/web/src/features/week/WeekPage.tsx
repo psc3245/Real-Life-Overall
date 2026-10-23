@@ -1,13 +1,31 @@
-import { HABIT_TYPE_LABELS, type HabitProposalDto, type WeeklyReviewDto } from "@rlo/shared";
+import {
+  HABIT_TYPE_LABELS,
+  statPeriod,
+  type HabitProposalDto,
+  type RatedNodeDto,
+  type WeekRange,
+  type WeeklyReviewDto,
+  type WeeklyStateDto,
+} from "@rlo/shared";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { useDay } from "../../api/days";
 import { useMe } from "../../api/hooks";
 import { useRatings } from "../../api/ratings";
-import { useResolveProposal, useRunWeekly, useSetWeekStart, useWeekly } from "../../api/weekly";
+import {
+  useResolveProposal,
+  useRunWeekly,
+  useSetWeekStart,
+  useWeekly,
+  useWeeklyReview,
+} from "../../api/weekly";
 import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
 import { Delta } from "../../components/Delta";
+import { SectionNav } from "../../components/SectionNav";
+import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { WeekBreakdown } from "./WeekBreakdown";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -87,24 +105,118 @@ export function WeekPage() {
         </section>
       )}
 
-      {review && <ReviewCard review={review} names={names} />}
+      <SectionNav
+        sections={[
+          ...(review ? [{ id: "review", label: "Review" }] : []),
+          { id: "detail", label: "Week in detail" },
+          ...(history.length ? [{ id: "earlier", label: "Earlier weeks" }] : []),
+        ]}
+      />
+
+      {review && (
+        <div id="review" className="scroll-mt-16">
+          <ReviewCard review={review} names={names} />
+        </div>
+      )}
+
+      <div id="detail" className="scroll-mt-16">
+        <WeekDetail lastWeek={week} nodes={ratings.data?.nodes ?? []} />
+      </div>
 
       {history.length > 0 && (
-        <section className="space-y-3">
+        <section id="earlier" className="scroll-mt-16 space-y-3">
           <h2 className="font-display text-2xl uppercase tracking-wider">Earlier weeks</h2>
           <ul className="space-y-2">
             {history.map((h) => (
-              <li key={h.id} className="rounded-xl border border-court-700 bg-court-900/70 p-4">
-                <p className="text-xs uppercase tracking-wider text-court-500">
-                  {fmt(h.weekStart)} – {fmt(h.weekEnd)}
-                </p>
-                <p className="mt-1 text-sm text-court-300">{h.narrative}</p>
-              </li>
+              <EarlierWeek key={h.id} week={h} names={names} />
             ))}
           </ul>
         </section>
       )}
     </div>
+  );
+}
+
+/** Day-by-day specifics for the week in progress or the last finished one. */
+function WeekDetail({ lastWeek, nodes }: { lastWeek: WeekRange | null; nodes: RatedNodeDto[] }) {
+  const me = useMe();
+  const today = useDay(null).data?.today;
+  const [which, setWhich] = useState<"current" | "last">(lastWeek ? "last" : "current");
+  if (!today || !me.data) return null;
+  const current = statPeriod("week", today, me.data.weekStart);
+  const week = which === "last" && lastWeek ? lastWeek : current;
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="font-display text-2xl uppercase tracking-wider">Week in detail</h2>
+        <div
+          role="tablist"
+          aria-label="Which week"
+          className="flex rounded-lg border border-court-700"
+        >
+          {(
+            [
+              ["current", "This week"],
+              ["last", "Last week"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={which === key}
+              disabled={key === "last" && !lastWeek}
+              onClick={() => setWhich(key)}
+              className={`px-3 py-1.5 font-display text-sm uppercase tracking-wider first:rounded-l-lg last:rounded-r-lg disabled:opacity-30 ${which === key ? "bg-neon text-court-950" : "text-court-300 hover:text-court-100"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-sm text-court-500">
+        {fmt(week.start)} – {fmt(week.end)}
+        {week === current && " · so far"}
+      </p>
+      <WeekBreakdown week={week} today={today} nodes={nodes} />
+    </section>
+  );
+}
+
+/** An earlier week's narrative that opens into its full review. */
+function EarlierWeek({
+  week: h,
+  names,
+}: {
+  week: WeeklyStateDto["history"][number];
+  names: Map<string, string>;
+}) {
+  const [open, setOpen] = useState(false);
+  const review = useWeeklyReview(open ? h.id : null);
+  return (
+    <li className="rounded-xl border border-court-700 bg-court-900/70">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="block w-full p-4 text-left hover:bg-court-800/40"
+      >
+        <span className="flex items-baseline justify-between gap-3">
+          <span className="text-xs uppercase tracking-wider text-court-500">
+            {fmt(h.weekStart)} – {fmt(h.weekEnd)}
+          </span>
+          <span className="text-xs text-court-500">{open ? "Hide ▲" : "Full review ▼"}</span>
+        </span>
+        {!open && <span className="mt-1 block text-sm text-court-300">{h.narrative}</span>}
+      </button>
+      {open && (
+        <div className="px-4 pb-4">
+          {review.isPending && <p className="text-sm text-court-500">Loading…</p>}
+          <ErrorNote error={review.error} />
+          {review.data && <ReviewCard review={review.data} names={names} />}
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -171,12 +283,7 @@ function ReviewCard({ review, names }: { review: WeeklyReviewDto; names: Map<str
                   {g.nodeIds.length > 0 && (
                     <p className="mt-1 flex flex-wrap gap-1.5">
                       {g.nodeIds.map((id) => (
-                        <span
-                          key={id}
-                          className="rounded bg-court-800 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-court-300"
-                        >
-                          {names.get(id) ?? "?"}
-                        </span>
+                        <NodeChip key={id} id={id} name={names.get(id)} />
                       ))}
                     </p>
                   )}
@@ -206,7 +313,9 @@ function ReviewCard({ review, names }: { review: WeeklyReviewDto; names: Map<str
               <li key={c.nodeId} className="grid grid-cols-[4rem_1fr] gap-3 py-2">
                 <Delta value={c.delta} className="text-lg" />
                 <div>
-                  <p className="font-medium">{c.nodeName}</p>
+                  <Link to={`/ratings/node/${c.nodeId}`} className="font-medium hover:text-neon">
+                    {c.nodeName}
+                  </Link>
                   <p className="text-sm text-court-300">{c.reason}</p>
                 </div>
               </li>

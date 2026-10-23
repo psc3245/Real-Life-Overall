@@ -1,4 +1,10 @@
-import { addDays, type DayDto, type HabitDto, type WeeklyStateDto } from "@rlo/shared";
+import {
+  addDays,
+  type DayDto,
+  type HabitDto,
+  type WeeklyReviewDto,
+  type WeeklyStateDto,
+} from "@rlo/shared";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { decayRules, ratingEvents } from "../src/db/schema";
@@ -123,6 +129,16 @@ describe("weekly review", () => {
     expect(prompt).toContain("[n3] Cardio: grace 5 days, 0.25/day, floor 50");
     expect(prompt).toContain("Existing habit names: Morning run");
     expect(prompt).toContain("Related older days:\\n(none)");
+  });
+
+  it("serves one review in full by id, for earlier weeks", async () => {
+    const t = await setup();
+    const review = (await body<WeeklyStateDto>(await t.run())).review!;
+    const fetched = await body<WeeklyReviewDto>(await t.request(`/weekly/${review.id}`));
+    expect(fetched).toMatchObject({ id: review.id, narrative: review.narrative });
+    expect(fetched.corrections).toEqual(review.corrections);
+    expect((await t.request(`/weekly/${review.id}`, { user: "someone-else" })).status).toBe(404);
+    expect((await t.request("/weekly/not-a-uuid")).status).toBe(404);
   });
 
   it("weekly corrections are not day-level activity for decay", async () => {

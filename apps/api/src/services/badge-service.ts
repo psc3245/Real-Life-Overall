@@ -3,8 +3,8 @@ import {
   BADGE_CATALOG,
   BADGE_TIER_LABELS,
   computeNodeValues,
-  dayOfWeek,
   earnedTiers,
+  habitStreaks,
   isHabitDone,
   leafIds,
   leafValuesFromEvents,
@@ -60,14 +60,7 @@ export function bestHabitStreak(
   doneDates: Set<string>,
   today: string,
 ): number {
-  let best = 0;
-  let run = 0;
-  for (let d = startsOn; d <= today; d = addDays(d, 1)) {
-    if (!days.includes(dayOfWeek(d))) continue;
-    if (doneDates.has(d)) best = Math.max(best, ++run);
-    else if (d !== today) run = 0;
-  }
-  return best;
+  return habitStreaks(startsOn, days, doneDates, today).best;
 }
 
 export async function computeMetrics(db: Database, userId: string): Promise<BadgeMetrics> {

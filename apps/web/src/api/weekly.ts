@@ -1,4 +1,4 @@
-import type { FocusGoalDto, HabitDto, WeeklyStateDto } from "@rlo/shared";
+import type { FocusGoalDto, HabitDto, WeeklyReviewDto, WeeklyStateDto } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { habitsKey } from "./days";
@@ -9,6 +9,15 @@ export const focusKey = ["weekly-focus"] as const;
 
 export function useWeekly() {
   return useQuery({ queryKey: weeklyKey, queryFn: () => api<WeeklyStateDto>("/weekly") });
+}
+
+/** One earlier review in full, fetched when it's opened. */
+export function useWeeklyReview(id: string | null) {
+  return useQuery({
+    enabled: Boolean(id),
+    queryKey: [...weeklyKey, "review", id],
+    queryFn: () => api<WeeklyReviewDto>(`/weekly/${id}`),
+  });
 }
 
 export function useFocus() {

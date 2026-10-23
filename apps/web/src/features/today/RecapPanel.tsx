@@ -1,5 +1,6 @@
 import { MAX_RECAPS_PER_DAY, type DayDto, type RecapDto } from "@rlo/shared";
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { useEndDay } from "../../api/days";
 import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
@@ -98,7 +99,9 @@ export function RecapCard({ recap }: { recap: RecapDto }) {
               <Delta value={c.delta} className="text-lg" />
               <div className="min-w-0">
                 <p className="font-medium">
-                  {c.nodeName}{" "}
+                  <Link to={`/ratings/node/${c.nodeId}`} className="hover:text-neon">
+                    {c.nodeName}
+                  </Link>{" "}
                   <span className="text-sm text-court-500 tabular-nums">
                     → {c.valueAfter.toFixed(1)}
                   </span>

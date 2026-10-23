@@ -19,14 +19,26 @@ const shortDate = (d: string) =>
     timeZone: "UTC",
   });
 
-/** Overall over time by default; "Categories" shows each category in its fixed color. */
-export function HistoryChart({ history, nodes }: { history: HistoryDto; nodes: RatedNodeDto[] }) {
+/**
+ * Overall over time by default; "Categories" shows each category in its fixed color. With `only`,
+ * just that node's line (attribute and category pages).
+ */
+export function HistoryChart({
+  history,
+  nodes,
+  only,
+}: {
+  history: HistoryDto;
+  nodes: RatedNodeDto[];
+  only?: RatedNodeDto;
+}) {
   const [view, setView] = useState<"overall" | "categories">("overall");
   const [showTable, setShowTable] = useState(false);
   const root = nodes.find((n) => n.parentId === null);
   const categories = nodes.filter((n) => n.parentId === root?.id);
-  const series =
-    view === "overall"
+  const series = only
+    ? [{ id: only.id, name: only.name, color: OVERALL_COLOR }]
+    : view === "overall"
       ? root
         ? [{ id: root.id, name: "Overall", color: OVERALL_COLOR }]
         : []
@@ -54,7 +66,7 @@ export function HistoryChart({ history, nodes }: { history: HistoryDto; nodes: R
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="History view">
-        {(["overall", "categories"] as const).map((v) => (
+        {(only ? [] : (["overall", "categories"] as const)).map((v) => (
           <button
             key={v}
             type="button"

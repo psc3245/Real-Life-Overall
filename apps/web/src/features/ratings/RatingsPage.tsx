@@ -8,10 +8,11 @@ import { ActivityHeatmap } from "../../components/charts/ActivityHeatmap";
 import { HistoryChart } from "../../components/charts/HistoryChart";
 import { ShapeRadar } from "../../components/charts/ShapeRadar";
 import { Button } from "../../components/Button";
-import { Delta } from "../../components/Delta";
 import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
+import { SectionNav } from "../../components/SectionNav";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { ChangeList } from "./ActivityPage";
 import { BadgesSection } from "./BadgesSection";
 import { DecayCard } from "./DecayCard";
 import { NewSeasonBanner, PastSeasons } from "./SeasonSections";
@@ -22,6 +23,16 @@ const CONFIDENCE_LABEL = {
   medium: "Medium confidence",
   high: "High confidence",
 };
+
+const RATINGS_SECTIONS = [
+  { id: "card", label: "Card" },
+  { id: "charts", label: "Charts" },
+  { id: "badges", label: "Badges" },
+  { id: "activity", label: "Activity" },
+  { id: "categories", label: "Categories" },
+  { id: "seasons", label: "Seasons" },
+  { id: "decay", label: "Decay" },
+];
 
 export function RatingsPage() {
   const ratings = useRatings();
@@ -47,7 +58,8 @@ export function RatingsPage() {
   return (
     <div className="space-y-10 pt-4">
       <NewSeasonBanner />
-      <div className="grid gap-8 md:grid-cols-[1fr_1.2fr] md:items-start">
+      <SectionNav sections={RATINGS_SECTIONS} />
+      <div id="card" className="grid scroll-mt-16 gap-8 md:grid-cols-[1fr_1.2fr] md:items-start">
         <ExportableCard
           ratings={data}
           name={me.data?.displayName ?? "Player"}
@@ -76,24 +88,41 @@ export function RatingsPage() {
         </div>
       </div>
 
-      <Charts ratings={data} />
+      <div id="charts" className="scroll-mt-16">
+        <Charts ratings={data} />
+      </div>
 
-      <BadgesSection />
+      <div id="badges" className="scroll-mt-16">
+        <BadgesSection />
+      </div>
 
-      <RecentChanges />
+      <div id="activity" className="scroll-mt-16">
+        <RecentChanges />
+      </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div id="categories" className="grid scroll-mt-16 gap-6 md:grid-cols-2">
         {categories.map((c) => (
           <section key={c.id} className="rounded-xl border border-court-700 bg-court-900/70 p-5">
-            <StatBar
-              label={c.name}
-              value={c.value ?? 0}
-              trend={c.trend}
-              projection={c.projection}
-              goal={c.goal}
-            />
-            <div className="mt-2">
+            <Link
+              to={`/ratings/node/${c.id}`}
+              className="block rounded-lg outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-neon"
+            >
+              <StatBar
+                label={c.name}
+                value={c.value ?? 0}
+                trend={c.trend}
+                projection={c.projection}
+                goal={c.goal}
+              />
+            </Link>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <GoalEditor node={c} />
+              <Link
+                to={`/ratings/node/${c.id}`}
+                className="text-xs uppercase tracking-wider text-court-300 hover:text-neon"
+              >
+                Details →
+              </Link>
             </div>
             <div className="mt-4 space-y-3 border-t border-court-800 pt-4">
               <Children ratings={data} parent={c} />
@@ -102,9 +131,13 @@ export function RatingsPage() {
         ))}
       </div>
 
-      <PastSeasons />
+      <div id="seasons" className="scroll-mt-16">
+        <PastSeasons />
+      </div>
 
-      <DecayCard />
+      <div id="decay" className="scroll-mt-16">
+        <DecayCard />
+      </div>
     </div>
   );
 }
@@ -118,7 +151,9 @@ function Children({ ratings, parent }: { ratings: RatingsDto; parent: RatedNodeD
         const grandchildren = ratings.nodes.some((n) => n.parentId === child.id);
         return grandchildren ? (
           <div key={child.id} className="space-y-3 border-l border-court-700 pl-3">
-            <StatBar label={child.name} value={child.value ?? 0} trend={child.trend} />
+            <Link to={`/ratings/node/${child.id}`} className="block hover:opacity-90">
+              <StatBar label={child.name} value={child.value ?? 0} trend={child.trend} />
+            </Link>
             <Children ratings={ratings} parent={child} />
           </div>
         ) : (
@@ -150,6 +185,9 @@ function Detail({ node }: { node: RatedNodeDto }) {
   return (
     <div className="mt-2 space-y-2 rounded-lg bg-court-950/60 p-3 text-sm">
       {node.rationale && <p className="text-court-100">{node.rationale}</p>}
+      <Link to={`/ratings/node/${node.id}`} className="inline-block text-neon hover:underline">
+        History, changes and linked habits →
+      </Link>
       <GoalEditor node={node} />
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs uppercase tracking-wider text-court-500">
         {node.confidence && <span>{CONFIDENCE_LABEL[node.confidence]}</span>}
@@ -164,39 +202,23 @@ function Detail({ node }: { node: RatedNodeDto }) {
   );
 }
 
-const SOURCE_LABEL = {
-  onboarding: "Scouting",
-  daily_recap: "Recap",
-  weekly_review: "Weekly",
-  decay: "Decay",
-  recalibration: "New season",
-} as const;
-
+/** The latest few changes; the full feed is its own page. */
 function RecentChanges() {
-  const changes = useChanges(15);
-  const items = (changes.data ?? []).filter((c) => c.source !== "onboarding");
-  if (!items.length) return null;
+  const changes = useChanges(5);
+  const items = (changes.data ?? []).filter((c) => c.source !== "onboarding").slice(0, 3);
   return (
     <section className="space-y-3">
-      <h2 className="font-display text-2xl uppercase tracking-wider">Recent changes</h2>
-      <ul className="divide-y divide-court-800 rounded-xl border border-court-700 bg-court-900/70">
-        {items.map((c) => (
-          <li
-            key={c.id}
-            className="grid grid-cols-[4rem_1fr_auto] items-baseline gap-3 px-4 py-2.5"
-          >
-            <Delta value={c.delta} className="text-lg" />
-            <div className="min-w-0">
-              <p className="font-medium">{c.nodeName}</p>
-              <p className="text-sm text-court-300">{c.reason}</p>
-            </div>
-            <span className="text-right text-xs uppercase tracking-wider text-court-500">
-              {SOURCE_LABEL[c.source]}
-              {c.date && <span className="block normal-case tracking-normal">{c.date}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-2xl uppercase tracking-wider">Recent activity</h2>
+        <Link to="/ratings/activity" className="text-sm text-court-300 hover:text-neon">
+          All activity →
+        </Link>
+      </div>
+      {items.length ? (
+        <ChangeList items={items} showDates />
+      ) : (
+        <p className="text-sm text-court-500">No changes since scouting yet.</p>
+      )}
     </section>
   );
 }

@@ -1,10 +1,13 @@
 import { LEADERBOARD_MIN_RECAPPED_DAYS, type PublicCardDto, type RatingsDto } from "@rlo/shared";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
 import { OvrBadge } from "./OvrBadge";
 import { StatBar } from "./StatBar";
 
 interface CardCategory {
   key: string;
+  /** Makes the bar a link (your own card's categories open their pages). */
+  href?: string;
   name: string;
   value: number;
   trend?: number | null;
@@ -40,9 +43,15 @@ export function CardView({
         </div>
       </div>
       <div className="mt-6 space-y-4">
-        {categories.map(({ key, name: label, ...bar }) => (
-          <StatBar key={key} label={label} {...bar} />
-        ))}
+        {categories.map(({ key, href, name: label, ...bar }) =>
+          href ? (
+            <Link key={key} to={href} className="block rounded-lg hover:opacity-90">
+              <StatBar label={label} {...bar} />
+            </Link>
+          ) : (
+            <StatBar key={key} label={label} {...bar} />
+          ),
+        )}
       </div>
     </section>
   );
@@ -68,6 +77,7 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
       }
       categories={categories.map((c) => ({
         key: c.id,
+        href: `/ratings/node/${c.id}`,
         name: c.name,
         value: c.value ?? 0,
         trend: c.trend,

@@ -140,6 +140,34 @@ export function isHabitDone(type: HabitType, config: HabitConfig, value: HabitEn
   }
 }
 
+/** A compact reading of one entry for summaries: "✓", "6/8 glasses", "25/30 min", "4/5". */
+export function formatHabitEntry(
+  type: HabitType,
+  config: HabitConfig,
+  value: HabitEntryValue | null,
+): string {
+  if (!value) return "—";
+  const n = value.num;
+  switch (type) {
+    case "checkbox":
+      return n === 1 ? "✓" : "—";
+    case "checknote":
+      return n === 1 ? (value.text?.trim() ? `✓ ${value.text.trim()}` : "✓") : "—";
+    case "counter": {
+      const unit = config.unit ? ` ${config.unit}` : "";
+      return config.target ? `${n ?? 0}/${config.target}${unit}` : `${n ?? 0}${unit}`;
+    }
+    case "duration":
+      return config.target ? `${n ?? 0}/${config.target} min` : `${n ?? 0} min`;
+    case "rating":
+      return n === null ? "—" : `${n}/${config.max ?? 5}`;
+    case "slider":
+      return n === null ? "—" : `${n}${config.max !== null ? `/${config.max}` : ""}`;
+    default:
+      return value.text?.trim() || "—";
+  }
+}
+
 export interface HabitDto {
   id: string;
   name: string;

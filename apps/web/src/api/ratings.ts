@@ -5,7 +5,7 @@ import type {
   OnboardingStateDto,
   RatingsDto,
 } from "@rlo/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
 import { onboardingKey } from "./onboarding";
 
@@ -43,6 +43,28 @@ export function useChanges(limit = 30) {
   return useQuery({
     queryKey: [...changesKey, limit],
     queryFn: () => api<ChangeFeedItemDto[]>(`/ratings/changes?limit=${limit}`),
+  });
+}
+
+export type ChangeSource = ChangeFeedItemDto["source"];
+const FEED_PAGE = 50;
+
+/** The change feed in pages of 50, optionally narrowed to sources or one node (and below it). */
+export function useChangeFeed({
+  sources,
+  nodeId,
+}: { sources?: ChangeSource[]; nodeId?: string } = {}) {
+  return useInfiniteQuery({
+    queryKey: [...changesKey, "feed", sources?.join(",") ?? "all", nodeId ?? "all"],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(FEED_PAGE), offset: String(pageParam) });
+      if (sources?.length) params.set("source", sources.join(","));
+      if (nodeId) params.set("nodeId", nodeId);
+      return api<ChangeFeedItemDto[]>(`/ratings/changes?${params}`);
+    },
+    getNextPageParam: (last, pages) =>
+      last.length === FEED_PAGE ? pages.length * FEED_PAGE : undefined,
   });
 }
 
