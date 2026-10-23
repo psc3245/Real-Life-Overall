@@ -8,7 +8,6 @@ import { ActivityHeatmap } from "../../components/charts/ActivityHeatmap";
 import { HistoryChart } from "../../components/charts/HistoryChart";
 import { ShapeRadar } from "../../components/charts/ShapeRadar";
 import { Button } from "../../components/Button";
-import { Delta } from "../../components/Delta";
 import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
 import { SectionNav } from "../../components/SectionNav";
