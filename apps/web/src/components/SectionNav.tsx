@@ -49,11 +49,12 @@ export function SectionNav({ sections }: { sections: Section[] }) {
 
   return (
     <>
+      {/* Full-bleed and translucent so the page's tinted background shows through. */}
       <nav
         aria-label="On this page"
-        className="sticky top-0 z-20 -mx-4 overflow-x-auto border-b border-court-800 bg-court-950/90 px-4 py-2 backdrop-blur"
+        className="sticky top-0 z-20 mx-[calc(50%-50vw)] w-screen border-b border-court-700/70 bg-court-900/80 py-2 shadow-[0_8px_16px_-12px_rgb(0_0_0/0.8)] backdrop-blur-md"
       >
-        <ul className="flex gap-2">
+        <ul className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-4">
           {sections.map((s) => (
             <li key={s.id}>
               <a

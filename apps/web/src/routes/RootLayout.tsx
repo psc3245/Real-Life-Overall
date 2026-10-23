@@ -18,47 +18,13 @@ export function RootLayout() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col px-4">
       {auth.signedIn && <TimezoneSync />}
-      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-5">
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 pt-5 pb-3">
         <Link to="/" className="font-display text-2xl font-bold tracking-wider">
           <span className="text-neon">OVR</span>
           <span className="ml-2 text-sm font-medium tracking-[0.25em] text-court-300">
             REAL LIFE
           </span>
         </Link>
-        {/* On phones the nav drops to its own full-width row below the logo and status. */}
-        <nav
-          className={`order-last -mx-4 flex w-[calc(100%+2rem)] gap-5 overflow-x-auto px-4 sm:order-none sm:mx-0 sm:w-auto sm:px-0 ${auth.signedIn ? "" : "invisible"}`}
-          aria-label="Main"
-          aria-hidden={!auth.signedIn}
-        >
-          {[
-            ["/today", "Today"],
-            ["/log", "Log"],
-            ["/habits", "Habits"],
-            ["/week", "Week"],
-            ["/ratings", "Rating"],
-            ["/friends", "Friends"],
-            ["/leaderboards", "Leaders"],
-          ].map(([to, label]) => (
-            <NavLink
-              key={to}
-              to={to!}
-              className={({ isActive }) =>
-                `whitespace-nowrap font-display text-sm uppercase tracking-wider ${isActive ? "text-neon" : "text-court-300 hover:text-court-100"}`
-              }
-            >
-              {label}
-              {to === "/friends" && requests > 0 && (
-                <span
-                  className="ml-1.5 rounded-full bg-neon px-1.5 text-xs text-court-950"
-                  aria-label={`${requests} friend request${requests === 1 ? "" : "s"}`}
-                >
-                  {requests}
-                </span>
-              )}
-            </NavLink>
-          ))}
-        </nav>
         <div className="flex items-center gap-4">
           <span
             className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-court-500"
@@ -103,9 +69,72 @@ export function RootLayout() {
             ))}
         </div>
       </header>
+      {auth.signedIn && <MainNav requests={requests} />}
       <main className="flex-1 pb-16">
         <Outlet />
       </main>
     </div>
+  );
+}
+
+const side = ({ isActive }: { isActive: boolean }) =>
+  `whitespace-nowrap font-display text-xs uppercase tracking-wider ${isActive ? "text-neon" : "text-court-300 hover:text-court-100"}`;
+
+/**
+ * Today anchors the left; Rating is the big centered button with smaller links either side.
+ * Below lg it's one scrolling row in the same order.
+ */
+function MainNav({ requests }: { requests: number }) {
+  return (
+    <nav
+      aria-label="Main"
+      className="-mx-4 mb-4 flex items-center gap-5 overflow-x-auto border-y border-court-800/70 px-4 py-2.5 lg:mx-0 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:overflow-visible lg:rounded-full lg:border lg:px-5"
+    >
+      <div className="contents lg:flex lg:items-center lg:justify-between lg:gap-5">
+        <NavLink
+          to="/today"
+          className={({ isActive }) =>
+            `whitespace-nowrap font-display text-base font-semibold uppercase tracking-wider ${isActive ? "text-neon" : "text-court-100 hover:text-neon"}`
+          }
+        >
+          Today
+        </NavLink>
+        <span className="contents lg:flex lg:gap-5">
+          <NavLink to="/log" className={side}>
+            Log
+          </NavLink>
+          <NavLink to="/habits" className={side}>
+            Habits
+          </NavLink>
+          <NavLink to="/week" className={side}>
+            Week
+          </NavLink>
+        </span>
+      </div>
+      <NavLink
+        to="/ratings"
+        className={({ isActive }) =>
+          `whitespace-nowrap rounded-full border-2 border-neon px-6 py-1.5 font-display text-lg font-bold uppercase tracking-[0.2em] shadow-[0_0_18px_-6px_var(--color-neon)] transition ${isActive ? "bg-neon text-court-950" : "text-neon hover:bg-neon/10"}`
+        }
+      >
+        Rating
+      </NavLink>
+      <div className="contents lg:flex lg:items-center lg:gap-5">
+        <NavLink to="/friends" className={side}>
+          Friends
+          {requests > 0 && (
+            <span
+              className="ml-1.5 rounded-full bg-neon px-1.5 text-[10px] text-court-950"
+              aria-label={`${requests} friend request${requests === 1 ? "" : "s"}`}
+            >
+              {requests}
+            </span>
+          )}
+        </NavLink>
+        <NavLink to="/leaderboards" className={side}>
+          Leaders
+        </NavLink>
+      </div>
+    </nav>
   );
 }

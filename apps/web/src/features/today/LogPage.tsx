@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useDay, useSaveEntry, useSaveJournal } from "../../api/days";
 import { useRatings } from "../../api/ratings";
+import { DayPicker } from "../../components/DayPicker";
 import { SectionNav } from "../../components/SectionNav";
 import { useHashScroll } from "../../components/useHashScroll";
 import { NodeChip } from "../../components/NodeChip";
@@ -54,7 +55,6 @@ export function LogPage() {
 
   const d = day.data;
   const go = (target: string) => setParams(target === d.today ? {} : { date: target });
-  const earliest = addDays(d.today, -BACKFILL_DAYS);
 
   return (
     <div className="space-y-8 pt-4">
@@ -69,10 +69,10 @@ export function LogPage() {
           </h1>
         </div>
         <nav className="flex items-center gap-2" aria-label="Change day">
+          <DayPicker today={d.today} selected={d.date} />
           <button
             type="button"
             aria-label="Previous day"
-            disabled={d.date <= earliest}
             onClick={() => go(addDays(d.date, -1))}
             className="h-10 w-10 rounded-lg border border-court-700 text-court-100 hover:border-neon disabled:opacity-30"
           >

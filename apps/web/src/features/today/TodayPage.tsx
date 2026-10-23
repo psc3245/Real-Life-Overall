@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useDay } from "../../api/days";
 import { useActivity, useRatings } from "../../api/ratings";
+import { DayPicker } from "../../components/DayPicker";
 import { Delta } from "../../components/Delta";
 import { OvrBadge } from "../../components/OvrBadge";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -62,12 +63,15 @@ export function TodayPage() {
             {STATUS_LABEL[d.status]}
           </p>
         </div>
-        <Link
-          to="/log"
-          className="rounded-lg bg-neon px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider text-court-950 hover:brightness-110"
-        >
-          {d.status === "open" ? "Log today →" : "Open today's log →"}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <DayPicker today={d.today} />
+          <Link
+            to="/log"
+            className="rounded-lg bg-neon px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider text-court-950 hover:brightness-110"
+          >
+            {d.status === "open" ? "Log today →" : "Open today's log →"}
+          </Link>
+        </div>
       </header>
 
       <MissedRecaps today={d.today} />
