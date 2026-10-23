@@ -153,7 +153,6 @@ const styles = StyleSheet.create({
     gap: space.sm,
     borderTopWidth: 1,
     borderTopColor: colors.court700,
-    borderStyle: "dashed",
     paddingTop: space.md,
   },
 });

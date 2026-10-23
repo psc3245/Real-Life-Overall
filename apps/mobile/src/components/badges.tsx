@@ -54,6 +54,7 @@ export function EarnedBadges({ badges }: { badges: EarnedBadgeDto[] }) {
 const styles = StyleSheet.create({
   medal: {
     borderWidth: 2,
+    backgroundColor: colors.court900,
     alignItems: "center",
     justifyContent: "center",
     shadowOpacity: 0.6,

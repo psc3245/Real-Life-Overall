@@ -13,3 +13,9 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? defaultApiUrl()).repl
 
 /** The URL scheme in app.json, also trusted by the API's Better Auth config. */
 export const APP_SCHEME = "rlo";
+
+/** The website, for links people open elsewhere (shared profiles). */
+export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? "http://localhost:5173").replace(
+  /\/$/,
+  "",
+);

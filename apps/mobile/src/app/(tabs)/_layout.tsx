@@ -1,7 +1,10 @@
 import { NativeTabs } from "expo-router/native-tabs";
+import { useFriends } from "@/api/social";
 import { colors } from "@/lib/theme";
 
 export default function TabsLayout() {
+  // Pending friend requests badge the You tab (the web shows them on Friends in the header).
+  const requests = useFriends().data?.incoming.length ?? 0;
   return (
     <NativeTabs tintColor={colors.neon}>
       <NativeTabs.Trigger name="today">
@@ -22,6 +25,7 @@ export default function TabsLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="me">
         <NativeTabs.Trigger.Label>You</NativeTabs.Trigger.Label>
+        {requests > 0 && <NativeTabs.Trigger.Badge>{String(requests)}</NativeTabs.Trigger.Badge>}
         <NativeTabs.Trigger.Icon
           sf={{ default: "person.crop.circle", selected: "person.crop.circle.fill" }}
         />

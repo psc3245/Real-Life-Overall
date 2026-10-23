@@ -64,6 +64,9 @@ function RootStack() {
         <Stack.Screen name="history/[id]" options={pushedOptions} />
         <Stack.Screen name="season-setup" options={pushedOptions} />
         <Stack.Screen name="u/[username]" options={pushedOptions} />
+        <Stack.Screen name="friends" options={pushedOptions} />
+        <Stack.Screen name="leaderboards" options={pushedOptions} />
+        <Stack.Screen name="compare/[username]" options={pushedOptions} />
       </Stack.Protected>
       <Stack.Protected guard={!auth.signedIn}>
         <Stack.Screen name="sign-in" />
