@@ -526,3 +526,32 @@ export const playerCards = pgTable(
   },
   (t) => [index().on(t.seasonLabel, t.overall)],
 );
+
+export const friendshipStatus = pgEnum("friendship_status", ["pending", "accepted"]);
+
+/** One row per pair of players: a pending request (requester → addressee) or a friendship. */
+export const friendships = pgTable(
+  "friendships",
+  {
+    id: id(),
+    requesterId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addresseeId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: friendshipStatus().notNull().default("pending"),
+    createdAt: createdAt(),
+    respondedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    // Either direction counts as the same pair.
+    uniqueIndex("friendships_pair").on(
+      sql`least(${t.requesterId}, ${t.addresseeId})`,
+      sql`greatest(${t.requesterId}, ${t.addresseeId})`,
+    ),
+    index().on(t.requesterId),
+    index().on(t.addresseeId),
+    check("friendships_not_self", sql`${t.requesterId} <> ${t.addresseeId}`),
+  ],
+);

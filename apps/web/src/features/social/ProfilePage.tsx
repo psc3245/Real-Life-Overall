@@ -6,6 +6,7 @@ import { Medallion } from "../../components/BadgeChip";
 import { PublicCard } from "../../components/PlayerCard";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { CopyLink } from "./CopyLink";
+import { FriendButtons } from "./FriendButtons";
 
 export const VISIBILITY_LABEL = {
   private: "Private: only you",
@@ -73,6 +74,18 @@ export function ProfilePage() {
               })}
             </p>
           </div>
+          {p.friendship && (
+            <FriendButtons
+              username={p.username}
+              state={p.friendship}
+              canCompare={Boolean(p.card)}
+            />
+          )}
+          {!p.isSelf && !p.friendship && (
+            <Link to="/signin" className="inline-block text-sm text-neon hover:underline">
+              Sign in to add {p.displayName} as a friend
+            </Link>
+          )}
           <section aria-label="Badges">
             <h2 className="mb-2 text-xs uppercase tracking-wider text-court-300">Badges</h2>
             {p.badges.length ? (

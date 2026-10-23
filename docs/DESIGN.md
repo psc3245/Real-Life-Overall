@@ -264,7 +264,7 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 
 ### 7.3 Social (Phase 4)
 - Public profile and card link (requires real URLs, hence React Router)
-- Friends: follow or request, side-by-side card comparison
+- Friends: **mutual requests** (send by exact username or from a profile; befriending someone who already asked accepts). Limits: 20 pending sent requests, 200 friends. Side-by-side **compare** lines up template categories by template key (even when renamed) and custom ones by name. Usernames are discoverable by exact match through requests; cards are not.
 - Leaderboards: friends and global, by Overall or by category template (custom categories aren't comparable, so global boards are probably limited to template categories)
 - **Privacy model** (decided 2026-10-22):
   - Each player picks a **visibility**: `private` (default: nobody else), `friends` (accepted friends) or `public` (anyone with the link, signed in or not).
@@ -406,6 +406,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
 | `settings` | per-user UI prefs | Carried over pattern |
 | `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
+| `friendships` | `requester_id`, `addressee_id`, `status` (`pending`/`accepted`), `responded_at` | One row per pair (unique on least/greatest), Phase 4 |
 | `player_cards` | `user_id` pk, `season_id`, `season_label`, `overall`, `archetype`, `categories` jsonb, `recapped_days` | Shareable card cache, Phase 4 |
 
 ---
@@ -492,7 +493,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 ### Phase 4: Social
 - [x] Privacy model decision (private by default; card-only visibility: private / friends / public)
 - [x] Public profile and card links (`/u/:username`, editable usernames, cached `player_cards`)
-- [ ] Friends and compare
+- [x] Friends and compare (mutual requests, `/friends`, `/compare/:username`)
 - [ ] Leaderboards (friends, plus global on template categories)
 - [ ] Anti-gaming hardening
 

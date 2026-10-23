@@ -5,6 +5,8 @@ import { OnboardingPage } from "./features/onboarding/OnboardingPage";
 import { HabitsPage } from "./features/habits/HabitsPage";
 import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { ComparePage } from "./features/social/ComparePage";
+import { FriendsPage } from "./features/social/FriendsPage";
 import { ProfilePage } from "./features/social/ProfilePage";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
@@ -76,6 +78,22 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "u/:username", element: <ProfilePage /> },
+      {
+        path: "friends",
+        element: (
+          <RequireAuth>
+            <FriendsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "compare/:username",
+        element: (
+          <RequireAuth>
+            <ComparePage />
+          </RequireAuth>
+        ),
+      },
       {
         path: "settings",
         element: (

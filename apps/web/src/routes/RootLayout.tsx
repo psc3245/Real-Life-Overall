@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { useHealth } from "../api/hooks";
 import { useAuthState, useSignOut } from "../api/auth";
+import { useFriends } from "../api/social";
 import { Button } from "../components/Button";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
 import { TimezoneSync } from "../components/TimezoneSync";
@@ -11,6 +12,8 @@ export function RootLayout() {
   const signOut = useSignOut();
   const navigate = useNavigate();
   const apiUp = health.data?.ok === true;
+  const friends = useFriends(auth.signedIn);
+  const requests = friends.data?.incoming.length ?? 0;
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col px-4">
@@ -24,7 +27,7 @@ export function RootLayout() {
         </Link>
         {/* On phones the nav drops to its own full-width row below the logo and status. */}
         <nav
-          className={`order-last flex w-full gap-5 sm:order-none sm:w-auto ${auth.signedIn ? "" : "invisible"}`}
+          className={`order-last -mx-4 flex w-[calc(100%+2rem)] gap-5 overflow-x-auto px-4 sm:order-none sm:mx-0 sm:w-auto sm:px-0 ${auth.signedIn ? "" : "invisible"}`}
           aria-label="Main"
           aria-hidden={!auth.signedIn}
         >
@@ -33,6 +36,7 @@ export function RootLayout() {
             ["/habits", "Habits"],
             ["/week", "Week"],
             ["/ratings", "My rating"],
+            ["/friends", "Friends"],
           ].map(([to, label]) => (
             <NavLink
               key={to}
@@ -42,6 +46,14 @@ export function RootLayout() {
               }
             >
               {label}
+              {to === "/friends" && requests > 0 && (
+                <span
+                  className="ml-1.5 rounded-full bg-neon px-1.5 text-xs text-court-950"
+                  aria-label={`${requests} friend request${requests === 1 ? "" : "s"}`}
+                >
+                  {requests}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

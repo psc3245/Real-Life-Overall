@@ -23,7 +23,7 @@ import {
   type GuidedPromptDto,
   type HabitType,
 } from "@rlo/shared";
-import { eq, or } from "drizzle-orm";
+import { eq, like, or } from "drizzle-orm";
 import { passwordHasher } from "../src/auth/password";
 import { createNeonDb } from "../src/db/client";
 import {
@@ -31,12 +31,14 @@ import {
   authUsers,
   dayLogs,
   decayRules,
+  friendships,
   goals,
   habitEntries,
   habitLinks,
   habits,
   onboardingSessions,
   pauses,
+  playerCards,
   ratingEvents,
   ratingNodes,
   recaps,
@@ -46,6 +48,7 @@ import {
 } from "../src/db/schema";
 import { awardBadges } from "../src/services/badge-service";
 import { applyDecay } from "../src/services/decay-service";
+import { getRatings } from "../src/services/ratings-service";
 
 export const DEMO_EMAIL = "demo@example.test";
 export const DEMO_PASSWORD = "demo-player-2026";
@@ -67,6 +70,76 @@ const pick = <T>(items: T[]) => items[Math.floor(rand() * items.length)]!;
 const round = (n: number, places = 2) => Math.round(n * 10 ** places) / 10 ** places;
 /** An evening timestamp on a local date (kept on that date for US timezones). */
 const evening = (date: string) => new Date(`${date}T23:00:00Z`);
+
+/**
+ * Other players for the social features: just a user, a season row and a cached card each (they
+ * have no ledger and can't sign in). Their cards only change when the seed runs again.
+ */
+const RIVAL_EMAIL_DOMAIN = "demo-rival.test";
+const RIVALS: {
+  username: string;
+  name: string;
+  visibility: "friends" | "public";
+  link: "friends" | "incoming" | "none";
+  archetype: string;
+  recappedDays: number;
+  categories: [name: string, templateKey: string | null, value: number][];
+}[] = [
+  {
+    username: "maya",
+    name: "Maya Chen",
+    visibility: "friends",
+    link: "friends",
+    archetype: "Endurance Engine",
+    recappedDays: 18,
+    categories: [
+      ["Fitness", "fitness", 78.4],
+      ["Career", "career", 61.2],
+      ["Social", "social", 66.0],
+      ["Health", "health", 71.5],
+    ],
+  },
+  {
+    username: "devon",
+    name: "Devon Brooks",
+    visibility: "public",
+    link: "friends",
+    archetype: "Floor General",
+    recappedDays: 21,
+    categories: [
+      ["Career", "career", 74.9],
+      ["Mind", "mind", 69.3],
+      ["Social", "social", 72.1],
+      ["Guitar", null, 58.0],
+    ],
+  },
+  {
+    username: "priya",
+    name: "Priya Natarajan",
+    visibility: "public",
+    link: "incoming",
+    archetype: "Two-Way Scholar",
+    recappedDays: 15,
+    categories: [
+      ["Mind", "mind", 81.0],
+      ["Career", "career", 70.4],
+      ["Fitness", "fitness", 55.7],
+    ],
+  },
+  {
+    username: "lucas",
+    name: "Lucas Ortiz",
+    visibility: "public",
+    link: "none",
+    archetype: "Raw Prospect",
+    recappedDays: 4,
+    categories: [
+      ["Fitness", "fitness", 88.0],
+      ["Career", "career", 52.3],
+      ["Social", "social", 60.5],
+    ],
+  },
+];
 
 interface LeafSpec {
   name: string;
@@ -832,6 +905,9 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
   // Let the app's own engines fill in decay and catalog badges.
   const decayed = await applyDecay(db, userId);
   const badges = await awardBadges(db, userId);
+  await db.update(users).set({ profileVisibility: "friends" }).where(eq(users.id, userId));
+  await getRatings(db, userId); // writes the demo player's shared card
+  await seedRivals(db, userId, season);
 
   const events2 = await db.select().from(ratingEvents).where(eq(ratingEvents.seasonId, seasonId));
   const finalValues = computeNodeValues(
@@ -861,6 +937,59 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
         ?.toFixed(1)}); previous season ${previous.label} card at ${prevOverall}`,
       `Sign in with the demo credentials in apps/api/scripts/seed-demo.ts, or use dev user "${DEMO_USERNAME}".`,
     ].join("\n"),
+  );
+}
+
+async function seedRivals(
+  db: ReturnType<typeof createNeonDb>["db"],
+  demoUserId: string,
+  season: { label: string; startsOn: string; endsOn: string },
+) {
+  await db.delete(users).where(like(users.email, `%@${RIVAL_EMAIL_DOMAIN}`));
+  for (const r of RIVALS) {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: `${r.username}@${RIVAL_EMAIL_DOMAIN}`,
+        username: r.username,
+        displayName: r.name,
+        timezone: TIMEZONE,
+        profileVisibility: r.visibility,
+      })
+      .returning({ id: users.id });
+    // "setup" keeps them out of the hourly job, which only visits active seasons.
+    const [rivalSeason] = await db
+      .insert(seasons)
+      .values({ userId: user!.id, ...season, status: "setup", archetype: r.archetype })
+      .returning({ id: seasons.id });
+    const categories = r.categories.map(([name, templateKey, value]) => ({
+      name,
+      templateKey,
+      value,
+    }));
+    const values = categories.map((c) => c.value);
+    await db.insert(playerCards).values({
+      userId: user!.id,
+      seasonId: rivalSeason!.id,
+      seasonLabel: season.label,
+      overall: round(values.reduce((a, b) => a + b, 0) / values.length),
+      archetype: r.archetype,
+      categories,
+      recappedDays: r.recappedDays,
+    });
+    if (r.link === "friends") {
+      await db.insert(friendships).values({
+        requesterId: user!.id,
+        addresseeId: demoUserId,
+        status: "accepted",
+        respondedAt: new Date(),
+      });
+    } else if (r.link === "incoming") {
+      await db.insert(friendships).values({ requesterId: user!.id, addresseeId: demoUserId });
+    }
+  }
+  console.log(
+    `Seeded ${RIVALS.length} rival players (${RIVALS.map((r) => `${r.username}: ${r.link}`).join(", ")})`,
   );
 }
 

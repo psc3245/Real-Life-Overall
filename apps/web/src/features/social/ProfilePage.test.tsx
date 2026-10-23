@@ -17,6 +17,7 @@ const profile: ProfileDto = {
   displayName: "Jordan Reyes",
   memberSince: "2026-10-01T00:00:00Z",
   isSelf: false,
+  friendship: "none",
   visibility: null,
   card: {
     overall: 71.4,
@@ -58,6 +59,11 @@ describe("ProfilePage", () => {
     expect(screen.getByRole("meter", { name: "Career" })).toBeInTheDocument();
     expect(screen.getByText("Closer")).toBeInTheDocument();
     expect(mockedApi).toHaveBeenCalledWith("/profiles/jordan");
+    expect(screen.getByRole("button", { name: "Add friend" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Compare" })).toHaveAttribute(
+      "href",
+      "/compare/jordan",
+    );
     // Visitors don't get the owner's sharing banner.
     expect(screen.queryByText(/how other players see your card/)).not.toBeInTheDocument();
   });

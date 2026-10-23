@@ -99,6 +99,13 @@
       "when": 1792716706817,
       "tag": "0013_social_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792717256114,
+      "tag": "0014_friendships",
+      "breakpoints": true
     }
   ]
 }

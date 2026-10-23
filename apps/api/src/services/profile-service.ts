@@ -5,6 +5,7 @@ import * as badgeRepo from "../repos/badge-repo";
 import * as cardRepo from "../repos/card-repo";
 import * as userRepo from "../repos/user-repo";
 import type { PublicUser } from "../repos/user-repo";
+import { friendshipState } from "./friend-service";
 import { getRatings } from "./ratings-service";
 
 /** Whether `viewerId` (null when signed out) may see `owner`'s card. */
@@ -13,8 +14,9 @@ export async function canView(
   viewerId: string | null,
   owner: PublicUser,
 ): Promise<boolean> {
-  if (viewerId === owner.id) return true;
-  return owner.profileVisibility === "public";
+  if (viewerId === owner.id || owner.profileVisibility === "public") return true;
+  if (owner.profileVisibility === "private" || !viewerId) return false;
+  return (await friendshipState(db, viewerId, owner.id)) === "friends";
 }
 
 /** Highest catalog tier per badge. Personal badges are LLM-written from journals: never shared. */
@@ -61,6 +63,7 @@ export async function getProfile(
     displayName: owner.displayName,
     memberSince: owner.createdAt.toISOString(),
     isSelf,
+    friendship: viewerId && !isSelf ? await friendshipState(db, viewerId, owner.id) : null,
     visibility: isSelf ? owner.profileVisibility : null,
     card: card ? cardRepo.toCardDto(card) : null,
     badges,
