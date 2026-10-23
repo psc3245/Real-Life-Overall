@@ -48,6 +48,8 @@ export const users = pgTable("users", {
   profileSummary: text(),
   /** Who can see the player card (DESIGN.md §7.3). */
   profileVisibility: profileVisibility().notNull().default("private"),
+  /** Appear on global leaderboards (also needs a public profile). */
+  leaderboardOptIn: boolean().notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -522,6 +524,8 @@ export const playerCards = pgTable(
     /** PublicCategoryDto[] */
     categories: jsonb().notNull(),
     recappedDays: integer().notNull().default(0),
+    /** Recapped days where the model flagged implausible or ambiguous claims. Owner-only. */
+    flaggedDays: integer().notNull().default(0),
     updatedAt: updatedAt(),
   },
   (t) => [index().on(t.seasonLabel, t.overall)],

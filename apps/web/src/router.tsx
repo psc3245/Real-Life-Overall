@@ -7,6 +7,7 @@ import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ComparePage } from "./features/social/ComparePage";
 import { FriendsPage } from "./features/social/FriendsPage";
+import { LeaderboardsPage } from "./features/social/LeaderboardsPage";
 import { ProfilePage } from "./features/social/ProfilePage";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
@@ -83,6 +84,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <FriendsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "leaderboards",
+        element: (
+          <RequireAuth>
+            <LeaderboardsPage />
           </RequireAuth>
         ),
       },

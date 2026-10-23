@@ -1,4 +1,4 @@
-import type { PublicCardDto, RatingsDto } from "@rlo/shared";
+import { LEADERBOARD_MIN_RECAPPED_DAYS, type PublicCardDto, type RatingsDto } from "@rlo/shared";
 import type { ReactNode } from "react";
 import { OvrBadge } from "./OvrBadge";
 import { StatBar } from "./StatBar";
@@ -85,7 +85,7 @@ export function PublicCard({ card, name }: { card: PublicCardDto; name: string }
       name={name}
       overall={card.overall}
       subtitle={`${card.archetype ?? "Unranked"} · ${card.seasonLabel}`}
-      note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season`}
+      note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
       categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
     />
   );

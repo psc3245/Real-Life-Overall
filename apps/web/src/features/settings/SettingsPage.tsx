@@ -1,4 +1,9 @@
-import { PROFILE_VISIBILITIES, USERNAME_PATTERN, type ProfileVisibility } from "@rlo/shared";
+import {
+  LEADERBOARD_MIN_RECAPPED_DAYS,
+  PROFILE_VISIBILITIES,
+  USERNAME_PATTERN,
+  type ProfileVisibility,
+} from "@rlo/shared";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { useMe, type Me } from "../../api/hooks";
@@ -122,6 +127,26 @@ function SharingSection({ me }: { me: Me }) {
           </label>
         ))}
       </fieldset>
+      <label
+        className={`flex gap-3 rounded-lg border border-court-700 px-4 py-3 ${me.profileVisibility === "public" ? "cursor-pointer" : "opacity-60"}`}
+      >
+        <input
+          type="checkbox"
+          checked={me.leaderboardOptIn}
+          // Unchecking always works; opting in needs a public profile.
+          disabled={update.isPending || (me.profileVisibility !== "public" && !me.leaderboardOptIn)}
+          onChange={(e) => update.mutate({ leaderboardOptIn: e.target.checked })}
+          className="mt-1 accent-[var(--color-neon)]"
+        />
+        <span>
+          <span className="block font-medium">Show me on global leaderboards</span>
+          <span className="block text-sm text-court-500">
+            {me.profileVisibility === "public"
+              ? `Ratings count once at least ${LEADERBOARD_MIN_RECAPPED_DAYS} days this season are recapped. Friends boards don't need this.`
+              : "Global boards only include public profiles."}
+          </span>
+        </span>
+      </label>
       <ErrorNote error={update.error} />
       <div className="flex flex-wrap items-center gap-4">
         {me.profileVisibility !== "private" && <CopyLink username={me.username} />}

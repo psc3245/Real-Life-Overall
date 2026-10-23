@@ -37,6 +37,7 @@ export function RootLayout() {
             ["/week", "Week"],
             ["/ratings", "My rating"],
             ["/friends", "Friends"],
+            ["/leaderboards", "Leaders"],
           ].map(([to, label]) => (
             <NavLink
               key={to}

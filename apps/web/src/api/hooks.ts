@@ -9,6 +9,7 @@ export interface Me {
   timezone: string;
   weekStart: number;
   profileVisibility: ProfileVisibility;
+  leaderboardOptIn: boolean;
   createdAt: string;
 }
 

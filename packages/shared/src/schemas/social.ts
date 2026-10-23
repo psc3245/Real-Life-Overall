@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CATEGORY_TEMPLATES } from "../templates";
 import type { BadgeTier } from "./badges";
 
 /**
@@ -133,4 +134,79 @@ export function alignCategories(
     .filter((c) => !matched.has(key(c)))
     .map((c) => ({ name: c.name, mine: null, theirs: c.value }));
   return [...rows, ...onlyMine, ...onlyTheirs];
+}
+
+// Leaderboards (DESIGN.md §7.3)
+
+/** Global boards only count ratings backed by this many recapped days this season. */
+export const LEADERBOARD_MIN_RECAPPED_DAYS = 7;
+/**
+ * Players whose recaps are flagged this often sit out of global boards. Flags also cover
+ * ambiguity, so the bar is lenient: at least 5 flagged days and over half of all recapped days.
+ */
+export const LEADERBOARD_FLAGGED_MIN_DAYS = 5;
+export const LEADERBOARD_FLAGGED_MAX_SHARE = 0.5;
+export const LEADERBOARD_SIZE = 50;
+
+export const LEADERBOARD_SCOPES = ["friends", "global"] as const;
+export type LeaderboardScope = (typeof LEADERBOARD_SCOPES)[number];
+
+/** Boards: Overall, plus one per template category (custom categories don't compare). */
+export const LEADERBOARD_BOARDS = [
+  { key: "overall", name: "Overall" },
+  ...CATEGORY_TEMPLATES.map((t) => ({ key: t.key, name: t.name })),
+];
+export const leaderboardQuerySchema = z.object({
+  scope: z.enum(LEADERBOARD_SCOPES).default("friends"),
+  board: z
+    .string()
+    .default("overall")
+    .refine((b) => LEADERBOARD_BOARDS.some((x) => x.key === b), "Unknown board"),
+});
+
+export type IneligibleReason = "few-recaps" | "flagged";
+
+/** Whether a card's evidence is strong enough for global boards. */
+export function leaderboardIneligibility(card: {
+  recappedDays: number;
+  flaggedDays: number;
+}): IneligibleReason[] {
+  const reasons: IneligibleReason[] = [];
+  if (card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS) reasons.push("few-recaps");
+  if (
+    card.flaggedDays >= LEADERBOARD_FLAGGED_MIN_DAYS &&
+    card.flaggedDays > card.recappedDays * LEADERBOARD_FLAGGED_MAX_SHARE
+  ) {
+    reasons.push("flagged");
+  }
+  return reasons;
+}
+
+export interface LeaderboardEntryDto {
+  rank: number;
+  username: string;
+  displayName: string;
+  archetype: string | null;
+  value: number;
+  recappedDays: number;
+  /** Too few recapped days to count on global boards yet. */
+  provisional: boolean;
+  isMe: boolean;
+}
+
+export interface LeaderboardDto {
+  scope: LeaderboardScope;
+  board: string;
+  seasonLabel: string;
+  entries: LeaderboardEntryDto[];
+  /** Your row, even when it's outside the top of the board (null if you're not on it). */
+  me: LeaderboardEntryDto | null;
+  /** Why you're not on the global board, if you aren't. */
+  globalStatus: {
+    optedIn: boolean;
+    visibility: ProfileVisibility;
+    hasCard: boolean;
+    reasons: IneligibleReason[];
+    recappedDays: number;
+  };
 }

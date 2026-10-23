@@ -12,6 +12,7 @@ import { devRoutes } from "./routes/dev";
 import { friendRoutes } from "./routes/friends";
 import { goalRoutes } from "./routes/goals";
 import { habitRoutes } from "./routes/habits";
+import { leaderboardRoutes } from "./routes/leaderboards";
 import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
@@ -110,6 +111,7 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/weekly/*", requireUser)
     .use("/friends", requireUser)
     .use("/friends/*", requireUser)
+    .use("/leaderboards", requireUser)
     .use("/profiles/*", optionalUser)
     .route("/me", meRoutes)
     .route("/onboarding", onboardingRoutes)
@@ -123,7 +125,8 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/badges", badgeRoutes)
     .route("/seasons", seasonRoutes)
     .route("/profiles", profileRoutes)
-    .route("/friends", friendRoutes);
+    .route("/friends", friendRoutes)
+    .route("/leaderboards", leaderboardRoutes);
 
   return routes;
 }

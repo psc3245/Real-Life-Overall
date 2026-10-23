@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lt, lte } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { recaps } from "../db/schema";
 
@@ -122,6 +122,23 @@ export async function countRecappedDaysSince(db: Executor, userId: string, from:
         eq(recaps.kind, "daily"),
         eq(recaps.status, "active"),
         gte(recaps.periodStart, from),
+      ),
+    );
+  return row?.n ?? 0;
+}
+
+/** Of those, days whose recap flagged implausible or ambiguous claims. */
+export async function countFlaggedDaysSince(db: Executor, userId: string, from: string) {
+  const [row] = await db
+    .select({ n: count() })
+    .from(recaps)
+    .where(
+      and(
+        eq(recaps.userId, userId),
+        eq(recaps.kind, "daily"),
+        eq(recaps.status, "active"),
+        gte(recaps.periodStart, from),
+        sql`jsonb_array_length(coalesce(${recaps.output} -> 'flags', '[]'::jsonb)) > 0`,
       ),
     );
   return row?.n ?? 0;

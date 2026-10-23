@@ -73,7 +73,8 @@ const evening = (date: string) => new Date(`${date}T23:00:00Z`);
 
 /**
  * Other players for the social features: just a user, a season row and a cached card each (they
- * have no ledger and can't sign in). Their cards only change when the seed runs again.
+ * have no ledger and can't sign in). Their cards only change when the seed runs again. Public
+ * rivals opt in to global boards; lucas has too few recaps to count there yet.
  */
 const RIVAL_EMAIL_DOMAIN = "demo-rival.test";
 const RIVALS: {
@@ -955,6 +956,7 @@ async function seedRivals(
         displayName: r.name,
         timezone: TIMEZONE,
         profileVisibility: r.visibility,
+        leaderboardOptIn: r.visibility === "public",
       })
       .returning({ id: users.id });
     // "setup" keeps them out of the hourly job, which only visits active seasons.

@@ -14,6 +14,7 @@ const updateMeSchema = z
     weekStart: z.number().int().min(0).max(6),
     username: usernameSchema,
     profileVisibility: z.enum(PROFILE_VISIBILITIES),
+    leaderboardOptIn: z.boolean(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Provide at least one field");

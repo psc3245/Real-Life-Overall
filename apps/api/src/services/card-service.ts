@@ -21,5 +21,6 @@ export async function syncCard(db: Database, userId: string, ratings: RatingsDto
     archetype: ratings.archetype?.name ?? null,
     categories,
     recappedDays: await recapRepo.countRecappedDaysSince(db, userId, ratings.season.startsOn),
+    flaggedDays: await recapRepo.countFlaggedDaysSince(db, userId, ratings.season.startsOn),
   });
 }

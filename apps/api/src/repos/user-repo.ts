@@ -10,6 +10,7 @@ export const publicUserColumns = {
   timezone: users.timezone,
   weekStart: users.weekStart,
   profileVisibility: users.profileVisibility,
+  leaderboardOptIn: users.leaderboardOptIn,
   createdAt: users.createdAt,
 };
 
@@ -45,7 +46,15 @@ export async function update(
   db: Database,
   id: string,
   changes: Partial<
-    Pick<PublicUser, "displayName" | "timezone" | "weekStart" | "username" | "profileVisibility">
+    Pick<
+      PublicUser,
+      | "displayName"
+      | "timezone"
+      | "weekStart"
+      | "username"
+      | "profileVisibility"
+      | "leaderboardOptIn"
+    >
   >,
 ): Promise<PublicUser | null> {
   const rows = await db

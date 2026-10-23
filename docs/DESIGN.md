@@ -265,7 +265,15 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 ### 7.3 Social (Phase 4)
 - Public profile and card link (requires real URLs, hence React Router)
 - Friends: **mutual requests** (send by exact username or from a profile; befriending someone who already asked accepts). Limits: 20 pending sent requests, 200 friends. Side-by-side **compare** lines up template categories by template key (even when renamed) and custom ones by name. Usernames are discoverable by exact match through requests; cards are not.
-- Leaderboards: friends and global, by Overall or by category template (custom categories aren't comparable, so global boards are probably limited to template categories)
+- **Leaderboards** (`/leaderboards`), per season, by Overall or by **template category** (custom categories don't compare; a renamed template category still counts under its template):
+  - **Friends**: you plus friends whose visibility is `friends` or `public`. Provisional players are included and marked.
+  - **Global**: players who are `public` **and** opted in (`users.leaderboard_opt_in`), and whose card passes the evidence rules below. Top 50 shown, plus your own row.
+- **Anti-gaming hardening** (ratings are self-reported, so boards lean on evidence, not trust):
+  - **Evidence floor:** global boards need at least **7 recapped days** this season (`LEADERBOARD_MIN_RECAPPED_DAYS`). Until then cards and friends-board rows show **Provisional**. Onboarding ratings alone never reach a global board.
+  - **Skepticism carries through:** the daily recap's `flags` (implausible or ambiguous claims) are counted per season (`player_cards.flagged_days`, owner-only). Players with **≥ 5 flagged days and over half of their recapped days flagged** sit out global boards until that changes; the leaderboard page tells them why.
+  - Existing rails still apply: ±3 per attribute per day, ±5 weekly corrections, 3 recap runs per day, a 3-day backfill window.
+  - Social limits: 20 pending sent requests, 200 friends; reserved usernames; hidden profiles answer 404.
+  - *Later:* report a player, username change cooldown, and moving ranking into SQL once boards grow (ranking is in memory today).
 - **Privacy model** (decided 2026-10-22):
   - Each player picks a **visibility**: `private` (default: nobody else), `friends` (accepted friends) or `public` (anyone with the link, signed in or not).
   - Visibility covers the **card only**: Overall, archetype, season label, **category** values, recapped-day count and the highest tier of each **catalog** badge.
@@ -372,6 +380,7 @@ embed(texts: string[], ctx): Promise<number[][]>
 | `weeklyReview` | hourly | For users whose local week just ended and whose last daily recap is done |
 | `seasonRollover` | daily | At the quarter boundary, archive the season and prompt season setup |
 | `snapshots` | daily | Write per-node daily value snapshots (chart optimization) |
+| card refresh | hourly (end of each user's run) | Rewrite the user's `player_cards` row so profiles and leaderboards stay current |
 
 Jobs must be **idempotent**: unique constraints on `(user_id, local_date, kind)` for recaps, plus status columns.
 
@@ -407,7 +416,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `settings` | per-user UI prefs | Carried over pattern |
 | `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
 | `friendships` | `requester_id`, `addressee_id`, `status` (`pending`/`accepted`), `responded_at` | One row per pair (unique on least/greatest), Phase 4 |
-| `player_cards` | `user_id` pk, `season_id`, `season_label`, `overall`, `archetype`, `categories` jsonb, `recapped_days` | Shareable card cache, Phase 4 |
+| `player_cards` | `user_id` pk, `season_id`, `season_label`, `overall`, `archetype`, `categories` jsonb, `recapped_days`, `flagged_days` | Shareable card cache, Phase 4 |
+| `users.leaderboard_opt_in` | boolean | Global boards (needs a public profile) |
 
 ---
 
@@ -494,8 +504,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Privacy model decision (private by default; card-only visibility: private / friends / public)
 - [x] Public profile and card links (`/u/:username`, editable usernames, cached `player_cards`)
 - [x] Friends and compare (mutual requests, `/friends`, `/compare/:username`)
-- [ ] Leaderboards (friends, plus global on template categories)
-- [ ] Anti-gaming hardening
+- [x] Leaderboards (friends, plus global on template categories; opt-in)
+- [x] Anti-gaming hardening (7-recap evidence floor and provisional marks, flagged-recap exclusion, social limits)
 
 ### Phase 5: Rich Inputs, Mobile & Monetization
 - [ ] Photos (R2 + vision model), voice notes (transcription)
@@ -518,6 +528,6 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 10. **Decay rule visibility and editability** for users.
 11. ~~**Privacy model**~~ Decided: private by default, card-only opt-in visibility (§7.3).
 12. **Monetization model** (freemium, subscription, BYO key…) and quota design.
-13. **Global leaderboard comparability** across custom trees.
+13. ~~**Global leaderboard comparability**~~ Decided: boards are Overall plus template categories only (§7.3). Overall still mixes different trees; revisit if it feels unfair.
 14. **Data export and account deletion** (should be in place before launch).
 15. **Content safety:** journals may contain sensitive topics (mental health, etc.). Define how the LLM responds to distressing content, what data goes to providers, and the provider data-retention settings.

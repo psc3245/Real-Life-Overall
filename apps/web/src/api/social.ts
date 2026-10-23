@@ -1,4 +1,11 @@
-import type { FriendsDto, FriendshipState, ProfileDto, ProfileVisibility } from "@rlo/shared";
+import type {
+  FriendsDto,
+  FriendshipState,
+  LeaderboardDto,
+  LeaderboardScope,
+  ProfileDto,
+  ProfileVisibility,
+} from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { queryKeys, type Me } from "./hooks";
@@ -18,6 +25,7 @@ export interface ProfileSettings {
   displayName?: string;
   username?: string;
   profileVisibility?: ProfileVisibility;
+  leaderboardOptIn?: boolean;
 }
 
 export function useUpdateProfile() {
@@ -27,7 +35,10 @@ export function useUpdateProfile() {
       api<Me>("/me", { method: "PATCH", body: JSON.stringify(changes) }),
     onSuccess: async (me) => {
       queryClient.setQueryData(queryKeys.me, me);
-      await queryClient.invalidateQueries({ queryKey: ["profile"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
+      ]);
     },
   });
 }
@@ -50,7 +61,15 @@ export function useFriendAction() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: friendsKey }),
         queryClient.invalidateQueries({ queryKey: ["profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
       ]);
     },
+  });
+}
+
+export function useLeaderboard(scope: LeaderboardScope, board: string) {
+  return useQuery({
+    queryKey: ["leaderboard", scope, board],
+    queryFn: () => api<LeaderboardDto>(`/leaderboards?scope=${scope}&board=${board}`),
   });
 }
