@@ -11,7 +11,8 @@ import { SectionNav } from "../../components/SectionNav";
 import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { EarlierWeek } from "../week/WeekPage";
-import { seasonDates } from "./HistoryPage";
+import { seasonDates } from "../../lib/format";
+import { StatTile } from "../../components/StatTile";
 
 /** HistoryChart reads rated nodes; a season's nodes carry only what the chart needs. */
 const asRated = (nodes: SeasonDetailNode[]): RatedNodeDto[] =>
@@ -122,11 +123,11 @@ function Season({ s }: { s: SeasonDetailDto }) {
       />
 
       <dl id="stats" className="grid scroll-mt-16 grid-cols-2 gap-3 sm:grid-cols-5">
-        <Tile label="Days logged" value={s.stats.daysLogged} />
-        <Tile label="Recapped" value={s.stats.daysRecapped} />
-        <Tile label="Best streak" value={s.stats.bestLoggingStreak} />
-        <Tile label="Habits done" value={s.stats.habitCompletions} />
-        <Tile label="Weekly reviews" value={s.stats.weeklyReviews} />
+        <StatTile label="Days logged" value={s.stats.daysLogged} />
+        <StatTile label="Recapped" value={s.stats.daysRecapped} />
+        <StatTile label="Best streak" value={s.stats.bestLoggingStreak} />
+        <StatTile label="Habits done" value={s.stats.habitCompletions} />
+        <StatTile label="Weekly reviews" value={s.stats.weeklyReviews} />
       </dl>
 
       {s.history.dates.length > 1 && (
@@ -224,14 +225,5 @@ function StartEnd({ node }: { node: SeasonDetailNode }) {
       </span>
       {d !== null && <Delta value={d} />}
     </span>
-  );
-}
-
-function Tile({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-court-700 bg-court-900/70 p-3">
-      <dt className="text-xs uppercase tracking-wider text-court-500">{label}</dt>
-      <dd className="font-display text-3xl tabular-nums">{value}</dd>
-    </div>
   );
 }

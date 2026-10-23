@@ -48,8 +48,8 @@ switchable from the web app's header.
 
 ### Demo data
 
-To see the app with a few weeks of history (habits, journals, recaps, decay, a paused flu week,
-weekly reviews, goals, badges and a previous season), seed a demo player:
+To see the app with a few weeks of history (habits and a habit group, journals, recaps, decay, a
+paused flu week, weekly reviews, goals, badges and a full previous season), seed a demo player:
 
 ```bash
 npm run seed:demo -w @rlo/api
@@ -68,7 +68,7 @@ The API runs an hourly Cron Trigger: it brings rating decay up to date for every
 in each user's timezone, recaps any recent day that has content but no current recap. To try it
 locally:
 
-- In the web app (dev builds only), **My rating → Decay & pauses → Run 4am job now** runs it for
+- In the web app (dev builds only), **Rating → Decay & pauses → Run 4am job now** runs it for
   the current user immediately.
 - Or run the real Worker handler: start the API with
   `npx wrangler dev --test-scheduled` (in `apps/api`) and open `http://localhost:8787/__scheduled`.

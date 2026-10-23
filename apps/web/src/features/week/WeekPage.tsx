@@ -1,5 +1,7 @@
 import {
   HABIT_TYPE_LABELS,
+  WEEKDAY_NAMES,
+  WEEKDAY_SHORT,
   statPeriod,
   type HabitProposalDto,
   type RatedNodeDto,
@@ -26,17 +28,9 @@ import { SectionNav } from "../../components/SectionNav";
 import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { WeekBreakdown } from "./WeekBreakdown";
+import { shortDate } from "../../lib/format";
 
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WORKING = ["Reading your week…", "Checking habits and decay…", "Setting next week's focus…"];
-
-const fmt = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
 
 export function WeekPage() {
   const weekly = useWeekly();
@@ -71,7 +65,7 @@ export function WeekPage() {
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-neon">Weekly review</p>
           <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
-            {week ? `${fmt(week.start)} – ${fmt(week.end)}` : "Your week"}
+            {week ? `${shortDate(week.start)} – ${shortDate(week.end)}` : "Your week"}
           </h1>
         </div>
         <WeekStartPicker />
@@ -175,7 +169,7 @@ function WeekDetail({ lastWeek, nodes }: { lastWeek: WeekRange | null; nodes: Ra
         </div>
       </div>
       <p className="text-sm text-court-500">
-        {fmt(week.start)} – {fmt(week.end)}
+        {shortDate(week.start)} – {shortDate(week.end)}
         {week === current && " · so far"}
       </p>
       <WeekBreakdown week={week} today={today} nodes={nodes} />
@@ -203,7 +197,7 @@ export function EarlierWeek({
       >
         <span className="flex items-baseline justify-between gap-3">
           <span className="text-xs uppercase tracking-wider text-court-500">
-            {fmt(h.weekStart)} – {fmt(h.weekEnd)}
+            {shortDate(h.weekStart)} – {shortDate(h.weekEnd)}
           </span>
           <span className="text-xs text-court-500">{open ? "Hide ▲" : "Full review ▼"}</span>
         </span>
@@ -236,7 +230,7 @@ function WeekStartPicker() {
       >
         {[1, 0, 6].map((d) => (
           <option key={d} value={d}>
-            {DAY_NAMES[d]}
+            {WEEKDAY_NAMES[d]}
           </option>
         ))}
       </select>
@@ -359,7 +353,8 @@ function Proposal({
   names: Map<string, string>;
 }) {
   const resolve = useResolveProposal();
-  const schedule = p.days.length === 7 ? "every day" : p.days.map((d) => DAY_SHORT[d]).join(", ");
+  const schedule =
+    p.days.length === 7 ? "every day" : p.days.map((d) => WEEKDAY_SHORT[d]).join(", ");
   const goal =
     p.target !== null && (p.type === "counter" || p.type === "duration")
       ? ` · goal ${p.target} ${p.type === "duration" ? "min" : (p.unit ?? "")}`

@@ -36,6 +36,19 @@ export const usernameSchema = z
   .regex(USERNAME_PATTERN, "Use 3-24 lowercase letters, digits, - or _")
   .refine((u) => !RESERVED_USERNAMES.has(u), "That username is reserved");
 
+/** The signed-in player's own account (GET/PATCH /me). */
+export interface MeDto {
+  id: string;
+  username: string;
+  displayName: string;
+  timezone: string;
+  /** 0 = Sunday … 6 = Saturday */
+  weekStart: number;
+  profileVisibility: ProfileVisibility;
+  leaderboardOptIn: boolean;
+  createdAt: string;
+}
+
 /** A category on a shared card: the top level of the tree only. */
 export interface PublicCategoryDto {
   name: string;

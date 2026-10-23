@@ -36,13 +36,23 @@ export interface RecapDto {
   createdAt: string;
 }
 
+/** Where a rating change came from (the ledger's `source`). */
+export const RATING_EVENT_SOURCES = [
+  "onboarding",
+  "daily_recap",
+  "weekly_review",
+  "decay",
+  "recalibration",
+] as const;
+export type RatingEventSource = (typeof RATING_EVENT_SOURCES)[number];
+
 export interface ChangeFeedItemDto {
   id: string;
   nodeId: string;
   nodeName: string;
   delta: number;
   reason: string;
-  source: "onboarding" | "daily_recap" | "weekly_review" | "decay" | "recalibration";
+  source: RatingEventSource;
   /** Local date the change belongs to (the recapped day), when known. */
   date: string | null;
   createdAt: string;

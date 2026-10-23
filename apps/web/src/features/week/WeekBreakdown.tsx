@@ -1,14 +1,19 @@
-import { addDays, MAX_HISTORY_DAYS, type RatedNodeDto, type WeekRange } from "@rlo/shared";
+import {
+  addDays,
+  daysBetween,
+  dayOfWeek,
+  MAX_HISTORY_DAYS,
+  WEEKDAY_SHORT,
+  type RatedNodeDto,
+  type WeekRange,
+} from "@rlo/shared";
 import { Link } from "react-router";
 import { useHabitStats } from "../../api/days";
 import { useActivity, useHistory } from "../../api/ratings";
 import { Delta } from "../../components/Delta";
-import { DayStrip, shortDate } from "../habits/DayStrip";
-
-const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const daysBetween = (from: string, to: string) =>
-  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+import { DayStrip } from "../habits/DayStrip";
+import { StatTile } from "../../components/StatTile";
+import { shortDate } from "../../lib/format";
 
 /**
  * The specifics of one week: logging and recaps per day, net rating movement, category moves
@@ -72,14 +77,14 @@ export function WeekBreakdown({
   return (
     <div className="space-y-6">
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile label="Days logged" value={`${logged}/${past.length}`} />
-        <Tile label="Recapped" value={`${recapped}/${past.length}`} />
-        <Tile
+        <StatTile label="Days logged" value={`${logged}/${past.length}`} />
+        <StatTile label="Recapped" value={`${recapped}/${past.length}`} />
+        <StatTile
           label="Habits done"
           value={scheduled ? `${Math.round((100 * completed) / scheduled)}%` : "—"}
           detail={scheduled ? `${completed} of ${scheduled}` : undefined}
         />
-        <Tile
+        <StatTile
           label="Overall"
           value={overall ? overall.to.toFixed(1) : "—"}
           detail={overall ? <Delta value={overall.delta} /> : undefined}
@@ -135,7 +140,7 @@ export function WeekBreakdown({
                 >
                   <span>
                     <span className="block font-display uppercase">
-                      {DAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]}
+                      {WEEKDAY_SHORT[dayOfWeek(date)]}
                     </span>
                     <span className="text-xs text-court-500">{shortDate(date)}</span>
                   </span>
@@ -192,24 +197,6 @@ export function WeekBreakdown({
           </Link>
         </section>
       )}
-    </div>
-  );
-}
-
-function Tile({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-court-700 bg-court-900/70 p-3">
-      <dt className="text-xs uppercase tracking-wider text-court-500">{label}</dt>
-      <dd className="font-display text-3xl tabular-nums">{value}</dd>
-      {detail && <dd className="text-sm text-court-300">{detail}</dd>}
     </div>
   );
 }

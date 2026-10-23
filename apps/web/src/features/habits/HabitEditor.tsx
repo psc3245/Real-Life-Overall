@@ -12,17 +12,14 @@ import {
   type GroupRule,
   type HabitType,
   type RatedNodeDto,
+  WEEKDAY_LETTERS,
+  WEEKDAY_NAMES,
 } from "@rlo/shared";
 import { useState, type FormEvent } from "react";
 import { useCreateHabit, useSuggestLinks, useUpdateHabit } from "../../api/days";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
-
-const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-const field =
-  "rounded-lg border border-court-700 bg-court-950 px-3 py-2 text-sm outline-none focus:border-neon";
+import { compactFieldClass } from "../../components/form";
 
 export function HabitEditor({
   habit,
@@ -111,7 +108,7 @@ export function HabitEditor({
         ...c,
         [key]: Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : null,
       })),
-    className: `${field} w-24`,
+    className: `${compactFieldClass} w-24`,
   });
 
   return (
@@ -129,7 +126,7 @@ export function HabitEditor({
             autoFocus
             placeholder={parent ? `e.g. Stretch (in ${parent.name})` : "e.g. Morning run"}
             onChange={(e) => setName(e.target.value)}
-            className={`${field} w-full`}
+            className={`${compactFieldClass} w-full`}
           />
         </label>
         <label className="space-y-1">
@@ -138,7 +135,7 @@ export function HabitEditor({
             value={type}
             disabled={Boolean(habit)}
             onChange={(e) => changeType(e.target.value as HabitType)}
-            className={`${field} w-full disabled:opacity-60`}
+            className={`${compactFieldClass} w-full disabled:opacity-60`}
           >
             {HABIT_TYPES.filter((t) => !parent || t !== "group").map((t) => (
               <option key={t} value={t}>
@@ -167,7 +164,7 @@ export function HabitEditor({
                   maxLength={20}
                   placeholder="pages"
                   onChange={(e) => setConfig((c) => ({ ...c, unit: e.target.value }))}
-                  className={`${field} w-28`}
+                  className={`${compactFieldClass} w-28`}
                 />
               </label>
             </>
@@ -213,7 +210,7 @@ export function HabitEditor({
                   normalizeHabitConfig("group", { ...config, rule: e.target.value as GroupRule }),
                 )
               }
-              className={field}
+              className={compactFieldClass}
             >
               {GROUP_RULES.map((r) => (
                 <option key={r} value={r}>
@@ -246,12 +243,12 @@ export function HabitEditor({
               Scheduled on
             </legend>
             <div className="flex gap-1.5">
-              {DAY_LETTERS.map((letter, d) => (
+              {WEEKDAY_LETTERS.map((letter, d) => (
                 <button
                   key={d}
                   type="button"
                   aria-pressed={days.includes(d)}
-                  aria-label={DAY_NAMES[d]}
+                  aria-label={WEEKDAY_NAMES[d]}
                   onClick={() => toggleDay(d)}
                   className={`h-9 w-9 rounded-full border text-sm font-semibold ${
                     days.includes(d)
@@ -272,7 +269,7 @@ export function HabitEditor({
               value={startsOn}
               required
               onChange={(e) => setStartsOn(e.target.value)}
-              className={field}
+              className={compactFieldClass}
             />
           </label>
         </div>

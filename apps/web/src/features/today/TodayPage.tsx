@@ -18,14 +18,7 @@ import { Delta } from "../../components/Delta";
 import { OvrBadge } from "../../components/OvrBadge";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { FocusCard } from "./FocusCard";
-
-const longDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+import { dayLabel, longDate } from "../../lib/format";
 
 const STATUS_LABEL: Record<DayDto["status"], string> = {
   open: "Not recapped yet",
@@ -348,12 +341,7 @@ function MissedRecaps({ today }: { today: string }) {
       </span>
       {missed.map((a) => (
         <Link key={a.date} to={`/log?date=${a.date}#recap`} className="text-neon hover:underline">
-          {new Date(`${a.date}T00:00:00Z`).toLocaleDateString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            timeZone: "UTC",
-          })}
+          {dayLabel(a.date)}
         </Link>
       ))}
     </div>

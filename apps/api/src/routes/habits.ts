@@ -9,7 +9,7 @@ import { z } from "zod";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
 import * as habits from "../services/habit-service";
-import { parseJson } from "../validation";
+import { idParam, parseJson } from "../validation";
 
 const statsQuerySchema = z.object({
   range: z.enum(HABIT_STAT_RANGES).default("week"),
@@ -33,9 +33,11 @@ export const habitRoutes = new Hono<AppEnv>()
   })
   .patch("/:id", async (c) => {
     const body = await parseJson(c, updateHabitBodySchema);
-    return c.json(await habits.updateHabit(c.get("db"), c.get("userId"), c.req.param("id"), body));
+    return c.json(
+      await habits.updateHabit(c.get("db"), c.get("userId"), idParam(c, "id", "Habit"), body),
+    );
   })
   .delete("/:id", async (c) => {
-    await habits.archiveHabit(c.get("db"), c.get("userId"), c.req.param("id"));
+    await habits.archiveHabit(c.get("db"), c.get("userId"), idParam(c, "id", "Habit"));
     return c.body(null, 204);
   });

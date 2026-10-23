@@ -18,8 +18,6 @@ import { longestRun, toBadgeDto } from "./badge-service";
 import { activityBetween, historyBetween } from "./history-service";
 import { ensureCurrentSeason } from "./season-service";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * One season in full: start and end values per node, daily history, logging stats, badges and
  * weekly reviews. Archived seasons keep their ledger, so they're recomputed the same way.
@@ -30,7 +28,7 @@ export async function getSeasonDetail(
   id: string,
 ): Promise<SeasonDetailDto> {
   await ensureCurrentSeason(db, userId);
-  const season = UUID.test(id) ? await seasonRepo.findById(db, id) : null;
+  const season = await seasonRepo.findById(db, id);
   const user = await userRepo.findById(db, userId);
   if (!season || season.userId !== userId || !user) throw notFound("Season not found");
 

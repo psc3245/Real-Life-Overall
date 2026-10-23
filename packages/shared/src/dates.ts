@@ -25,3 +25,21 @@ export const BACKFILL_DAYS = 3;
 export function isEditableDate(date: string, today: string): boolean {
   return date <= today && date >= addDays(today, -BACKFILL_DAYS);
 }
+
+/** Weekday names indexed like dayOfWeek (0 = Sunday). */
+export const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+export const WEEKDAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"] as const;
+
+/** Whole days from `from` to `to` (negative if `to` is earlier). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}

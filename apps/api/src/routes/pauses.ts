@@ -2,7 +2,7 @@ import { createPauseBodySchema, endPauseBodySchema } from "@rlo/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
 import * as pauses from "../services/pause-service";
-import { parseJson } from "../validation";
+import { idParam, parseJson } from "../validation";
 
 export const pauseRoutes = new Hono<AppEnv>()
   .get("/", async (c) => c.json(await pauses.listPauses(c.get("db"), c.get("userId"))))
@@ -11,7 +11,8 @@ export const pauseRoutes = new Hono<AppEnv>()
     return c.json(await pauses.createPause(c.get("db"), c.get("userId"), body), 201);
   })
   .post("/:id/end", async (c) => {
+    const id = idParam(c, "id", "Pause");
     const { endsOn } = await parseJson(c, endPauseBodySchema);
-    const result = await pauses.endPause(c.get("db"), c.get("userId"), c.req.param("id"), endsOn);
+    const result = await pauses.endPause(c.get("db"), c.get("userId"), id, endsOn);
     return result ? c.json(result) : c.body(null, 204);
   });

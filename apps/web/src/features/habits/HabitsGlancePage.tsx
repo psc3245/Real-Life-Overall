@@ -10,8 +10,10 @@ import { useHabitStats } from "../../api/days";
 import { useRatings } from "../../api/ratings";
 import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
-import { DayStrip, shortDate } from "./DayStrip";
+import { DayStrip } from "./DayStrip";
 import { scheduleLabel } from "./ManageHabitsPage";
+import { StatTile } from "../../components/StatTile";
+import { shortDate } from "../../lib/format";
 
 const RANGE_LABEL: Record<HabitStatRange, string> = {
   week: "Week",
@@ -94,10 +96,10 @@ export function HabitsGlancePage() {
 
       {habits.length > 0 && (
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Completion" value={pct(scheduled ? completed / scheduled : null)} />
-          <Stat label="Done" value={`${completed}/${scheduled}`} />
-          <Stat label={`Left this ${range}`} value={String(remaining)} />
-          <Stat
+          <StatTile label="Completion" value={pct(scheduled ? completed / scheduled : null)} />
+          <StatTile label="Done" value={`${completed}/${scheduled}`} />
+          <StatTile label={`Left this ${range}`} value={String(remaining)} />
+          <StatTile
             label="Best streak going"
             value={hottest ? String(hottest.currentStreak) : "0"}
             detail={hottest?.habit.name}
@@ -117,16 +119,6 @@ export function HabitsGlancePage() {
           />
         ))}
       </ul>
-    </div>
-  );
-}
-
-function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-xl border border-court-700 bg-court-900/70 p-3">
-      <dt className="text-xs uppercase tracking-wider text-court-500">{label}</dt>
-      <dd className="font-display text-3xl tabular-nums">{value}</dd>
-      {detail && <dd className="truncate text-xs text-court-300">{detail}</dd>}
     </div>
   );
 }

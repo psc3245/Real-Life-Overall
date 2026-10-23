@@ -39,32 +39,25 @@ export function useRateInitial() {
   });
 }
 
-export function useChanges(limit = 30) {
-  return useQuery({
-    queryKey: [...changesKey, limit],
-    queryFn: () => api<ChangeFeedItemDto[]>(`/ratings/changes?limit=${limit}`),
-  });
-}
-
 export type ChangeSource = ChangeFeedItemDto["source"];
-const FEED_PAGE = 50;
 
-/** The change feed in pages of 50, optionally narrowed to sources or one node (and below it). */
+/** The change feed in pages (50 by default), optionally narrowed to sources or one node. */
 export function useChangeFeed({
   sources,
   nodeId,
-}: { sources?: ChangeSource[]; nodeId?: string } = {}) {
+  pageSize = 50,
+}: { sources?: ChangeSource[]; nodeId?: string; pageSize?: number } = {}) {
   return useInfiniteQuery({
-    queryKey: [...changesKey, "feed", sources?.join(",") ?? "all", nodeId ?? "all"],
+    queryKey: [...changesKey, "feed", sources?.join(",") ?? "all", nodeId ?? "all", pageSize],
     initialPageParam: 0,
     queryFn: ({ pageParam }) => {
-      const params = new URLSearchParams({ limit: String(FEED_PAGE), offset: String(pageParam) });
+      const params = new URLSearchParams({ limit: String(pageSize), offset: String(pageParam) });
       if (sources?.length) params.set("source", sources.join(","));
       if (nodeId) params.set("nodeId", nodeId);
       return api<ChangeFeedItemDto[]>(`/ratings/changes?${params}`);
     },
     getNextPageParam: (last, pages) =>
-      last.length === FEED_PAGE ? pages.length * FEED_PAGE : undefined,
+      last.length === pageSize ? pages.length * pageSize : undefined,
   });
 }
 

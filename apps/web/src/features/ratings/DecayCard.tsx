@@ -4,9 +4,7 @@ import { useDay } from "../../api/days";
 import { useCreatePause, useEndPause, usePauses, useRunScheduled } from "../../api/pauses";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
-
-const field =
-  "rounded-lg border border-court-700 bg-court-950 px-3 py-2 text-sm outline-none focus:border-neon";
+import { compactFieldClass } from "../../components/form";
 
 function describe(p: PauseDto) {
   return `${p.startsOn} → ${p.endsOn ?? "until you end it"}${p.reason ? ` · ${p.reason}` : ""}`;
@@ -77,7 +75,7 @@ export function DecayCard() {
               value={start}
               min={addDays(today, -BACKFILL_DAYS)}
               onChange={(e) => setStartsOn(e.target.value)}
-              className={field}
+              className={compactFieldClass}
             />
           </label>
           <label className="space-y-1">
@@ -90,7 +88,7 @@ export function DecayCard() {
               value={endsOn}
               min={start}
               onChange={(e) => setEndsOn(e.target.value)}
-              className={field}
+              className={compactFieldClass}
             />
           </label>
           <label className="min-w-40 flex-1 space-y-1">
@@ -101,7 +99,7 @@ export function DecayCard() {
               maxLength={MAX_PAUSE_REASON}
               placeholder="Vacation"
               onChange={(e) => setReason(e.target.value)}
-              className={`${field} w-full`}
+              className={`${compactFieldClass} w-full`}
             />
           </label>
           <Button type="submit" disabled={create.isPending}>

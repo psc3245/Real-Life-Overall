@@ -1,4 +1,4 @@
-import { GROUP_RULE_LABELS, HABIT_TYPE_LABELS, type HabitDto } from "@rlo/shared";
+import { GROUP_RULE_LABELS, HABIT_TYPE_LABELS, WEEKDAY_SHORT, type HabitDto } from "@rlo/shared";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useArchiveHabit, useDay, useHabits } from "../../api/days";
@@ -7,13 +7,11 @@ import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { HabitEditor } from "./HabitEditor";
 
-const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 export function scheduleLabel(days: number[]) {
   if (days.length === 7) return "Every day";
   if (days.join() === "1,2,3,4,5") return "Weekdays";
   if (days.join() === "0,6") return "Weekends";
-  return days.map((d) => DAY_SHORT[d]).join(", ");
+  return days.map((d) => WEEKDAY_SHORT[d]).join(", ");
 }
 
 export function ManageHabitsPage() {

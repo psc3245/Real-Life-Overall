@@ -1,7 +1,7 @@
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 const DEV_USER_KEY = "rlo.devUser";
 
-/** Auth is deferred (DESIGN.md §8.5): the API trusts an x-dev-user header in dev mode. */
+/** In AUTH_MODE=dev the API trusts this header instead of a session (DESIGN.md §8.5). */
 export function getDevUser(): string {
   try {
     return localStorage.getItem(DEV_USER_KEY) ?? "dev";

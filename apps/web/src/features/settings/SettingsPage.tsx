@@ -12,9 +12,7 @@ import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { CopyLink } from "../social/CopyLink";
 import { VISIBILITY_LABEL } from "../social/ProfilePage";
-
-const field =
-  "w-full rounded-lg border border-court-700 bg-court-950 px-3 py-2.5 outline-none focus:border-neon";
+import { fieldClass } from "../../components/form";
 
 const VISIBILITY_DETAIL: Record<ProfileVisibility, string> = {
   private: "Nobody else can open your profile.",
@@ -61,7 +59,7 @@ function ProfileForm({ me }: { me: Me }) {
           required
           maxLength={40}
           onChange={(e) => setDisplayName(e.target.value)}
-          className={field}
+          className={fieldClass}
         />
       </label>
       <label className="block space-y-1">
@@ -73,7 +71,7 @@ function ProfileForm({ me }: { me: Me }) {
           autoCapitalize="none"
           spellCheck={false}
           onChange={(e) => setUsername(e.target.value)}
-          className={field}
+          className={fieldClass}
           aria-invalid={!validUsername}
         />
         <span className={`text-xs ${validUsername ? "text-court-500" : "text-flare"}`}>

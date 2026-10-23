@@ -2,8 +2,9 @@
  * Seeds a demo player with ~3 weeks of realistic history so the app can be seen "over time":
  * a rated tree, habits with entries, journals, daily recaps that moved ratings, a flu week with a
  * decay pause, guided questions, weekly reviews (focus goals, projections, a habit proposal, a
- * personal badge), goals, and a finished previous season. Decay and catalog badges are then
- * computed by the app's own engine.
+ * personal badge), goals, a "Morning routine" habit group, and a finished previous season with
+ * its own ledger, logs and weekly reviews. Decay and catalog badges are then computed by the
+ * app's own engine.
  *
  * Deterministic (seeded random) and repeatable: re-running replaces the demo account.
  * No LLM calls. Run with: npm run seed:demo -w @rlo/api
@@ -56,15 +57,19 @@ const DEMO_USERNAME = "demo";
 const DEMO_NAME = "Jordan Reyes";
 const TIMEZONE = "America/Chicago";
 
-// Deterministic randomness (mulberry32) so every run tells the same story.
-let seed = 20261022;
-function rand() {
-  seed |= 0;
-  seed = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+// Deterministic randomness (mulberry32) so every run tells the same story. Extra stories (the
+// previous season, the morning routine) get their own streams so they don't reshuffle this one.
+function mulberry32(start: number) {
+  let seed = start;
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
+const rand = mulberry32(20261022);
 const between = (lo: number, hi: number) => lo + rand() * (hi - lo);
 const pick = <T>(items: T[]) => items[Math.floor(rand() * items.length)]!;
 const round = (n: number, places = 2) => Math.round(n * 10 ** places) / 10 ** places;
@@ -405,56 +410,8 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
     return lineage.get(name)!;
   };
 
-  // Previous season: archived, with a frozen card.
-  const prevNodes = [
-    {
-      id: crypto.randomUUID(),
-      lineageId: lineageOf("Overall"),
-      parentId: null as string | null,
-      name: "Overall",
-      depth: 0,
-      value: null as number | null,
-    },
-  ];
-  for (const c of TREE) {
-    const catId = crypto.randomUUID();
-    const leafValues = c.leaves.map((l) => l.previous);
-    const catValue = round(
-      c.leaves.reduce((s, l) => s + l.previous * l.weight, 0) /
-        c.leaves.reduce((s, l) => s + l.weight, 0),
-    );
-    prevNodes.push({
-      id: catId,
-      lineageId: lineageOf(c.name),
-      parentId: prevNodes[0]!.id,
-      name: c.name,
-      depth: 1,
-      value: catValue,
-    });
-    c.leaves.forEach((l, i) =>
-      prevNodes.push({
-        id: crypto.randomUUID(),
-        lineageId: lineageOf(l.name),
-        parentId: catId,
-        name: l.name,
-        depth: 2,
-        value: leafValues[i]!,
-      }),
-    );
-  }
-  const prevOverall = round(
-    TREE.reduce((s, c) => s + prevNodes.find((n) => n.name === c.name)!.value! * c.weight, 0) /
-      TREE.reduce((s, c) => s + c.weight, 0),
-  );
-  prevNodes[0]!.value = prevOverall;
-  await db.insert(seasons).values({
-    userId,
-    ...previous,
-    status: "archived",
-    archetype: "Steady Generalist",
-    archetypeDescription: "Even across the board, with no standout strength yet.",
-    finalSnapshot: { overall: prevOverall, archetype: "Steady Generalist", nodes: prevNodes },
-  });
+  // Previous season: archived with a frozen card, plus the ledger, logs and reviews behind it.
+  const prevOverall = await seedPreviousSeason(db, userId, previous, lineageOf);
 
   // Current season and its tree.
   const [current] = await db
@@ -903,6 +860,8 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
     }
   }
 
+  await seedRoutine(db, userId, start, yesterday, isFlu);
+
   // Let the app's own engines fill in decay and catalog badges.
   const decayed = await applyDecay(db, userId);
   const badges = await awardBadges(db, userId);
@@ -939,6 +898,265 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
       `Sign in with the demo credentials in apps/api/scripts/seed-demo.ts, or use dev user "${DEMO_USERNAME}".`,
     ].join("\n"),
   );
+}
+
+/** Last quarter: same tree, starting a little lower, moved week by week to its final values. */
+async function seedPreviousSeason(
+  db: ReturnType<typeof createNeonDb>["db"],
+  userId: string,
+  period: { label: string; startsOn: string; endsOn: string },
+  lineageOf: (name: string) => string,
+): Promise<number> {
+  const r = mulberry32(20260701);
+  const [season] = await db
+    .insert(seasons)
+    .values({
+      userId,
+      ...period,
+      status: "archived",
+      archetype: "Steady Generalist",
+      archetypeDescription: "Even across the board, with no standout strength yet.",
+    })
+    .returning({ id: seasons.id });
+  const seasonId = season!.id;
+
+  const rootId = crypto.randomUUID();
+  const rows: (typeof ratingNodes.$inferInsert)[] = [
+    {
+      id: rootId,
+      seasonId,
+      userId,
+      parentId: null,
+      lineageId: lineageOf("Overall"),
+      name: "Overall",
+      depth: 0,
+    },
+  ];
+  const leafId = new Map<string, string>();
+  TREE.forEach((c, ci) => {
+    const catId = crypto.randomUUID();
+    rows.push({
+      id: catId,
+      seasonId,
+      userId,
+      parentId: rootId,
+      lineageId: lineageOf(c.name),
+      name: c.name,
+      description: c.description,
+      depth: 1,
+      weight: c.weight,
+      sortOrder: ci,
+      templateKey: c.templateKey,
+    });
+    c.leaves.forEach((l, li) => {
+      const id = crypto.randomUUID();
+      leafId.set(l.name, id);
+      rows.push({
+        id,
+        seasonId,
+        userId,
+        parentId: catId,
+        lineageId: lineageOf(l.name),
+        name: l.name,
+        description: l.description,
+        depth: 2,
+        weight: l.weight,
+        sortOrder: li,
+      });
+    });
+  });
+  await db.insert(ratingNodes).values(rows);
+  const leaves = TREE.flatMap((c) => c.leaves);
+
+  // Started a bit below where it finished; onboarding on the first day.
+  const startValue = new Map(leaves.map((l) => [l.name, round(l.previous - 1 - r() * 4, 1)]));
+  await db.insert(ratingEvents).values(
+    leaves.map((l) => ({
+      nodeId: leafId.get(l.name)!,
+      seasonId,
+      delta: startValue.get(l.name)!,
+      source: "onboarding" as const,
+      reason: `Starting rating from your scouting report for ${l.name.toLowerCase()}.`,
+      evidence: { confidence: "medium" },
+      createdAt: new Date(`${period.startsOn}T15:00:00Z`),
+    })),
+  );
+
+  // Most days logged, each with a one-line recap.
+  const logs: (typeof dayLogs.$inferInsert)[] = [];
+  const dailies: (typeof recaps.$inferInsert)[] = [];
+  for (let d = addDays(period.startsOn, 1); d <= period.endsOn; d = addDays(d, 1)) {
+    if (r() > 0.72) continue;
+    const journal = LIFE_NOTES[Math.floor(r() * LIFE_NOTES.length)]!;
+    logs.push({ userId, localDate: d, journal, status: "recapped", updatedAt: evening(d) });
+    dailies.push({
+      userId,
+      seasonId,
+      kind: "daily",
+      periodStart: d,
+      periodEnd: d,
+      narrative: journal,
+      output: { flags: [], nextPrompts: [] },
+      promptVersion: "demo-seed",
+      createdAt: evening(d),
+    });
+  }
+  await db.insert(dayLogs).values(logs);
+  for (let i = 0; i < dailies.length; i += 200)
+    await db.insert(recaps).values(dailies.slice(i, i + 200));
+
+  // Weekly reviews carry the season's movement, landing exactly on the final card.
+  const weeks: { start: string; end: string }[] = [];
+  for (let end = addDays(period.startsOn, 6); end <= period.endsOn; end = addDays(end, 7)) {
+    weeks.push({ start: addDays(end, -6), end });
+  }
+  const NARRATIVES = [
+    "A steady week: most days logged and nothing slipped badly.",
+    "Work ran long; workouts were the casualty. Logging stayed consistent.",
+    "Good balance this week, with a couple of social plans kept.",
+    "Quiet week. Small gains across the board, no big moves.",
+  ];
+  const now = new Map(startValue);
+  for (const [i, week] of weeks.entries()) {
+    const recapId = crypto.randomUUID();
+    const left = weeks.length - i;
+    const deltas = leaves
+      .map((l) => {
+        const remaining = l.previous - now.get(l.name)!;
+        const delta = left === 1 ? remaining : remaining / left + (r() - 0.5) * 0.6;
+        return { l, delta: round(delta, 2) };
+      })
+      .filter((d) => Math.abs(d.delta) >= 0.01);
+    await db.insert(recaps).values({
+      id: recapId,
+      userId,
+      seasonId,
+      kind: "weekly",
+      periodStart: week.start,
+      periodEnd: week.end,
+      narrative: NARRATIVES[Math.floor(r() * NARRATIVES.length)]!,
+      output: {
+        focusGoals: [],
+        habitProposals: [],
+        decayRevisions: [],
+        projections: [],
+        archetypeChange: null,
+      },
+      promptVersion: "demo-seed",
+      createdAt: new Date(`${addDays(week.end, 1)}T10:00:00Z`),
+    });
+    await db.insert(ratingEvents).values(
+      deltas.map(({ l, delta }) => ({
+        nodeId: leafId.get(l.name)!,
+        seasonId,
+        delta,
+        source: "weekly_review" as const,
+        reason:
+          delta >= 0
+            ? `Consistent work on ${l.name.toLowerCase()}.`
+            : `${l.name} slipped this week.`,
+        recapId,
+        createdAt: new Date(`${addDays(week.end, 1)}T10:00:00Z`),
+      })),
+    );
+    for (const { l, delta } of deltas) now.set(l.name, round(now.get(l.name)! + delta, 2));
+  }
+
+  // The frozen card, rolled up from the final values exactly as rollover would.
+  const values = computeNodeValues(
+    rows.map((n) => ({
+      id: n.id!,
+      parentId: n.parentId ?? null,
+      depth: n.depth,
+      weight: n.weight ?? 1,
+    })),
+    new Map(leaves.map((l) => [leafId.get(l.name)!, now.get(l.name)!])),
+  );
+  const overall = round(values.get(rootId) ?? 0);
+  await db
+    .update(seasons)
+    .set({
+      finalSnapshot: {
+        overall,
+        archetype: "Steady Generalist",
+        nodes: rows.map((n) => ({
+          id: n.id!,
+          lineageId: n.lineageId!,
+          parentId: n.parentId ?? null,
+          name: n.name,
+          depth: n.depth,
+          value: values.get(n.id!) ?? null,
+        })),
+      },
+    })
+    .where(eq(seasons.id, seasonId));
+  return overall;
+}
+
+/** A habit group: three morning sub-habits, done when at least two are. */
+async function seedRoutine(
+  db: ReturnType<typeof createNeonDb>["db"],
+  userId: string,
+  start: string,
+  yesterday: string,
+  isFlu: (date: string) => boolean,
+) {
+  const r = mulberry32(20261001);
+  const days = [1, 2, 3, 4, 5];
+  const [group] = await db
+    .insert(habits)
+    .values({
+      userId,
+      name: "Morning routine",
+      type: "group",
+      config: normalizeHabitConfig("group", { rule: "count", target: 2 }),
+      days,
+      startsOn: start,
+      sortOrder: HABITS.length,
+    })
+    .returning({ id: habits.id });
+  const subs = [
+    { name: "Make bed", type: "checkbox" as const, config: {}, rate: 0.85, amount: null },
+    {
+      name: "Meditate",
+      type: "duration" as const,
+      config: { target: 10 },
+      rate: 0.5,
+      amount: [10, 20],
+    },
+    {
+      name: "Water first thing",
+      type: "counter" as const,
+      config: { target: 2, unit: "glasses" },
+      rate: 0.7,
+      amount: [2, 3],
+    },
+  ];
+  const ids = await db
+    .insert(habits)
+    .values(
+      subs.map((h, i) => ({
+        userId,
+        name: h.name,
+        type: h.type,
+        config: normalizeHabitConfig(h.type, h.config),
+        days,
+        startsOn: start,
+        parentId: group!.id,
+        sortOrder: HABITS.length + 1 + i,
+      })),
+    )
+    .returning({ id: habits.id });
+  const entries: (typeof habitEntries.$inferInsert)[] = [];
+  for (let d = addDays(start, 1); d <= yesterday; d = addDays(d, 1)) {
+    if (!days.includes(dayOfWeek(d))) continue;
+    subs.forEach((h, i) => {
+      if (r() >= (isFlu(d) ? 0.1 : h.rate)) return;
+      const value = h.amount ? Math.round(h.amount[0]! + r() * (h.amount[1]! - h.amount[0]!)) : 1;
+      entries.push({ habitId: ids[i]!.id, localDate: d, valueNum: value });
+    });
+  }
+  if (entries.length) await db.insert(habitEntries).values(entries);
 }
 
 async function seedRivals(
