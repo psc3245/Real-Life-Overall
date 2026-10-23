@@ -43,14 +43,23 @@ export async function getHistory(db: Database, userId: string, days: number): Pr
   const range = await rangeFor(db, userId, days);
   if (!range) return { dates: [], series: [] };
   const { ctx, today, from } = range;
-  const events = datedEvents(await eventRepo.findActiveWithDates(db, ctx.season.id));
-  const dates = datesBetween(from, today);
-  const daily = dates.map((d) =>
-    computeNodeValues(ctx.nodes, leafValuesFromEvents(asOf(events, d))),
-  );
+  return historyBetween(db, ctx.season.id, ctx.nodes, from, today);
+}
+
+/** Every node's end-of-day value over [from, to], from one season's ledger. */
+export async function historyBetween(
+  db: Database,
+  seasonId: string,
+  nodes: Parameters<typeof computeNodeValues>[0],
+  from: string,
+  to: string,
+): Promise<HistoryDto> {
+  const events = datedEvents(await eventRepo.findActiveWithDates(db, seasonId));
+  const dates = datesBetween(from, to);
+  const daily = dates.map((d) => computeNodeValues(nodes, leafValuesFromEvents(asOf(events, d))));
   return {
     dates,
-    series: ctx.nodes.map((n) => ({
+    series: nodes.map((n) => ({
       nodeId: n.id,
       values: daily.map((values) => values.get(n.id) ?? null),
     })),
@@ -76,8 +85,19 @@ export async function getActivity(
   const range = await rangeFor(db, userId, days);
   if (!range) return [];
   const { ctx, today, from } = range;
+  return activityBetween(db, userId, ctx.season.id, from, today);
+}
+
+/** Per-day logging, recaps and rating movement over [from, to] within one season. */
+export async function activityBetween(
+  db: Database,
+  userId: string,
+  seasonId: string,
+  from: string,
+  today: string,
+): Promise<ActivityDayDto[]> {
   const [events, logs, recaps, habits] = await Promise.all([
-    eventRepo.findActiveWithDates(db, ctx.season.id).then(datedEvents),
+    eventRepo.findActiveWithDates(db, seasonId).then(datedEvents),
     dayRepo.findWithPromptsBetween(db, userId, from, today),
     recapRepo.findDailyBetween(db, userId, from, today),
     habitRepo.findAllByUser(db, userId),

@@ -31,25 +31,32 @@ export function PastSeasons() {
   if (!cards.data?.length) return null;
   return (
     <section className="space-y-3">
-      <h2 className="font-display text-2xl uppercase tracking-wider">Past seasons</h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-2xl uppercase tracking-wider">Past seasons</h2>
+        <Link to="/history" className="text-sm text-court-300 hover:text-neon">
+          All seasons →
+        </Link>
+      </div>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.data.map((c) => {
           const categories = c.nodes.filter((n) => n.depth === 1);
           return (
-            <li
-              key={c.id}
-              className="flex gap-4 rounded-xl border border-court-700 bg-court-900/70 p-4"
-            >
-              {c.overall !== null && <OvrBadge value={c.overall} size="md" />}
-              <div className="min-w-0 text-sm">
-                <p className="font-display text-lg uppercase tracking-wider">{c.label}</p>
-                {c.archetype && <p className="truncate text-court-300">{c.archetype}</p>}
-                <p className="mt-1 text-court-500">
-                  {categories
-                    .map((n) => `${n.name} ${n.value === null ? "–" : n.value.toFixed(0)}`)
-                    .join(" · ")}
-                </p>
-              </div>
+            <li key={c.id}>
+              <Link
+                to={`/history/${c.id}`}
+                className="flex gap-4 rounded-xl border border-court-700 bg-court-900/70 p-4 hover:border-neon/60"
+              >
+                {c.overall !== null && <OvrBadge value={c.overall} size="md" />}
+                <div className="min-w-0 text-sm">
+                  <p className="font-display text-lg uppercase tracking-wider">{c.label}</p>
+                  {c.archetype && <p className="truncate text-court-300">{c.archetype}</p>}
+                  <p className="mt-1 text-court-500">
+                    {categories
+                      .map((n) => `${n.name} ${n.value === null ? "–" : n.value.toFixed(0)}`)
+                      .join(" · ")}
+                  </p>
+                </div>
+              </Link>
             </li>
           );
         })}

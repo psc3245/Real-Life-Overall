@@ -143,3 +143,19 @@ export async function countFlaggedDaysSince(db: Executor, userId: string, from: 
     );
   return row?.n ?? 0;
 }
+
+/** A season's weekly reviews, oldest first. */
+export async function findWeeklyBySeason(db: Executor, userId: string, seasonId: string) {
+  return db
+    .select()
+    .from(recaps)
+    .where(
+      and(
+        eq(recaps.userId, userId),
+        eq(recaps.seasonId, seasonId),
+        eq(recaps.kind, "weekly"),
+        eq(recaps.status, "active"),
+      ),
+    )
+    .orderBy(recaps.periodStart);
+}
