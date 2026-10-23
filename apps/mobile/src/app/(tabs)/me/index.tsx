@@ -2,19 +2,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { getDevUser, setDevUser } from "@/api/client";
-import { useMe } from "@/api/queries";
+import { useMe } from "@/api/hooks";
 import { useAuthState, useSignOut } from "@/api/session";
 import { Body, Button, Card, Label, Muted, Screen } from "@/components/ui";
 import { API_URL } from "@/lib/config";
 import { colors, space } from "@/lib/theme";
 
-export default function SettingsScreen() {
+export default function MeScreen() {
   const auth = useAuthState();
   const me = useMe();
   const signOut = useSignOut();
 
   return (
-    <Screen title="Settings" onRefresh={() => void me.refetch()} refreshing={me.isRefetching}>
+    <Screen title="You" onRefresh={() => void me.refetch()} refreshing={me.isRefetching}>
       <View style={styles.section}>
         <Label>Player</Label>
         <Card style={styles.card}>

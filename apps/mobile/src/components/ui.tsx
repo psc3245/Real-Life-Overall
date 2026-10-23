@@ -1,3 +1,4 @@
+import { Link, type Href } from "expo-router";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -7,19 +8,26 @@ import {
   StyleSheet,
   Text,
   View,
+  type StyleProp,
+  type TextInputProps,
   type TextProps,
   type ViewStyle,
 } from "react-native";
+import { TextInput } from "react-native";
 import { colors, fonts, space } from "@/lib/theme";
 
 /** A scrolling page with a big 2K-style title and pull to refresh. Insets come from the tab bar. */
 export function Screen({
   title,
+  eyebrow,
+  subtitle,
   children,
   onRefresh,
   refreshing = false,
 }: {
   title?: string;
+  eyebrow?: string;
+  subtitle?: string;
   children: ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -36,16 +44,20 @@ export function Screen({
       }
     >
       {title && (
-        <Text accessibilityRole="header" style={styles.title}>
-          {title}
-        </Text>
+        <View>
+          {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+          <Text accessibilityRole="header" style={styles.title}>
+            {title}
+          </Text>
+          {subtitle && <Label>{subtitle}</Label>}
+        </View>
       )}
       {children}
     </ScrollView>
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
@@ -71,6 +83,55 @@ export function Muted({ children, style, ...props }: TextProps) {
     <Text style={[styles.muted, style]} {...props}>
       {children}
     </Text>
+  );
+}
+
+/** A titled card, like the web's dashboard cards, with an optional link on the right. */
+export function Section({
+  title,
+  action,
+  children,
+  style,
+}: {
+  title: string;
+  action?: { label: string; href: Href };
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Card style={[{ gap: space.md }, style]}>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {action && <TextLink href={action.href}>{action.label}</TextLink>}
+      </View>
+      {children}
+    </Card>
+  );
+}
+
+/** Neon text that navigates. */
+export function TextLink({ href, children }: { href: Href; children: ReactNode }) {
+  return (
+    <Link href={href} style={styles.link}>
+      {children}
+    </Link>
+  );
+}
+
+/** The small neon line above a screen title ("Day log", a date). */
+export function Eyebrow({ children }: { children: ReactNode }) {
+  return <Text style={styles.eyebrow}>{children}</Text>;
+}
+
+/** A dark text field matching the theme. */
+export function Field({ style, ...props }: TextInputProps) {
+  return (
+    <TextInput
+      placeholderTextColor={colors.court500}
+      keyboardAppearance="dark"
+      style={[styles.field, props.multiline && styles.fieldMulti, style]}
+      {...props}
+    />
   );
 }
 
@@ -126,6 +187,7 @@ export function Loading({ title }: { title?: string }) {
 }
 
 export function ErrorNote({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  if (!error) return null;
   return (
     <Card style={{ gap: space.md }}>
       <Body style={{ color: colors.flare }}>
@@ -144,7 +206,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     fontSize: 40,
     textTransform: "uppercase",
-    marginBottom: -space.xs,
   },
   card: {
     backgroundColor: colors.court900,
@@ -153,6 +214,38 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: space.lg,
   },
+  sectionHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: space.md,
+  },
+  sectionTitle: {
+    color: colors.court100,
+    fontFamily: fonts.display,
+    fontSize: 19,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    flexShrink: 1,
+  },
+  link: { color: colors.neon, fontSize: 14 },
+  eyebrow: {
+    color: colors.neon,
+    fontSize: 13,
+    letterSpacing: 3,
+    textTransform: "uppercase",
+  },
+  field: {
+    backgroundColor: colors.court900,
+    borderColor: colors.court700,
+    borderWidth: 1,
+    borderRadius: 10,
+    color: colors.court100,
+    fontSize: 16,
+    paddingHorizontal: space.md,
+    paddingVertical: 10,
+  },
+  fieldMulti: { minHeight: 140, textAlignVertical: "top", lineHeight: 22 },
   label: {
     color: colors.court300,
     fontFamily: fonts.display,
@@ -179,3 +272,16 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xxl },
 });
+
+/** Shown where a page needs ratings the player doesn't have yet. */
+export function NeedsRating() {
+  return (
+    <Screen>
+      <Card style={{ gap: space.md, marginTop: space.xxl }}>
+        <Text style={styles.sectionTitle}>Build your rating first</Text>
+        <Muted>Daily logging moves ratings you don&apos;t have yet.</Muted>
+        <TextLink href="/onboarding">Start onboarding →</TextLink>
+      </Card>
+    </Screen>
+  );
+}

@@ -1,6 +1,6 @@
 import type { RatedNodeDto } from "@rlo/shared";
 import { StyleSheet, View } from "react-native";
-import { useRatings } from "@/api/queries";
+import { useRatings } from "@/api/ratings";
 import { StatBar } from "@/components/ratings";
 import { Body, Card, ErrorNote, Label, Loading, Muted, Screen } from "@/components/ui";
 import { space } from "@/lib/theme";
