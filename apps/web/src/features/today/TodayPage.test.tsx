@@ -43,6 +43,18 @@ const day: DayDto = {
       entry: { num: 5, text: null },
     },
     { habit: habit("read", "Read"), scheduled: true, entry: null },
+    {
+      habit: habit("am", "Morning routine", {
+        type: "group",
+        config: { target: null, unit: null, min: null, max: null, rule: "all" },
+      }),
+      scheduled: true,
+      entry: null,
+      children: [
+        { habit: habit("bed", "Make bed"), scheduled: true, entry: { num: 1, text: null } },
+        { habit: habit("med", "Meditate"), scheduled: true, entry: null },
+      ],
+    },
   ],
 };
 
@@ -70,6 +82,8 @@ describe("TodayPage", () => {
       "1",
     );
     expect(screen.getByText("5/8 glasses")).toBeInTheDocument();
+    expect(screen.getByText("1/2")).toBeInTheDocument(); // group progress
+    expect(screen.getByText(/Meditate/)).toBeInTheDocument();
     expect(screen.getByText("to do")).toBeInTheDocument();
     expect(screen.getByText(/shipped the migration/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Log today →" })).toHaveAttribute("href", "/log");

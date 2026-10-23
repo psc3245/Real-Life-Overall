@@ -31,7 +31,9 @@ export function HabitsGlancePage() {
   const ratings = useRatings();
   const names = new Map((ratings.data?.nodes ?? []).map((n) => [n.id, n.name]));
 
-  const habits = stats.data?.habits ?? [];
+  const all = stats.data?.habits ?? [];
+  // Groups count once (their sub-habits show inside the group's card).
+  const habits = all.filter((h) => !h.habit.parentId);
   const scheduled = habits.reduce((n, h) => n + h.scheduled, 0);
   const completed = habits.reduce((n, h) => n + h.completed, 0);
   const remaining = habits.reduce((n, h) => n + h.remaining, 0);
@@ -108,6 +110,7 @@ export function HabitsGlancePage() {
           <HabitCard
             key={h.habit.id}
             stats={h}
+            subs={all.filter((c) => c.habit.parentId === h.habit.id)}
             range={range}
             today={stats.data!.today}
             names={names}
@@ -130,11 +133,13 @@ function Stat({ label, value, detail }: { label: string; value: string; detail?:
 
 function HabitCard({
   stats: s,
+  subs,
   range,
   today,
   names,
 }: {
   stats: HabitStatsDto;
+  subs: HabitStatsDto[];
   range: HabitStatRange;
   today: string;
   names: Map<string, string>;
@@ -191,6 +196,23 @@ function HabitCard({
       </dl>
 
       <DayStrip days={s.days} range={range} today={today} />
+
+      {subs.length > 0 && (
+        <ul className="space-y-1 border-t border-court-800 pt-3 text-sm" aria-label="Sub-habits">
+          {subs.map((c) => (
+            <li key={c.habit.id} className="flex items-center gap-3">
+              <span className="min-w-0 flex-1 truncate">{c.habit.name}</span>
+              {c.habit.links.map((id) => (
+                <NodeChip key={id} id={id} name={names.get(id)} />
+              ))}
+              <span className="tabular-nums text-court-300">
+                {c.completed}/{c.scheduled}
+              </span>
+              <span className="w-10 text-right font-display tabular-nums">{pct(c.rate)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {s.recent.length > 0 && (
         <div>

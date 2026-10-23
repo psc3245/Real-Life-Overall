@@ -2,10 +2,10 @@ import {
   addDays,
   BACKFILL_DAYS,
   formatHabitEntry,
-  isHabitDone,
+  groupProgress,
+  isDayHabitDone,
   TREND_THRESHOLD,
   type DayDto,
-  type DayHabitDto,
   type RatedNodeDto,
   type RecapDto,
 } from "@rlo/shared";
@@ -119,9 +119,10 @@ const cardLink = "text-sm text-court-300 hover:text-neon";
 
 function HabitsCard({ day }: { day: DayDto }) {
   const scheduled = day.habits.filter((h) => h.scheduled);
-  const extra = day.habits.filter((h) => !h.scheduled && h.entry);
-  const done = (h: DayHabitDto) =>
-    Boolean(h.entry && isHabitDone(h.habit.type, h.habit.config, h.entry));
+  const extra = day.habits.filter(
+    (h) => !h.scheduled && (h.entry || h.children?.some((c) => c.entry)),
+  );
+  const done = isDayHabitDone;
   const count = scheduled.filter(done).length;
 
   return (
@@ -182,9 +183,28 @@ function HabitsCard({ day }: { day: DayDto }) {
                     {!h.scheduled && <span className="ml-2 text-xs text-court-500">bonus</span>}
                   </span>
                   <span className="max-w-[40%] truncate text-sm tabular-nums text-court-300">
-                    {h.entry ? formatHabitEntry(h.habit.type, h.habit.config, h.entry) : "to do"}
+                    {h.habit.type === "group"
+                      ? groupProgress(h)
+                      : h.entry
+                        ? formatHabitEntry(h.habit.type, h.habit.config, h.entry)
+                        : "to do"}
                   </span>
                 </Link>
+                {h.children && h.children.length > 0 && (
+                  <ul className="mb-2 ml-8 space-y-0.5 text-sm text-court-300">
+                    {h.children.map((c) => (
+                      <li key={c.habit.id} className="flex justify-between gap-3">
+                        <span className={isDayHabitDone(c) ? "text-court-100" : ""}>
+                          {isDayHabitDone(c) ? "✓ " : "○ "}
+                          {c.habit.name}
+                        </span>
+                        <span className="truncate tabular-nums">
+                          {c.entry ? formatHabitEntry(c.habit.type, c.habit.config, c.entry) : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>

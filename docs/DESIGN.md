@@ -403,7 +403,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `onboarding_sessions` | `user_id`, `season_id`, `stage`, `questionnaire` jsonb, `answers` jsonb, `chat` jsonb, `result` jsonb | Resumable |
 | `day_logs` | `user_id`, `local_date`, `journal` text, `status` (`open`/`submitted`/`recapped`) | Unique `(user_id, local_date)` |
 | `guided_prompts` | `day_log_id`, `question`, `answer` | |
-| `habits` | `user_id`, `name`, `type` (8 types), `config` jsonb (target, slider min/max, colors…), `recurrence_interval`, `recurrence_days`, `archived` | Ported from Habit Tracker, with the type-specific columns folded into `config` |
+| `habits` | `user_id`, `name`, `type` (8 types + `group`), `config` jsonb (target, slider min/max, group rule…), `recurrence_interval`, `recurrence_days`, `parent_id`, `archived` | Ported from Habit Tracker, with the type-specific columns folded into `config`. **Groups** (`type = group`) hold sub-habits (`parent_id`): done by a rule (all / any / at least N), no entries of their own, sub-habits share the group's schedule and carry the links. One level for now; the parent link leaves room for richer habits later. |
 | `habit_links` | `habit_id`, `node_lineage_id`, `status` (`suggested`/`confirmed`/`rejected`) | Linked by lineage so links survive seasons |
 | `habit_entries` | `habit_id`, `local_date`, `value_num`, `value_text` | |
 | `recaps` | `user_id`, `kind` (`daily`/`weekly`/`onboarding`/`recalibration`), `period_start`, `period_end`, `narrative`, `output` jsonb, `prompt_version`, `model`, `status`, `superseded_by` | |

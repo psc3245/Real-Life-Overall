@@ -231,23 +231,28 @@ async function renderWeek(
     week.start,
     week.end,
   );
-  const habitLines = active.map((h) => {
-    let scheduled = 0;
-    for (let d = week.start; d <= week.end; d = addDays(d, 1)) {
-      if (d >= h.startsOn && h.days.includes(dayOfWeek(d))) scheduled += 1;
-    }
-    const done = entries.filter(
-      (e) =>
-        e.habitId === h.id &&
-        isHabitDone(h.type, h.config as HabitConfig, { num: e.valueNum, text: e.valueText }),
-    ).length;
-    const builds = links
-      .filter((l) => l.habitId === h.id)
-      .map((l) => ctx.nodeByLineage.get(l.nodeLineageId))
-      .filter((id): id is string => !!id)
-      .map(ref);
-    return `- ${h.name} (${HABIT_TYPE_LABELS[h.type].toLowerCase()}): done ${done} of ${scheduled} scheduled days${builds.length ? `. Builds: ${builds.join(", ")}` : ""}`;
-  });
+  // Groups have no entries of their own; their sub-habits are listed under the group's name.
+  const groupName = new Map(habits.filter((h) => h.type === "group").map((h) => [h.id, h.name]));
+  const habitLines = active
+    .filter((h) => h.type !== "group")
+    .map((h) => {
+      let scheduled = 0;
+      for (let d = week.start; d <= week.end; d = addDays(d, 1)) {
+        if (d >= h.startsOn && h.days.includes(dayOfWeek(d))) scheduled += 1;
+      }
+      const done = entries.filter(
+        (e) =>
+          e.habitId === h.id &&
+          isHabitDone(h.type, h.config as HabitConfig, { num: e.valueNum, text: e.valueText }),
+      ).length;
+      const builds = links
+        .filter((l) => l.habitId === h.id)
+        .map((l) => ctx.nodeByLineage.get(l.nodeLineageId))
+        .filter((id): id is string => !!id)
+        .map(ref);
+      const name = h.parentId ? `${groupName.get(h.parentId) ?? "Group"} › ${h.name}` : h.name;
+      return `- ${name} (${HABIT_TYPE_LABELS[h.type].toLowerCase()}): done ${done} of ${scheduled} scheduled days${builds.length ? `. Builds: ${builds.join(", ")}` : ""}`;
+    });
 
   const decay = new Map<string, number>();
   for (const e of events) {

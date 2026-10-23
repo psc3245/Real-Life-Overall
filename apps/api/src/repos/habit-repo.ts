@@ -36,6 +36,16 @@ export async function update(
   return rows[0]!;
 }
 
+/** Applies schedule (or archive) changes to every sub-habit of a group. */
+export async function updateChildren(
+  db: Executor,
+  parentId: string,
+  changes: Partial<Pick<HabitRow, "days" | "startsOn" | "archivedAt">>,
+): Promise<void> {
+  if (!Object.keys(changes).length) return;
+  await db.update(habits).set(changes).where(eq(habits.parentId, parentId));
+}
+
 export async function findLinks(db: Executor, habitIds: string[]) {
   if (!habitIds.length) return [];
   return db.select().from(habitLinks).where(inArray(habitLinks.habitId, habitIds));
