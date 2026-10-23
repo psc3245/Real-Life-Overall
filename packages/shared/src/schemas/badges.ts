@@ -31,6 +31,8 @@ export interface CatalogBadge {
   description: string;
   metric: keyof BadgeMetrics;
   unit: string;
+  /** How to move toward the next tier, shown on the badge's detail. */
+  hint: string;
   /** Thresholds for bronze, silver, gold, Hall of Fame. */
   thresholds: [number, number, number, number];
 }
@@ -40,6 +42,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "logged-in",
     name: "Logged In",
     description: "Log something several days in a row.",
+    hint: "Log anything (a journal line, a habit, an answer) every day. One missed day resets the streak.",
     metric: "bestLoggingStreak",
     unit: "day streak",
     thresholds: [3, 7, 30, 90],
@@ -48,6 +51,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "closer",
     name: "Closer",
     description: "Finish your days with a recap.",
+    hint: "Hit “End my day” each evening, or let the 4am auto-recap catch days you logged.",
     metric: "recappedDays",
     unit: "days recapped",
     thresholds: [5, 20, 60, 150],
@@ -56,6 +60,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "habit-machine",
     name: "Habit Machine",
     description: "Complete habits, any of them, again and again.",
+    hint: "Every habit done counts, scheduled or bonus. More habits, more chances.",
     metric: "habitCompletions",
     unit: "completions",
     thresholds: [10, 50, 150, 400],
@@ -64,6 +69,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "iron-will",
     name: "Iron Will",
     description: "Never miss a habit on its scheduled days.",
+    hint: "Keep one habit going on every day it is scheduled; an unfinished today never breaks it.",
     metric: "bestHabitStreak",
     unit: "scheduled days in a row",
     thresholds: [5, 14, 30, 60],
@@ -72,6 +78,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "climber",
     name: "Climber",
     description: "Raise one attribute above where it started this season.",
+    hint: "Pick one attribute and log the work that builds it; recaps raise it a little each time.",
     metric: "biggestGain",
     unit: "points gained",
     thresholds: [2, 5, 10, 15],
@@ -80,6 +87,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "well-rounded",
     name: "Well-Rounded",
     description: "Keep every category up, not just your favorites.",
+    hint: "Lift your lowest category. It is the only one this badge looks at.",
     metric: "lowestCategory",
     unit: "lowest category",
     thresholds: [50, 60, 70, 80],
@@ -88,6 +96,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "elite",
     name: "Elite",
     description: "Reach the top of the scale in any attribute.",
+    hint: "Push your strongest attribute higher; consistency beats one big day under the daily caps.",
     metric: "bestAttribute",
     unit: "best attribute",
     thresholds: [80, 85, 90, 95],
@@ -96,6 +105,7 @@ export const BADGE_CATALOG: CatalogBadge[] = [
     key: "week-warrior",
     name: "Week Warrior",
     description: "Complete weekly reviews.",
+    hint: "Finish a full week, then run the review on the Week page (or let it run automatically).",
     metric: "weeklyReviews",
     unit: "weekly reviews",
     thresholds: [1, 4, 8, 12],
@@ -139,6 +149,11 @@ export interface BadgeProgressDto {
   tier: BadgeTier | null;
   /** Value needed for the next tier, or null at Hall of Fame. */
   next: number | null;
+  hint: string;
+  /** Values needed for bronze, silver, gold and Hall of Fame. */
+  thresholds: [number, number, number, number];
+  /** Tiers earned so far, with when. */
+  earned: { tier: BadgeTier; earnedAt: string }[];
 }
 
 export interface BadgesDto {
