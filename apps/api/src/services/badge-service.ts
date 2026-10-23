@@ -1,6 +1,7 @@
 import {
   addDays,
   BADGE_CATALOG,
+  BADGE_TIERS,
   BADGE_TIER_LABELS,
   computeNodeValues,
   earnedTiers,
@@ -190,6 +191,12 @@ export async function getBadges(db: Database, userId: string): Promise<BadgesDto
         value: metrics[b.metric],
         tier,
         next: reached < 4 ? b.thresholds[reached]! : null,
+        hint: b.hint,
+        thresholds: b.thresholds,
+        earned: rows
+          .filter((r) => r.kind === "catalog" && r.badgeKey === b.key && r.tier)
+          .map((r) => ({ tier: r.tier!, earnedAt: r.earnedAt.toISOString() }))
+          .sort((x, y) => BADGE_TIERS.indexOf(x.tier) - BADGE_TIERS.indexOf(y.tier)),
       };
     }),
     personal: rows.filter((r) => r.kind === "personal").map(toBadgeDto),

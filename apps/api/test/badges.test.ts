@@ -59,7 +59,14 @@ describe("badges", () => {
 
     const badges = await body<BadgesDto>(await t.request("/badges"));
     const progress = new Map(badges.progress.map((p) => [p.key, p]));
-    expect(progress.get("logged-in")).toMatchObject({ value: 3, tier: "bronze", next: 7 });
+    expect(progress.get("logged-in")).toMatchObject({
+      value: 3,
+      tier: "bronze",
+      next: 7,
+      thresholds: [3, 7, 30, 90],
+    });
+    expect(progress.get("logged-in")!.earned.map((e) => e.tier)).toEqual(["bronze"]);
+    expect(progress.get("logged-in")!.hint).toMatch(/every day/);
     expect(progress.get("climber")).toMatchObject({ value: 9, tier: "silver", next: 10 });
     expect(progress.get("iron-will")).toMatchObject({ value: 3, tier: null, next: 5 });
     expect(progress.get("closer")).toMatchObject({ value: 3, tier: null, next: 5 });
