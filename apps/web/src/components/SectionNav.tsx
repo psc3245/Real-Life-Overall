@@ -49,12 +49,9 @@ export function SectionNav({ sections }: { sections: Section[] }) {
 
   return (
     <>
-      {/* Full-bleed and translucent so the page's tinted background shows through. */}
-      <nav
-        aria-label="On this page"
-        className="sticky top-0 z-20 mx-[calc(50%-50vw)] w-screen border-b border-court-700/70 bg-court-900/80 py-2 shadow-[0_8px_16px_-12px_rgb(0_0_0/0.8)] backdrop-blur-md"
-      >
-        <ul className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-4">
+      {/* No bar behind the chips; each chip blurs what scrolls under it so it stays readable. */}
+      <nav aria-label="On this page" className="sticky top-0 z-20 -mx-4 py-2">
+        <ul className="flex gap-2 overflow-x-auto px-4">
           {sections.map((s) => (
             <li key={s.id}>
               <a
@@ -64,7 +61,7 @@ export function SectionNav({ sections }: { sections: Section[] }) {
                   e.preventDefault();
                   jump(s.id);
                 }}
-                className={`block whitespace-nowrap rounded-full border px-3 py-1 text-sm ${active === s.id ? "border-neon bg-neon/10 text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`}
+                className={`block whitespace-nowrap rounded-full border px-3 py-1 text-sm backdrop-blur-md ${active === s.id ? "border-neon bg-neon/15 text-neon" : "border-court-700 bg-court-950/40 text-court-300 hover:border-court-500"}`}
               >
                 {s.label}
               </a>
