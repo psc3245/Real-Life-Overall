@@ -18,6 +18,9 @@ import { NotFound } from "./routes/NotFound";
 import { RootLayout } from "./routes/RootLayout";
 
 // The ratings page carries the charting library; load it only when visited.
+const ActivityPage = lazy(() =>
+  import("./features/ratings/ActivityPage").then((m) => ({ default: m.ActivityPage })),
+);
 const RatingsPage = lazy(() =>
   import("./features/ratings/RatingsPage").then((m) => ({ default: m.RatingsPage })),
 );
@@ -52,6 +55,16 @@ export const router = createBrowserRouter([
           <RequireAuth>
             <Suspense fallback={loading}>
               <RatingsPage />
+            </Suspense>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "ratings/activity",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <ActivityPage />
             </Suspense>
           </RequireAuth>
         ),

@@ -15,6 +15,7 @@ import { useResolveProposal, useRunWeekly, useSetWeekStart, useWeekly } from "..
 import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
 import { Delta } from "../../components/Delta";
+import { SectionNav } from "../../components/SectionNav";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { WeekBreakdown } from "./WeekBreakdown";
 
@@ -96,12 +97,26 @@ export function WeekPage() {
         </section>
       )}
 
-      {review && <ReviewCard review={review} names={names} />}
+      <SectionNav
+        sections={[
+          ...(review ? [{ id: "review", label: "Review" }] : []),
+          { id: "detail", label: "Week in detail" },
+          ...(history.length ? [{ id: "earlier", label: "Earlier weeks" }] : []),
+        ]}
+      />
 
-      <WeekDetail lastWeek={week} nodes={ratings.data?.nodes ?? []} />
+      {review && (
+        <div id="review" className="scroll-mt-16">
+          <ReviewCard review={review} names={names} />
+        </div>
+      )}
+
+      <div id="detail" className="scroll-mt-16">
+        <WeekDetail lastWeek={week} nodes={ratings.data?.nodes ?? []} />
+      </div>
 
       {history.length > 0 && (
-        <section className="space-y-3">
+        <section id="earlier" className="scroll-mt-16 space-y-3">
           <h2 className="font-display text-2xl uppercase tracking-wider">Earlier weeks</h2>
           <ul className="space-y-2">
             {history.map((h) => (

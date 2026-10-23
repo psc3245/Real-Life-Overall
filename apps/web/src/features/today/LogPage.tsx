@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useDay, useSaveEntry, useSaveJournal } from "../../api/days";
 import { useRatings } from "../../api/ratings";
+import { SectionNav } from "../../components/SectionNav";
 import { useHashScroll } from "../../components/useHashScroll";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { GuidedPrompts } from "./GuidedPrompts";
@@ -93,10 +94,24 @@ export function LogPage() {
         </p>
       )}
 
-      <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
-      <Journal key={d.date} day={d} />
-      <Habits day={d} leaves={ratings.data?.nodes ?? []} />
-      <div id="recap" className="scroll-mt-4">
+      <SectionNav
+        sections={[
+          ...(d.prompts.length ? [{ id: "questions", label: "Questions" }] : []),
+          { id: "journal-section", label: "Journal" },
+          { id: "habits", label: "Habits" },
+          { id: "recap", label: "Recap" },
+        ]}
+      />
+      <div id="questions" className="scroll-mt-16">
+        <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
+      </div>
+      <div id="journal-section" className="scroll-mt-16">
+        <Journal key={d.date} day={d} />
+      </div>
+      <div id="habits" className="scroll-mt-16">
+        <Habits day={d} leaves={ratings.data?.nodes ?? []} />
+      </div>
+      <div id="recap" className="scroll-mt-16">
         <RecapPanel day={d} />
       </div>
     </div>
@@ -212,7 +227,7 @@ function HabitRow({
   return (
     <div
       id={`habit-${habit.id}`}
-      className={`scroll-mt-4 rounded-xl border bg-court-900/70 p-4 transition ${done ? "border-neon/50" : "border-court-700"}`}
+      className={`scroll-mt-16 rounded-xl border bg-court-900/70 p-4 transition ${done ? "border-neon/50" : "border-court-700"}`}
     >
       <div className={`flex gap-3 ${wide ? "flex-col" : "flex-wrap items-center justify-between"}`}>
         <div className="min-w-0">

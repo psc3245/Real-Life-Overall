@@ -10,6 +10,8 @@ export interface ActivityDayDto {
   /** Anything logged: journal, habit entry or answered question. */
   logged: boolean;
   recapped: boolean;
+  /** First sentence of the day's recap, if recapped. */
+  summary: string | null;
   /** Sum of rating increases that day (recaps), and of decreases (recaps and decay). */
   gain: number;
   loss: number;

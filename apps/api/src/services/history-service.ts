@@ -57,6 +57,16 @@ export async function getHistory(db: Database, userId: string, days: number): Pr
   };
 }
 
+/** The recap narrative's first sentence, trimmed for a hover card. */
+export function firstSentence(text: string, max = 110): string {
+  const sentence =
+    text
+      .trim()
+      .match(/^.*?[.!?](\s|$)/)?.[0]
+      ?.trim() ?? text.trim();
+  return sentence.length > max ? `${sentence.slice(0, max - 1).trimEnd()}…` : sentence;
+}
+
 /** Per-day logging and rating movement, for the calendar heatmap. */
 export async function getActivity(
   db: Database,
@@ -89,6 +99,7 @@ export async function getActivity(
       .map((l) => l.localDate),
   ]);
   const recapped = new Set(recaps.map((r) => r.periodStart));
+  const summaries = new Map(recaps.map((r) => [r.periodStart, firstSentence(r.narrative)]));
   const round = (n: number) => Math.round(n * 100) / 100;
   return datesBetween(from, today).map((date) => {
     const day = events.filter((e) => e.date === date);
@@ -96,6 +107,7 @@ export async function getActivity(
       date,
       logged: logged.has(date),
       recapped: recapped.has(date),
+      summary: summaries.get(date) ?? null,
       gain: round(day.filter((e) => e.delta > 0).reduce((s, e) => s + e.delta, 0)),
       loss: round(day.filter((e) => e.delta < 0).reduce((s, e) => s + e.delta, 0)),
     };

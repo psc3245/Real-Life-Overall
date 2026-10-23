@@ -91,15 +91,36 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
   return dto;
 }
 
-/** Recent rating changes for the active season, newest first. */
+export type ChangeSource = ChangeFeedItemDto["source"];
+
+/**
+ * Rating changes for the active season, newest first. `nodeId` narrows to one node: a leaf's
+ * own changes, or every leaf below a category.
+ */
 export async function getChanges(
   db: Database,
   userId: string,
-  limit: number,
+  options: { limit: number; offset?: number; sources?: ChangeSource[]; nodeId?: string },
 ): Promise<ChangeFeedItemDto[]> {
   const season = await seasonRepo.findLatestActive(db, userId);
   if (!season) return [];
-  const rows = await eventRepo.findFeed(db, season.id, limit);
+  let nodeIds: string[] | undefined;
+  if (options.nodeId) {
+    const nodes = await nodeRepo.findActiveBySeason(db, season.id);
+    if (!nodes.some((n) => n.id === options.nodeId)) throw notFound("Rating not found");
+    const below = new Set([options.nodeId]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const n of nodes) {
+        if (n.parentId && below.has(n.parentId) && !below.has(n.id)) {
+          below.add(n.id);
+          grew = true;
+        }
+      }
+    }
+    nodeIds = [...below];
+  }
+  const rows = await eventRepo.findFeed(db, season.id, { ...options, nodeIds });
   return rows.map(({ recapDate, decayDate, ...r }) => ({
     ...r,
     date: recapDate ?? decayDate,

@@ -1,5 +1,6 @@
 import type { HistoryDto, RatedNodeDto } from "@rlo/shared";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { HistoryChart } from "./HistoryChart";
@@ -23,21 +24,39 @@ const node = (id: string, parentId: string | null, name: string): RatedNodeDto =
 });
 
 describe("ActivityHeatmap", () => {
-  it("labels every day and summarizes logging", () => {
-    const { container } = render(
-      <ActivityHeatmap
-        days={[
-          { date: "2026-10-18", logged: true, recapped: true, gain: 1.4, loss: -0.2 },
-          { date: "2026-10-19", logged: false, recapped: false, gain: 0, loss: -0.5 },
-        ]}
-      />,
+  const days = [
+    {
+      date: "2026-10-18",
+      logged: true,
+      recapped: true,
+      summary: "Long run and a deep work block.",
+      gain: 1.4,
+      loss: -0.2,
+    },
+    { date: "2026-10-19", logged: false, recapped: false, summary: null, gain: 0, loss: -0.5 },
+  ];
+
+  it("labels every day and shows a day card on hover", () => {
+    render(
+      <MemoryRouter>
+        <ActivityHeatmap days={days} />
+      </MemoryRouter>,
     );
     expect(screen.getByText("Logged 1 of 2 days.")).toBeInTheDocument();
-    const titles = [...container.querySelectorAll("title")].map((t) => t.textContent);
-    expect(titles).toEqual([
+    const cells = screen.getAllByRole("button");
+    expect(cells.map((c) => c.getAttribute("aria-label"))).toEqual([
       "2026-10-18 · logged · recapped · +1.4 gained · -0.2 lost",
       "2026-10-19 · nothing logged · -0.5 lost",
     ]);
+
+    fireEvent.mouseEnter(cells[0]!);
+    const card = screen.getByRole("tooltip");
+    expect(card).toHaveTextContent("Long run and a deep work block.");
+    expect(card).toHaveTextContent("+1.2");
+    expect(screen.getByRole("link", { name: "Open day →" })).toHaveAttribute(
+      "href",
+      "/log?date=2026-10-18",
+    );
   });
 });
 

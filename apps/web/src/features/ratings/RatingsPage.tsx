@@ -11,7 +11,9 @@ import { Button } from "../../components/Button";
 import { Delta } from "../../components/Delta";
 import { PlayerCard } from "../../components/PlayerCard";
 import { StatBar } from "../../components/StatBar";
+import { SectionNav } from "../../components/SectionNav";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { ChangeList } from "./ActivityPage";
 import { BadgesSection } from "./BadgesSection";
 import { DecayCard } from "./DecayCard";
 import { NewSeasonBanner, PastSeasons } from "./SeasonSections";
@@ -22,6 +24,16 @@ const CONFIDENCE_LABEL = {
   medium: "Medium confidence",
   high: "High confidence",
 };
+
+const RATINGS_SECTIONS = [
+  { id: "card", label: "Card" },
+  { id: "charts", label: "Charts" },
+  { id: "badges", label: "Badges" },
+  { id: "activity", label: "Activity" },
+  { id: "categories", label: "Categories" },
+  { id: "seasons", label: "Seasons" },
+  { id: "decay", label: "Decay" },
+];
 
 export function RatingsPage() {
   const ratings = useRatings();
@@ -47,7 +59,8 @@ export function RatingsPage() {
   return (
     <div className="space-y-10 pt-4">
       <NewSeasonBanner />
-      <div className="grid gap-8 md:grid-cols-[1fr_1.2fr] md:items-start">
+      <SectionNav sections={RATINGS_SECTIONS} />
+      <div id="card" className="grid scroll-mt-16 gap-8 md:grid-cols-[1fr_1.2fr] md:items-start">
         <ExportableCard
           ratings={data}
           name={me.data?.displayName ?? "Player"}
@@ -76,13 +89,19 @@ export function RatingsPage() {
         </div>
       </div>
 
-      <Charts ratings={data} />
+      <div id="charts" className="scroll-mt-16">
+        <Charts ratings={data} />
+      </div>
 
-      <BadgesSection />
+      <div id="badges" className="scroll-mt-16">
+        <BadgesSection />
+      </div>
 
-      <RecentChanges />
+      <div id="activity" className="scroll-mt-16">
+        <RecentChanges />
+      </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div id="categories" className="grid scroll-mt-16 gap-6 md:grid-cols-2">
         {categories.map((c) => (
           <section key={c.id} className="rounded-xl border border-court-700 bg-court-900/70 p-5">
             <StatBar
@@ -102,9 +121,13 @@ export function RatingsPage() {
         ))}
       </div>
 
-      <PastSeasons />
+      <div id="seasons" className="scroll-mt-16">
+        <PastSeasons />
+      </div>
 
-      <DecayCard />
+      <div id="decay" className="scroll-mt-16">
+        <DecayCard />
+      </div>
     </div>
   );
 }
@@ -164,39 +187,23 @@ function Detail({ node }: { node: RatedNodeDto }) {
   );
 }
 
-const SOURCE_LABEL = {
-  onboarding: "Scouting",
-  daily_recap: "Recap",
-  weekly_review: "Weekly",
-  decay: "Decay",
-  recalibration: "New season",
-} as const;
-
+/** The latest few changes; the full feed is its own page. */
 function RecentChanges() {
-  const changes = useChanges(15);
-  const items = (changes.data ?? []).filter((c) => c.source !== "onboarding");
-  if (!items.length) return null;
+  const changes = useChanges(5);
+  const items = (changes.data ?? []).filter((c) => c.source !== "onboarding").slice(0, 3);
   return (
     <section className="space-y-3">
-      <h2 className="font-display text-2xl uppercase tracking-wider">Recent changes</h2>
-      <ul className="divide-y divide-court-800 rounded-xl border border-court-700 bg-court-900/70">
-        {items.map((c) => (
-          <li
-            key={c.id}
-            className="grid grid-cols-[4rem_1fr_auto] items-baseline gap-3 px-4 py-2.5"
-          >
-            <Delta value={c.delta} className="text-lg" />
-            <div className="min-w-0">
-              <p className="font-medium">{c.nodeName}</p>
-              <p className="text-sm text-court-300">{c.reason}</p>
-            </div>
-            <span className="text-right text-xs uppercase tracking-wider text-court-500">
-              {SOURCE_LABEL[c.source]}
-              {c.date && <span className="block normal-case tracking-normal">{c.date}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-2xl uppercase tracking-wider">Recent activity</h2>
+        <Link to="/ratings/activity" className="text-sm text-court-300 hover:text-neon">
+          All activity →
+        </Link>
+      </div>
+      {items.length ? (
+        <ChangeList items={items} />
+      ) : (
+        <p className="text-sm text-court-500">No changes since scouting yet.</p>
+      )}
     </section>
   );
 }

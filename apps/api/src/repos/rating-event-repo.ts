@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { decayRuns, ratingEvents, ratingNodes, recaps } from "../db/schema";
 
@@ -31,7 +31,21 @@ export async function voidByRecap(db: Executor, recapId: string): Promise<void> 
 }
 
 /** Newest non-voided changes in a season, with attribute names and the recapped day. */
-export async function findFeed(db: Executor, seasonId: string, limit: number) {
+export async function findFeed(
+  db: Executor,
+  seasonId: string,
+  {
+    limit,
+    offset = 0,
+    sources,
+    nodeIds,
+  }: {
+    limit: number;
+    offset?: number;
+    sources?: (typeof ratingEvents.source.enumValues)[number][];
+    nodeIds?: string[];
+  },
+) {
   return (
     db
       .select({
@@ -49,10 +63,18 @@ export async function findFeed(db: Executor, seasonId: string, limit: number) {
       .innerJoin(ratingNodes, eq(ratingNodes.id, ratingEvents.nodeId))
       .leftJoin(recaps, eq(recaps.id, ratingEvents.recapId))
       .leftJoin(decayRuns, eq(decayRuns.id, ratingEvents.decayRunId))
-      .where(and(eq(ratingEvents.seasonId, seasonId), isNull(ratingEvents.voidedAt)))
+      .where(
+        and(
+          eq(ratingEvents.seasonId, seasonId),
+          isNull(ratingEvents.voidedAt),
+          sources?.length ? inArray(ratingEvents.source, sources) : undefined,
+          nodeIds ? inArray(ratingEvents.nodeId, nodeIds) : undefined,
+        ),
+      )
       // A decay catch-up writes many days in one transaction (same timestamp): newest day first.
       .orderBy(desc(ratingEvents.createdAt), desc(decayRuns.localDate), desc(recaps.periodStart))
       .limit(limit)
+      .offset(offset)
   );
 }
 
