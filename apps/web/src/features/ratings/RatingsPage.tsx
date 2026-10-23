@@ -103,15 +103,26 @@ export function RatingsPage() {
       <div id="categories" className="grid scroll-mt-16 gap-6 md:grid-cols-2">
         {categories.map((c) => (
           <section key={c.id} className="rounded-xl border border-court-700 bg-court-900/70 p-5">
-            <StatBar
-              label={c.name}
-              value={c.value ?? 0}
-              trend={c.trend}
-              projection={c.projection}
-              goal={c.goal}
-            />
-            <div className="mt-2">
+            <Link
+              to={`/ratings/node/${c.id}`}
+              className="block rounded-lg outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-neon"
+            >
+              <StatBar
+                label={c.name}
+                value={c.value ?? 0}
+                trend={c.trend}
+                projection={c.projection}
+                goal={c.goal}
+              />
+            </Link>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <GoalEditor node={c} />
+              <Link
+                to={`/ratings/node/${c.id}`}
+                className="text-xs uppercase tracking-wider text-court-300 hover:text-neon"
+              >
+                Details →
+              </Link>
             </div>
             <div className="mt-4 space-y-3 border-t border-court-800 pt-4">
               <Children ratings={data} parent={c} />
@@ -140,7 +151,9 @@ function Children({ ratings, parent }: { ratings: RatingsDto; parent: RatedNodeD
         const grandchildren = ratings.nodes.some((n) => n.parentId === child.id);
         return grandchildren ? (
           <div key={child.id} className="space-y-3 border-l border-court-700 pl-3">
-            <StatBar label={child.name} value={child.value ?? 0} trend={child.trend} />
+            <Link to={`/ratings/node/${child.id}`} className="block hover:opacity-90">
+              <StatBar label={child.name} value={child.value ?? 0} trend={child.trend} />
+            </Link>
             <Children ratings={ratings} parent={child} />
           </div>
         ) : (
@@ -172,6 +185,9 @@ function Detail({ node }: { node: RatedNodeDto }) {
   return (
     <div className="mt-2 space-y-2 rounded-lg bg-court-950/60 p-3 text-sm">
       {node.rationale && <p className="text-court-100">{node.rationale}</p>}
+      <Link to={`/ratings/node/${node.id}`} className="inline-block text-neon hover:underline">
+        History, changes and linked habits →
+      </Link>
       <GoalEditor node={node} />
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs uppercase tracking-wider text-court-500">
         {node.confidence && <span>{CONFIDENCE_LABEL[node.confidence]}</span>}
@@ -199,7 +215,7 @@ function RecentChanges() {
         </Link>
       </div>
       {items.length ? (
-        <ChangeList items={items} />
+        <ChangeList items={items} showDates />
       ) : (
         <p className="text-sm text-court-500">No changes since scouting yet.</p>
       )}

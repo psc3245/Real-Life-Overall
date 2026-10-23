@@ -227,7 +227,7 @@ function RatingCard({ nodes }: { nodes: RatedNodeDto[] }) {
         <ul className="space-y-1 text-sm">
           {movers.map((n) => (
             <li key={n.id} className="flex items-center justify-between gap-3">
-              <Link to="/ratings" className="truncate hover:text-neon">
+              <Link to={`/ratings/node/${n.id}`} className="truncate hover:text-neon">
                 <span className={n.trend! > 0 ? "text-tier-green" : "text-tier-red"}>
                   {n.trend! > 0 ? "▲ hot" : "▼ cold"}
                 </span>{" "}
@@ -292,7 +292,7 @@ function RecapCard({ title, recap, date }: { title: string; recap: RecapDto; dat
           {top.map((c) => (
             <li key={c.nodeId} className="grid grid-cols-[3.5rem_1fr] gap-2">
               <Delta value={c.delta} />
-              <Link to="/ratings" className="hover:text-neon">
+              <Link to={`/ratings/node/${c.nodeId}`} className="hover:text-neon">
                 <span className="font-medium">{c.nodeName}</span>{" "}
                 <span className="text-court-300">{c.reason}</span>
               </Link>

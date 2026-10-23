@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useHabitStats } from "../../api/days";
 import { useRatings } from "../../api/ratings";
+import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { DayStrip, shortDate } from "./DayStrip";
 import { scheduleLabel } from "./ManageHabitsPage";
@@ -151,12 +152,7 @@ function HabitCard({
           {habit.links.length > 0 && (
             <p className="mt-1 flex flex-wrap gap-1.5">
               {habit.links.map((id) => (
-                <span
-                  key={id}
-                  className="rounded bg-court-800 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-court-300"
-                >
-                  {names.get(id) ?? "?"}
-                </span>
+                <NodeChip key={id} id={id} name={names.get(id)} />
               ))}
             </p>
           )}

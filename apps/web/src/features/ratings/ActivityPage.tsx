@@ -129,19 +129,35 @@ export function ActivityPage() {
   );
 }
 
-/** Rows of rating changes; each names its attribute and the reason. */
-export function ChangeList({ items }: { items: ChangeFeedItemDto[] }) {
+/** Rows of rating changes; each links to its attribute (and, with `showDates`, its day). */
+export function ChangeList({
+  items,
+  showDates = false,
+}: {
+  items: ChangeFeedItemDto[];
+  showDates?: boolean;
+}) {
   return (
     <ul className="divide-y divide-court-800 rounded-xl border border-court-700 bg-court-900/70">
       {items.map((c) => (
         <li key={c.id} className="grid grid-cols-[4rem_1fr_auto] items-baseline gap-3 px-4 py-2.5">
           <Delta value={c.delta} className="text-lg" />
           <div className="min-w-0">
-            <p className="font-medium">{c.nodeName}</p>
+            <Link to={`/ratings/node/${c.nodeId}`} className="font-medium hover:text-neon">
+              {c.nodeName}
+            </Link>
             <p className="text-sm text-court-300">{c.reason}</p>
           </div>
           <span className="text-right text-xs uppercase tracking-wider text-court-500">
             {SOURCE_LABEL[c.source]}
+            {showDates && c.date && (
+              <Link
+                to={`/log?date=${c.date}`}
+                className="block normal-case tracking-normal hover:text-neon"
+              >
+                {dayLabel(c.date)}
+              </Link>
+            )}
           </span>
         </li>
       ))}

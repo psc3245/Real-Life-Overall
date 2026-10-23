@@ -21,6 +21,9 @@ import { RootLayout } from "./routes/RootLayout";
 const ActivityPage = lazy(() =>
   import("./features/ratings/ActivityPage").then((m) => ({ default: m.ActivityPage })),
 );
+const NodePage = lazy(() =>
+  import("./features/ratings/NodePage").then((m) => ({ default: m.NodePage })),
+);
 const RatingsPage = lazy(() =>
   import("./features/ratings/RatingsPage").then((m) => ({ default: m.RatingsPage })),
 );
@@ -55,6 +58,16 @@ export const router = createBrowserRouter([
           <RequireAuth>
             <Suspense fallback={loading}>
               <RatingsPage />
+            </Suspense>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "ratings/node/:id",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <NodePage />
             </Suspense>
           </RequireAuth>
         ),

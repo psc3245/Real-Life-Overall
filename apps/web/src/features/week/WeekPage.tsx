@@ -5,17 +5,25 @@ import {
   type RatedNodeDto,
   type WeekRange,
   type WeeklyReviewDto,
+  type WeeklyStateDto,
 } from "@rlo/shared";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useDay } from "../../api/days";
 import { useMe } from "../../api/hooks";
 import { useRatings } from "../../api/ratings";
-import { useResolveProposal, useRunWeekly, useSetWeekStart, useWeekly } from "../../api/weekly";
+import {
+  useResolveProposal,
+  useRunWeekly,
+  useSetWeekStart,
+  useWeekly,
+  useWeeklyReview,
+} from "../../api/weekly";
 import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
 import { Delta } from "../../components/Delta";
 import { SectionNav } from "../../components/SectionNav";
+import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { WeekBreakdown } from "./WeekBreakdown";
 
@@ -120,12 +128,7 @@ export function WeekPage() {
           <h2 className="font-display text-2xl uppercase tracking-wider">Earlier weeks</h2>
           <ul className="space-y-2">
             {history.map((h) => (
-              <li key={h.id} className="rounded-xl border border-court-700 bg-court-900/70 p-4">
-                <p className="text-xs uppercase tracking-wider text-court-500">
-                  {fmt(h.weekStart)} – {fmt(h.weekEnd)}
-                </p>
-                <p className="mt-1 text-sm text-court-300">{h.narrative}</p>
-              </li>
+              <EarlierWeek key={h.id} week={h} names={names} />
             ))}
           </ul>
         </section>
@@ -177,6 +180,43 @@ function WeekDetail({ lastWeek, nodes }: { lastWeek: WeekRange | null; nodes: Ra
       </p>
       <WeekBreakdown week={week} today={today} nodes={nodes} />
     </section>
+  );
+}
+
+/** An earlier week's narrative that opens into its full review. */
+function EarlierWeek({
+  week: h,
+  names,
+}: {
+  week: WeeklyStateDto["history"][number];
+  names: Map<string, string>;
+}) {
+  const [open, setOpen] = useState(false);
+  const review = useWeeklyReview(open ? h.id : null);
+  return (
+    <li className="rounded-xl border border-court-700 bg-court-900/70">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="block w-full p-4 text-left hover:bg-court-800/40"
+      >
+        <span className="flex items-baseline justify-between gap-3">
+          <span className="text-xs uppercase tracking-wider text-court-500">
+            {fmt(h.weekStart)} – {fmt(h.weekEnd)}
+          </span>
+          <span className="text-xs text-court-500">{open ? "Hide ▲" : "Full review ▼"}</span>
+        </span>
+        {!open && <span className="mt-1 block text-sm text-court-300">{h.narrative}</span>}
+      </button>
+      {open && (
+        <div className="px-4 pb-4">
+          {review.isPending && <p className="text-sm text-court-500">Loading…</p>}
+          <ErrorNote error={review.error} />
+          {review.data && <ReviewCard review={review.data} names={names} />}
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -243,12 +283,7 @@ function ReviewCard({ review, names }: { review: WeeklyReviewDto; names: Map<str
                   {g.nodeIds.length > 0 && (
                     <p className="mt-1 flex flex-wrap gap-1.5">
                       {g.nodeIds.map((id) => (
-                        <span
-                          key={id}
-                          className="rounded bg-court-800 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-court-300"
-                        >
-                          {names.get(id) ?? "?"}
-                        </span>
+                        <NodeChip key={id} id={id} name={names.get(id)} />
                       ))}
                     </p>
                   )}
@@ -278,7 +313,9 @@ function ReviewCard({ review, names }: { review: WeeklyReviewDto; names: Map<str
               <li key={c.nodeId} className="grid grid-cols-[4rem_1fr] gap-3 py-2">
                 <Delta value={c.delta} className="text-lg" />
                 <div>
-                  <p className="font-medium">{c.nodeName}</p>
+                  <Link to={`/ratings/node/${c.nodeId}`} className="font-medium hover:text-neon">
+                    {c.nodeName}
+                  </Link>
                   <p className="text-sm text-court-300">{c.reason}</p>
                 </div>
               </li>

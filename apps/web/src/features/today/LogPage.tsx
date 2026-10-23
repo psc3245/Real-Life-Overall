@@ -13,6 +13,7 @@ import { useDay, useSaveEntry, useSaveJournal } from "../../api/days";
 import { useRatings } from "../../api/ratings";
 import { SectionNav } from "../../components/SectionNav";
 import { useHashScroll } from "../../components/useHashScroll";
+import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { GuidedPrompts } from "./GuidedPrompts";
 import { HabitEntryInput } from "./HabitEntryInput";
@@ -235,12 +236,7 @@ function HabitRow({
           {habit.links.length > 0 && (
             <p className="mt-0.5 flex flex-wrap gap-1.5">
               {habit.links.map((id) => (
-                <span
-                  key={id}
-                  className="rounded bg-court-800 px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-court-300"
-                >
-                  {names.get(id) ?? "?"}
-                </span>
+                <NodeChip key={id} id={id} name={names.get(id)} />
               ))}
             </p>
           )}

@@ -41,6 +41,7 @@ import * as habitRepo from "../repos/habit-repo";
 import * as badgeRepo from "../repos/badge-repo";
 import * as goalRepo from "../repos/goal-repo";
 import * as eventRepo from "../repos/rating-event-repo";
+import * as nodeRepo from "../repos/rating-node-repo";
 import * as seasonRepo from "../repos/season-repo";
 import * as recapRepo from "../repos/recap-repo";
 import type { RecapRow } from "../repos/recap-repo";
@@ -157,6 +158,24 @@ export async function getWeeklyState(db: Database, userId: string): Promise<Week
         narrative: h.narrative,
       })),
   };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** One weekly review in full (earlier weeks on the Week page), from whichever season it's in. */
+export async function getWeeklyReview(
+  db: Database,
+  userId: string,
+  id: string,
+): Promise<WeeklyReviewDto> {
+  const recap = UUID.test(id) ? await recapRepo.findById(db, userId, id) : null;
+  if (!recap || recap.kind !== "weekly") throw notFound("Weekly review not found");
+  const [nodes, rows, badges] = await Promise.all([
+    nodeRepo.findActiveBySeason(db, recap.seasonId),
+    eventRepo.findActiveWithDates(db, recap.seasonId),
+    badgesByRecap(db, [recap.id]),
+  ]);
+  return toWeeklyDto(recap, nodes, datedEvents(rows), badges.get(recap.id));
 }
 
 /** Focus goals from the latest weekly review, for Today and the daily recap prompt. */
