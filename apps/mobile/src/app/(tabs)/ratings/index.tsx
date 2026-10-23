@@ -10,17 +10,17 @@ export default function RatingsScreen() {
   const ratings = useRatings();
   const refresh = () => void ratings.refetch();
 
-  if (ratings.isPending) return <Loading />;
+  if (ratings.isPending) return <Loading title="Ratings" />;
   if (ratings.isError) {
     return (
-      <Screen onRefresh={refresh}>
+      <Screen title="Ratings" onRefresh={refresh}>
         <ErrorNote error={ratings.error} onRetry={refresh} />
       </Screen>
     );
   }
   if (!ratings.data) {
     return (
-      <Screen onRefresh={refresh}>
+      <Screen title="Ratings" onRefresh={refresh}>
         <Card>
           <Body>No ratings yet. Finish onboarding on the web to get your OVR.</Body>
         </Card>
@@ -35,7 +35,7 @@ export default function RatingsScreen() {
   const categories = overall ? childrenOf(overall.id) : [];
 
   return (
-    <Screen onRefresh={refresh} refreshing={ratings.isRefetching}>
+    <Screen title="Ratings" onRefresh={refresh} refreshing={ratings.isRefetching}>
       <View style={styles.section}>
         <Label>{season.label}</Label>
         {summary && <Muted>{summary}</Muted>}

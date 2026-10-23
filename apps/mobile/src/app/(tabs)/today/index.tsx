@@ -21,10 +21,10 @@ export default function TodayScreen() {
   const refreshing = ratings.isRefetching || day.isRefetching;
   const refresh = () => void Promise.all([ratings.refetch(), day.refetch()]);
 
-  if (ratings.isPending || day.isPending) return <Loading />;
+  if (ratings.isPending || day.isPending) return <Loading title="Today" />;
   if (ratings.isError || day.isError) {
     return (
-      <Screen onRefresh={refresh} refreshing={refreshing}>
+      <Screen title="Today" onRefresh={refresh} refreshing={refreshing}>
         <ErrorNote error={ratings.error ?? day.error} onRetry={refresh} />
       </Screen>
     );
@@ -35,7 +35,7 @@ export default function TodayScreen() {
   const done = habits.filter(isDayHabitDone).length;
 
   return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
+    <Screen title="Today" onRefresh={refresh} refreshing={refreshing}>
       {ratings.data && overall ? (
         <Card style={styles.hero}>
           <OvrBadge value={overall.value} />

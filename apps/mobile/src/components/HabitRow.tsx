@@ -77,7 +77,10 @@ function Control({
   const num = entry?.num ?? null;
   const text = entry?.text ?? null;
   const save = (value: HabitEntryValue) => onSave(habit.id, value);
-  const reading = <Text style={styles.reading}>{formatHabitEntry(habit.type, config, entry)}</Text>;
+  // Counters and timers read "0/20 pages" before anything is logged, not "—".
+  const counted = habit.type === "counter" || habit.type === "duration";
+  const shown = entry ?? (counted ? { num: 0, text: null } : null);
+  const reading = <Text style={styles.reading}>{formatHabitEntry(habit.type, config, shown)}</Text>;
   if (!editable) return reading;
 
   switch (habit.type) {

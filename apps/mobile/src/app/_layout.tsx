@@ -51,6 +51,7 @@ function RootStack() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={auth.signedIn}>
+        <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
       </Stack.Protected>
       <Stack.Protected guard={!auth.signedIn}>

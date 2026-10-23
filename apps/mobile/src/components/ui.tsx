@@ -12,12 +12,14 @@ import {
 } from "react-native";
 import { colors, fonts, space } from "@/lib/theme";
 
-/** A scrolling page with pull to refresh. Insets come from the native tab bar and header. */
+/** A scrolling page with a big 2K-style title and pull to refresh. Insets come from the tab bar. */
 export function Screen({
+  title,
   children,
   onRefresh,
   refreshing = false,
 }: {
+  title?: string;
   children: ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -33,6 +35,11 @@ export function Screen({
         ) : undefined
       }
     >
+      {title && (
+        <Text accessibilityRole="header" style={styles.title}>
+          {title}
+        </Text>
+      )}
       {children}
     </ScrollView>
   );
@@ -103,7 +110,14 @@ export function Button({
   );
 }
 
-export function Loading() {
+export function Loading({ title }: { title?: string }) {
+  if (title) {
+    return (
+      <Screen title={title}>
+        <ActivityIndicator color={colors.neon} style={{ marginTop: space.xxl }} />
+      </Screen>
+    );
+  }
   return (
     <View style={styles.center}>
       <ActivityIndicator color={colors.neon} />
@@ -125,6 +139,13 @@ export function ErrorNote({ error, onRetry }: { error: unknown; onRetry?: () => 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.court950 },
   screenContent: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl * 2 },
+  title: {
+    color: colors.court100,
+    fontFamily: fonts.heavy,
+    fontSize: 40,
+    textTransform: "uppercase",
+    marginBottom: -space.xs,
+  },
   card: {
     backgroundColor: colors.court900,
     borderColor: colors.court700,

@@ -60,6 +60,10 @@ After that, `npm run dev:mobile` starts just the bundler for the installed app. 
 on port 8787 of the machine serving the bundle (`localhost` in the Simulator); set
 `EXPO_PUBLIC_API_URL` to point it elsewhere. It's iOS only; there is no Android build.
 
+It also needs CocoaPods (`brew install cocoapods`). Let Expo install pods (`npm run ios`, or
+`npx expo prebuild -p ios` in `apps/mobile`); a bare `pod install` fails the Reanimated and Worklets
+version checks in this monorepo. Rerun one of those after adding a package with native code.
+
 ### Demo data
 
 To see the app with a few weeks of history (habits and a habit group, journals, recaps, decay, a
