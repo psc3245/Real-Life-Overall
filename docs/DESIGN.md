@@ -2,7 +2,7 @@
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
 > **Status:** Pre-development. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
-> **Last updated:** 2026-10-20
+> **Last updated:** 2026-10-22
 
 ---
 
@@ -54,7 +54,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | LLM memory | **Full-history retrieval (RAG)**. |
 | Day boundary | **User's timezone.** The recap runs on "End my day", otherwise automatically the next morning. |
 | Social (eventual) | Public card sharing, friends and compare, leaderboards. |
-| Privacy | **Undecided.** Build private by default. |
+| Privacy | **Private by default, opt-in sharing** (decided 2026-10-22, §7.3): per-player visibility (private / friends / public) for the card only; journals, recaps, attributes, rationales and personal badges are never shared. |
 | Anti-gaming | **LLM skepticism plus caps.** Accept some cheating. |
 | Visual direction | **Video-game menu (2K-like)**: dark, bold, sporty, neon accents, animated stat bars. |
 | Visualizations | Rating history line charts, radar chart, daily change feed, calendar heatmap. |
@@ -264,9 +264,23 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 
 ### 7.3 Social (Phase 4)
 - Public profile and card link (requires real URLs, hence React Router)
-- Friends: follow or request, side-by-side card comparison
-- Leaderboards: friends and global, by Overall or by category template (custom categories aren't comparable, so global boards are probably limited to template categories)
-- **Privacy:** undecided. **Private by default.** Journals, photos and voice are never public unless an explicit future decision says otherwise. Ratings and cards are shareable only by opt-in.
+- Friends: **mutual requests** (send by exact username or from a profile; befriending someone who already asked accepts). Limits: 20 pending sent requests, 200 friends. Side-by-side **compare** lines up template categories by template key (even when renamed) and custom ones by name. Usernames are discoverable by exact match through requests; cards are not.
+- **Leaderboards** (`/leaderboards`), per season, by Overall or by **template category** (custom categories don't compare; a renamed template category still counts under its template):
+  - **Friends**: you plus friends whose visibility is `friends` or `public`. Provisional players are included and marked.
+  - **Global**: players who are `public` **and** opted in (`users.leaderboard_opt_in`), and whose card passes the evidence rules below. Top 50 shown, plus your own row.
+- **Anti-gaming hardening** (ratings are self-reported, so boards lean on evidence, not trust):
+  - **Evidence floor:** global boards need at least **7 recapped days** this season (`LEADERBOARD_MIN_RECAPPED_DAYS`). Until then cards and friends-board rows show **Provisional**. Onboarding ratings alone never reach a global board.
+  - **Skepticism carries through:** the daily recap's `flags` (implausible or ambiguous claims) are counted per season (`player_cards.flagged_days`, owner-only). Players with **≥ 5 flagged days and over half of their recapped days flagged** sit out global boards until that changes; the leaderboard page tells them why.
+  - Existing rails still apply: ±3 per attribute per day, ±5 weekly corrections, 3 recap runs per day, a 3-day backfill window.
+  - Social limits: 20 pending sent requests, 200 friends; reserved usernames; hidden profiles answer 404.
+  - *Later:* report a player, username change cooldown, and moving ranking into SQL once boards grow (ranking is in memory today).
+- **Privacy model** (decided 2026-10-22):
+  - Each player picks a **visibility**: `private` (default: nobody else), `friends` (accepted friends) or `public` (anyone with the link, signed in or not).
+  - Visibility covers the **card only**: Overall, archetype, season label, **category** values, recapped-day count and the highest tier of each **catalog** badge.
+  - **Never shared:** journals, guided answers, recaps and narratives, the model's rationales, **attribute names and values** (they can be personal, e.g. "Sobriety"), personal badges (written by the LLM from journals), goals and projections. Photos and voice (Phase 5) follow the same rule.
+  - Hidden profiles answer 404, the same as missing ones, so settings don't reveal who has an account.
+  - Usernames appear in links (`/u/:username`). They start as the email's local part, so the settings page lets players change them (3-24 lowercase characters; reserved words blocked).
+  - Shared cards read a per-player cache (`player_cards`) refreshed when the owner's ratings are read and by the hourly job, so other players never replay someone's ledger.
 
 ---
 
@@ -366,6 +380,7 @@ embed(texts: string[], ctx): Promise<number[][]>
 | `weeklyReview` | hourly | For users whose local week just ended and whose last daily recap is done |
 | `seasonRollover` | daily | At the quarter boundary, archive the season and prompt season setup |
 | `snapshots` | daily | Write per-node daily value snapshots (chart optimization) |
+| card refresh | hourly (end of each user's run) | Rewrite the user's `player_cards` row so profiles and leaderboards stay current |
 
 Jobs must be **idempotent**: unique constraints on `(user_id, local_date, kind)` for recaps, plus status columns.
 
@@ -399,6 +414,10 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `llm_calls` | `user_id`, `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`, `error` | **From day one** |
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
 | `settings` | per-user UI prefs | Carried over pattern |
+| `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
+| `friendships` | `requester_id`, `addressee_id`, `status` (`pending`/`accepted`), `responded_at` | One row per pair (unique on least/greatest), Phase 4 |
+| `player_cards` | `user_id` pk, `season_id`, `season_label`, `overall`, `archetype`, `categories` jsonb, `recapped_days`, `flagged_days` | Shareable card cache, Phase 4 |
+| `users.leaderboard_opt_in` | boolean | Global boards (needs a public profile) |
 
 ---
 
@@ -482,11 +501,11 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Seasons: lazy quarterly rollover (ratings, weights, decay rules and goals carry over), archived season cards, 14-day season setup with structure edits; new attributes rated by the model
 
 ### Phase 4: Social
-- [ ] Privacy model decision
-- [ ] Public profile and card links
-- [ ] Friends and compare
-- [ ] Leaderboards (friends, plus global on template categories)
-- [ ] Anti-gaming hardening
+- [x] Privacy model decision (private by default; card-only visibility: private / friends / public)
+- [x] Public profile and card links (`/u/:username`, editable usernames, cached `player_cards`)
+- [x] Friends and compare (mutual requests, `/friends`, `/compare/:username`)
+- [x] Leaderboards (friends, plus global on template categories; opt-in)
+- [x] Anti-gaming hardening (7-recap evidence floor and provisional marks, flagged-recap exclusion, social limits)
 
 ### Phase 5: Rich Inputs, Mobile & Monetization
 - [ ] Photos (R2 + vision model), voice notes (transcription)
@@ -507,8 +526,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 8. ~~**Mid-quarter onboarding**~~ Decided: the first season is shortened (it ends with the calendar quarter).
 9. **Display precision:** OVR shown as an integer or with one decimal?
 10. **Decay rule visibility and editability** for users.
-11. **Privacy model** for social features.
+11. ~~**Privacy model**~~ Decided: private by default, card-only opt-in visibility (§7.3).
 12. **Monetization model** (freemium, subscription, BYO key…) and quota design.
-13. **Global leaderboard comparability** across custom trees.
+13. ~~**Global leaderboard comparability**~~ Decided: boards are Overall plus template categories only (§7.3). Overall still mixes different trees; revisit if it feels unfair.
 14. **Data export and account deletion** (should be in place before launch).
 15. **Content safety:** journals may contain sensitive topics (mental health, etc.). Define how the LLM responds to distressing content, what data goes to providers, and the provider data-retention settings.

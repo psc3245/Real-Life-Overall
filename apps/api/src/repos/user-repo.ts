@@ -9,6 +9,8 @@ export const publicUserColumns = {
   displayName: users.displayName,
   timezone: users.timezone,
   weekStart: users.weekStart,
+  profileVisibility: users.profileVisibility,
+  leaderboardOptIn: users.leaderboardOptIn,
   createdAt: users.createdAt,
 };
 
@@ -18,6 +20,11 @@ export type PublicUser = {
 
 export async function findById(db: Database, id: string): Promise<PublicUser | null> {
   const rows = await db.select(publicUserColumns).from(users).where(eq(users.id, id));
+  return rows[0] ?? null;
+}
+
+export async function findByUsername(db: Database, username: string): Promise<PublicUser | null> {
+  const rows = await db.select(publicUserColumns).from(users).where(eq(users.username, username));
   return rows[0] ?? null;
 }
 
@@ -38,7 +45,17 @@ export async function findOrCreateDevUser(db: Database, username: string): Promi
 export async function update(
   db: Database,
   id: string,
-  changes: Partial<Pick<PublicUser, "displayName" | "timezone" | "weekStart">>,
+  changes: Partial<
+    Pick<
+      PublicUser,
+      | "displayName"
+      | "timezone"
+      | "weekStart"
+      | "username"
+      | "profileVisibility"
+      | "leaderboardOptIn"
+    >
+  >,
 ): Promise<PublicUser | null> {
   const rows = await db
     .update(users)

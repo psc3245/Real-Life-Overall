@@ -17,6 +17,7 @@ import * as seasonRepo from "../repos/season-repo";
 import * as goalRepo from "../repos/goal-repo";
 import * as recapRepo from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
+import { syncCard } from "./card-service";
 import { applyDecay } from "./decay-service";
 import { datedEvents } from "./event-dates";
 import { trends } from "./history-service";
@@ -58,7 +59,7 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
     { projections?: { nodeId: string; value: number }[] } | undefined;
   const projections = new Map((weeklyOutput?.projections ?? []).map((p) => [p.nodeId, p.value]));
 
-  return {
+  const dto: RatingsDto = {
     season,
     archetype: archetype
       ? {
@@ -86,6 +87,8 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
       };
     }),
   };
+  await syncCard(db, userId, dto);
+  return dto;
 }
 
 /** Recent rating changes for the active season, newest first. */

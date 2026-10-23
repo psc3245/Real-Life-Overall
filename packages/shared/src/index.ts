@@ -17,3 +17,4 @@ export * from "./schemas/weekly";
 export * from "./schemas/history";
 export * from "./schemas/badges";
 export * from "./schemas/seasons";
+export * from "./schemas/social";

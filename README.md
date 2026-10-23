@@ -59,6 +59,9 @@ It writes straight to the database with no AI calls, is deterministic, and repla
 demo account. Sign in with the credentials at the top of `apps/api/scripts/seed-demo.ts`, or in
 `AUTH_MODE=dev` switch the dev user to `demo`.
 
+It also adds four rival players for the social features (two friends, one incoming request, one
+public stranger). They're cached cards only and can't sign in.
+
 ### Scheduled jobs
 
 The API runs an hourly Cron Trigger: it brings rating decay up to date for every user and, at 4am

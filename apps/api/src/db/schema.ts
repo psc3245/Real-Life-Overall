@@ -32,6 +32,8 @@ const rating = () => numeric({ precision: 5, scale: 2, mode: "number" });
 /** Postgres full-text search vector; used for long-term memory retrieval (DESIGN.md §5.5). */
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
+export const profileVisibility = pgEnum("profile_visibility", ["private", "friends", "public"]);
+
 export const users = pgTable("users", {
   id: id(),
   email: text().notNull().unique(),
@@ -44,6 +46,10 @@ export const users = pgTable("users", {
   authSubject: text().unique(),
   /** Rolling LLM-maintained profile, refreshed by weekly reviews and fed to every prompt. */
   profileSummary: text(),
+  /** Who can see the player card (DESIGN.md §7.3). */
+  profileVisibility: profileVisibility().notNull().default("private"),
+  /** Appear on global leaderboards (also needs a public profile). */
+  leaderboardOptIn: boolean().notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -495,5 +501,61 @@ export const userBadges = pgTable(
   (t) => [
     uniqueIndex("user_badges_one_per_tier").on(t.userId, t.badgeKey, t.tier),
     index().on(t.recapId),
+  ],
+);
+
+/**
+ * The shareable slice of each player's current ratings (PublicCardDto), so profiles and
+ * leaderboards don't replay other users' ledgers. Refreshed whenever the owner's ratings are
+ * read and by the hourly job.
+ */
+export const playerCards = pgTable(
+  "player_cards",
+  {
+    userId: uuid()
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid()
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    seasonLabel: text().notNull(),
+    overall: rating().notNull(),
+    archetype: text(),
+    /** PublicCategoryDto[] */
+    categories: jsonb().notNull(),
+    recappedDays: integer().notNull().default(0),
+    /** Recapped days where the model flagged implausible or ambiguous claims. Owner-only. */
+    flaggedDays: integer().notNull().default(0),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.seasonLabel, t.overall)],
+);
+
+export const friendshipStatus = pgEnum("friendship_status", ["pending", "accepted"]);
+
+/** One row per pair of players: a pending request (requester → addressee) or a friendship. */
+export const friendships = pgTable(
+  "friendships",
+  {
+    id: id(),
+    requesterId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addresseeId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: friendshipStatus().notNull().default("pending"),
+    createdAt: createdAt(),
+    respondedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    // Either direction counts as the same pair.
+    uniqueIndex("friendships_pair").on(
+      sql`least(${t.requesterId}, ${t.addresseeId})`,
+      sql`greatest(${t.requesterId}, ${t.addresseeId})`,
+    ),
+    index().on(t.requesterId),
+    index().on(t.addresseeId),
+    check("friendships_not_self", sql`${t.requesterId} <> ${t.addresseeId}`),
   ],
 );

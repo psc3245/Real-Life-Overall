@@ -5,15 +5,18 @@ import { ZodError } from "zod";
 import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
 import { LlmError } from "./llm/client";
-import { authFor, requireUser } from "./middleware/auth";
+import { authFor, optionalUser, requireUser } from "./middleware/auth";
 import { badgeRoutes } from "./routes/badges";
 import { dayRoutes } from "./routes/days";
 import { devRoutes } from "./routes/dev";
+import { friendRoutes } from "./routes/friends";
 import { goalRoutes } from "./routes/goals";
 import { habitRoutes } from "./routes/habits";
+import { leaderboardRoutes } from "./routes/leaderboards";
 import { meRoutes } from "./routes/me";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
+import { profileRoutes } from "./routes/profiles";
 import { seasonRoutes } from "./routes/seasons";
 import { ratingsRoutes } from "./routes/ratings";
 import { weeklyRoutes } from "./routes/weekly";
@@ -106,6 +109,10 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/seasons/*", requireUser)
     .use("/weekly", requireUser)
     .use("/weekly/*", requireUser)
+    .use("/friends", requireUser)
+    .use("/friends/*", requireUser)
+    .use("/leaderboards", requireUser)
+    .use("/profiles/*", optionalUser)
     .route("/me", meRoutes)
     .route("/onboarding", onboardingRoutes)
     .route("/ratings", ratingsRoutes)
@@ -116,7 +123,10 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/weekly", weeklyRoutes)
     .route("/goals", goalRoutes)
     .route("/badges", badgeRoutes)
-    .route("/seasons", seasonRoutes);
+    .route("/seasons", seasonRoutes)
+    .route("/profiles", profileRoutes)
+    .route("/friends", friendRoutes)
+    .route("/leaderboards", leaderboardRoutes);
 
   return routes;
 }
