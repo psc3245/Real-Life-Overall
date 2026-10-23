@@ -17,6 +17,7 @@
     "@ai-sdk/anthropic": "^4.0.84",
     "@ai-sdk/google": "^4.0.101",
     "@ai-sdk/openai": "^4.0.98",
+    "@better-auth/expo": "^1.7.12",
     "@neondatabase/serverless": "^1.2.0",
     "@rlo/shared": "*",
     "ai": "^7.0.146",

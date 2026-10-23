@@ -8,6 +8,7 @@ A 2K-style overall rating for your real life, with ratings moved by an LLM. See
 | Path              | What                                                                              |
 | ----------------- | --------------------------------------------------------------------------------- |
 | `apps/web`        | React + Vite + React Router + TanStack Query + Tailwind                           |
+| `apps/mobile`     | iOS app: Expo + Expo Router + TanStack Query                                      |
 | `apps/api`        | Hono API on Cloudflare Workers, Drizzle + Neon Postgres, provider-agnostic LLM layer |
 | `packages/shared` | Zod schemas, rating math, templates and constants shared by both apps            |
 
@@ -45,6 +46,23 @@ Opens on http://localhost:5173 and proxies `/api/*` to the local API.
 Sign in at http://localhost:5173/signup (DESIGN.md §8.5). For quick experiments without accounts,
 set `AUTH_MODE` to `dev` in `apps/api/wrangler.jsonc`: the API then trusts an `x-dev-user` header,
 switchable from the web app's header.
+
+### iOS app
+
+Needs Xcode with an iOS Simulator runtime. With the API running (`npm run dev:api`), build and
+launch the app in the Simulator once:
+
+```bash
+npm run ios
+```
+
+After that, `npm run dev:mobile` starts just the bundler for the installed app. The app calls the API
+on port 8787 of the machine serving the bundle (`localhost` in the Simulator); set
+`EXPO_PUBLIC_API_URL` to point it elsewhere. It's iOS only; there is no Android build.
+
+It also needs CocoaPods (`brew install cocoapods`). Let Expo install pods (`npm run ios`, or
+`npx expo prebuild -p ios` in `apps/mobile`); a bare `pod install` fails the Reanimated and Worklets
+version checks in this monorepo. Rerun one of those after adding a package with native code.
 
 ### Demo data
 

@@ -1,7 +1,7 @@
 # Real Life Overall: Design & Development Guide
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
-> **Status:** In development: Phases 0–4 built, web refinements done, mobile next. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
+> **Status:** In development: Phases 0–4 built, web refinements done, iOS app started. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
 > **Last updated:** 2026-10-22
 
 ---
@@ -58,7 +58,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Anti-gaming | **LLM skepticism plus caps.** Accept some cheating. |
 | Visual direction | **Video-game menu (2K-like)**: dark, bold, sporty, neon accents, animated stat bars. |
 | Visualizations | Rating history line charts, radar chart, daily change feed, calendar heatmap. |
-| Platform | **Web first, mobile later.** |
+| Platform | **Web first, then iOS** (Expo / React Native). No Android (decided 2026-10-23). |
 | Language | **TypeScript everywhere.** |
 | Hosting | **Must be free to host** (LLM API spend aside). |
 | Repo layout | **Monorepo** (this repo). |
@@ -328,6 +328,7 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 │   │       ├── lib/         # formatting helpers
 │   │       ├── api/         # typed API client + TanStack Query hooks
 │   │       └── styles/
+│   ├── mobile/              # iOS app: Expo + Expo Router (src/app routes, src/api, src/components)
 │   └── api/                 # Hono API
 │       └── src/
 │           ├── routes/      # HTTP layer (validate with shared Zod, call services)
@@ -372,6 +373,7 @@ embed(texts: string[], ctx): Promise<number[][]>
 - **Better Auth** (decided 2026-10-22), running in the API Worker with users and sessions in Neon via the Drizzle adapter. Sign-in: **email + password** and **Google** (enabled when `GOOGLE_CLIENT_ID/SECRET` are set). Session cookies are first-party: the API lives under `/api` on the same origin as the web app (Vite proxy in dev; one Worker serving both in production).
 - Better Auth's tables (`auth_users`, `auth_sessions`, `auth_accounts`, `auth_verifications`) are separate from the app's `users`; an app user is created on first authenticated request and linked by `users.auth_subject`.
 - Passwords use WebCrypto PBKDF2-SHA256 (`PASSWORD_HASH_ITERATIONS`, default 100k) instead of Better Auth's JS scrypt, to stay within Workers CPU limits. *Verify sign-in CPU time on the free plan at first deploy.*
+- **iOS app:** the `@better-auth/expo` plugin on both sides. The app sends its scheme (`rlo://`, a trusted origin) in an `expo-origin` header, keeps the session cookie in the Keychain (SecureStore) and attaches it as a `Cookie` header on API calls; it talks to the API directly rather than through the web origin.
 - `AUTH_MODE=dev` (the `x-dev-user` header) remains for tests and local experiments and is refused in production.
 - *Later:* email verification and password reset need an email provider (e.g. Resend).
 
@@ -512,7 +514,13 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 
 ### Phase 5: Rich Inputs, Mobile & Monetization
 - [ ] Photos (R2 + vision model), voice notes (transcription)
-- [ ] PWA, then native mobile (likely React Native / Expo, sharing `packages/shared`)
+- [ ] iOS app (Expo SDK 58 + Expo Router, sharing `packages/shared`; iOS only, no Android, decided 2026-10-23). Skipped the PWA step.
+  - [x] Chunk 1, foundations: `apps/mobile`, Better Auth via `@better-auth/expo` (session cookie in the Keychain), native tabs (Today, Ratings, Settings), habit logging from Today, rating tree
+  - [ ] Journal and guided prompts, End my day and the recap view
+  - [ ] Node pages, charts, week view, player card
+  - [ ] Onboarding in the app (until then, onboard on the web)
+  - [ ] Social, push notifications (recap ready, streaks), Google sign-in
+  - [ ] EAS builds and TestFlight
 - [ ] Monetization model; per-user quotas and plan-based model tiers
 - [ ] Integrations (Strava, Health, etc.), if pursued
 

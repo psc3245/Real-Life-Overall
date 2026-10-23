@@ -3,3 +3,4 @@ dist
 apps/api/drizzle
 package-lock.json
 *.md
+.expo

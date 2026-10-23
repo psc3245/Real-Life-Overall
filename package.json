@@ -12,6 +12,8 @@
   "scripts": {
     "dev:api": "npm run dev -w @rlo/api",
     "dev:web": "npm run dev -w @rlo/web",
+    "dev:mobile": "npm run dev -w @rlo/mobile",
+    "ios": "npm run ios -w @rlo/mobile",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
