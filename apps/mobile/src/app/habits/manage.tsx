@@ -62,12 +62,7 @@ export default function ManageHabitsScreen() {
   );
 
   return (
-    <Screen
-      eyebrow="Habits"
-      title="Manage"
-      onRefresh={() => void habits.refetch()}
-      refreshing={habits.isRefetching}
-    >
+    <Screen eyebrow="Habits" title="Manage" onRefresh={() => habits.refetch()}>
       <Button title="+ New habit" onPress={() => edit({})} />
       {habits.data.length === 0 && (
         <Card>

@@ -50,8 +50,7 @@ export default function HabitsScreen() {
       eyebrow="At a glance"
       title="Habits"
       subtitle={stats.data ? `${shortDate(stats.data.start)} – ${shortDate(stats.data.end)}` : ""}
-      onRefresh={() => void stats.refetch()}
-      refreshing={stats.isRefetching}
+      onRefresh={() => stats.refetch()}
     >
       <View style={styles.bar}>
         <Segmented label="Period" options={RANGES} value={range} onChange={setRange} />

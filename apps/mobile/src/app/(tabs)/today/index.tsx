@@ -47,7 +47,7 @@ const openLog = (date: string, today: string) =>
 export default function TodayScreen() {
   const day = useDay(null);
   const ratings = useRatings();
-  const refresh = () => void Promise.all([day.refetch(), ratings.refetch()]);
+  const refresh = () => Promise.all([day.refetch(), ratings.refetch()]);
 
   if (ratings.data === null) return <NeedsRating />;
   if (day.isPending) return <Loading title="Today" />;
@@ -66,7 +66,6 @@ export default function TodayScreen() {
       title="Today"
       subtitle={STATUS_LABEL[d.status]}
       onRefresh={refresh}
-      refreshing={day.isRefetching || ratings.isRefetching}
     >
       <View style={styles.actions}>
         <View style={{ flex: 1 }}>

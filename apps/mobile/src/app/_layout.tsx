@@ -59,6 +59,11 @@ function RootStack() {
         <Stack.Screen name="habits/manage" options={pushedOptions} />
         <Stack.Screen name="habits/edit" options={{ ...pushedOptions, presentation: "modal" }} />
         <Stack.Screen name="onboarding" options={pushedOptions} />
+        <Stack.Screen name="activity" options={pushedOptions} />
+        <Stack.Screen name="history/index" options={pushedOptions} />
+        <Stack.Screen name="history/[id]" options={pushedOptions} />
+        <Stack.Screen name="season-setup" options={pushedOptions} />
+        <Stack.Screen name="u/[username]" options={pushedOptions} />
       </Stack.Protected>
       <Stack.Protected guard={!auth.signedIn}>
         <Stack.Screen name="sign-in" />

@@ -62,12 +62,7 @@ export default function LogScreen() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} keyboardVerticalOffset={100}>
-      <Screen
-        eyebrow="Day log"
-        title={dayTitle(d.date, d.today)}
-        onRefresh={() => void day.refetch()}
-        refreshing={day.isRefetching}
-      >
+      <Screen eyebrow="Day log" title={dayTitle(d.date, d.today)} onRefresh={() => day.refetch()}>
         <View style={styles.nav}>
           <DayPicker today={d.today} selected={d.date} onPick={go} />
           <NavButton

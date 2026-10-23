@@ -33,7 +33,7 @@ export default function WeekScreen() {
     const timer = setInterval(() => setLine((l) => (l + 1) % WORKING.length), 4000);
     return () => clearInterval(timer);
   }, [run.isPending]);
-  const refresh = () => void Promise.all([weekly.refetch(), ratings.refetch()]);
+  const refresh = () => Promise.all([weekly.refetch(), ratings.refetch()]);
 
   if (ratings.data === null) return <NeedsRating />;
   if (weekly.isPending || ratings.isPending) return <Loading title="Week" />;
@@ -52,7 +52,6 @@ export default function WeekScreen() {
       eyebrow="Weekly review"
       title={week ? `${shortDate(week.start)} – ${shortDate(week.end)}` : "Your week"}
       onRefresh={refresh}
-      refreshing={weekly.isRefetching}
     >
       <WeekStartPicker />
 

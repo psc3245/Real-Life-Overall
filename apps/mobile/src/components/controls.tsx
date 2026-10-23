@@ -1,5 +1,8 @@
+import { addDays } from "@rlo/shared";
+import { SymbolView } from "expo-symbols";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { dayLabel } from "@/lib/format";
 import { colors, fonts, space } from "@/lib/theme";
 import { Field } from "./ui";
 
@@ -103,7 +106,64 @@ export function NumberField({
   );
 }
 
+/** Pick a date a day at a time (no native date picker needed), within optional bounds. */
+export function DateStepper({
+  value,
+  onChange,
+  min,
+  max,
+  today,
+  label,
+}: {
+  value: string;
+  onChange: (date: string) => void;
+  min?: string;
+  max?: string;
+  today?: string;
+  label: string;
+}) {
+  const step = (by: number) => {
+    const next = addDays(value, by);
+    if ((min && next < min) || (max && next > max)) return;
+    onChange(next);
+  };
+  return (
+    <View style={styles.stepper} accessibilityLabel={label}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Earlier"
+        disabled={Boolean(min && value <= min)}
+        onPress={() => step(-1)}
+        style={[styles.stepButton, min && value <= min ? { opacity: 0.3 } : null]}
+      >
+        <SymbolView name="chevron.left" tintColor={colors.court100} size={14} />
+      </Pressable>
+      <Text style={styles.stepDate}>{value === today ? "Today" : dayLabel(value)}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Later"
+        disabled={Boolean(max && value >= max)}
+        onPress={() => step(1)}
+        style={[styles.stepButton, max && value >= max ? { opacity: 0.3 } : null]}
+      >
+        <SymbolView name="chevron.right" tintColor={colors.court100} size={14} />
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  stepper: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  stepButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: colors.court700,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepDate: { color: colors.court100, fontSize: 15, minWidth: 104, textAlign: "center" },
   segmented: {
     flexDirection: "row",
     borderWidth: 1,

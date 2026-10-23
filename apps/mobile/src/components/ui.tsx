@@ -1,5 +1,5 @@
 import { Link, type Href } from "expo-router";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -27,16 +27,25 @@ export function Screen({
   subtitle,
   children,
   onRefresh,
-  refreshing = false,
 }: {
   title?: string;
   eyebrow?: string;
   subtitle?: string;
   children: ReactNode;
-  onRefresh?: () => void;
-  refreshing?: boolean;
+  /** Pull to refresh; the spinner shows until the returned promise settles. */
+  onRefresh?: () => Promise<unknown> | void;
 }) {
   const tabRoot = useContext(TabRootContext);
+  // Only a pull shows the spinner, not background refetches.
+  const [pulling, setPulling] = useState(false);
+  const pull = async () => {
+    setPulling(true);
+    try {
+      await onRefresh?.();
+    } finally {
+      setPulling(false);
+    }
+  };
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
@@ -46,7 +55,7 @@ export function Screen({
         contentInsetAdjustmentBehavior="automatic"
         refreshControl={
           onRefresh ? (
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.neon} />
+            <RefreshControl refreshing={pulling} onRefresh={pull} tintColor={colors.neon} />
           ) : undefined
         }
       >

@@ -14,7 +14,7 @@ export default function MeScreen() {
   const signOut = useSignOut();
 
   return (
-    <Screen title="You" onRefresh={() => void me.refetch()} refreshing={me.isRefetching}>
+    <Screen title="You" onRefresh={() => me.refetch()}>
       <View style={styles.section}>
         <Label>Player</Label>
         <Card style={styles.card}>
