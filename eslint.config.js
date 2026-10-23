@@ -3,7 +3,15 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/.wrangler/**", "**/node_modules/**", "apps/api/drizzle/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/.wrangler/**",
+      "**/node_modules/**",
+      "apps/api/drizzle/**",
+      "**/.expo/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -11,5 +19,10 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
+  },
+  {
+    // Metro loads its config as CommonJS.
+    files: ["apps/mobile/metro.config.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
 );

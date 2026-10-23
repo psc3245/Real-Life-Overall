@@ -1,3 +1,4 @@
+import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { Database } from "../db/client";
@@ -6,6 +7,8 @@ import type { Env } from "../env";
 import { passwordHasher } from "./password";
 
 export const MIN_PASSWORD_LENGTH = 8;
+/** The iOS app's URL scheme (apps/mobile/app.json); trusted as an origin for its requests. */
+export const MOBILE_ORIGIN = "rlo://";
 
 /** Better Auth instance for one request (Workers bindings and DB pool are per request). */
 export function createAuth(env: Env, db: Database) {
@@ -26,7 +29,11 @@ export function createAuth(env: Env, db: Database) {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.PUBLIC_URL,
     basePath: "/api/auth",
-    trustedOrigins: [env.PUBLIC_URL, ...env.CORS_ORIGINS.split(",").map((o) => o.trim())],
+    trustedOrigins: [
+      env.PUBLIC_URL,
+      MOBILE_ORIGIN,
+      ...env.CORS_ORIGINS.split(",").map((o) => o.trim()),
+    ],
     emailAndPassword: {
       enabled: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,
@@ -34,6 +41,8 @@ export function createAuth(env: Env, db: Database) {
       password: passwordHasher(env.PASSWORD_HASH_ITERATIONS),
     },
     socialProviders: google,
+    // Lets the mobile app send its origin in a header and keep its session cookie in SecureStore.
+    plugins: [expo()],
   });
 }
 

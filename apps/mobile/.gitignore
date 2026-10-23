@@ -1,0 +1,8 @@
+# Expo
+.expo/
+expo-env.d.ts
+.metro-health-check*
+
+# Generated native project (Continuous Native Generation: configure in app.json instead)
+/ios
+/android
