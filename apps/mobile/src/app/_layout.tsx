@@ -7,6 +7,7 @@ import { AppState } from "react-native";
 import { useAuthState } from "@/api/session";
 import { Button, Card, Muted, Screen, Body } from "@/components/ui";
 import { API_URL } from "@/lib/config";
+import { pushedOptions } from "@/lib/stack";
 import { colors } from "@/lib/theme";
 
 void SplashScreen.preventAutoHideAsync();
@@ -53,6 +54,19 @@ function RootStack() {
       <Stack.Protected guard={auth.signedIn}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="log" options={pushedOptions} />
+        <Stack.Screen name="node/[id]" options={pushedOptions} />
+        <Stack.Screen name="habits/manage" options={pushedOptions} />
+        <Stack.Screen name="habits/edit" options={{ ...pushedOptions, presentation: "modal" }} />
+        <Stack.Screen name="onboarding" options={pushedOptions} />
+        <Stack.Screen name="activity" options={pushedOptions} />
+        <Stack.Screen name="history/index" options={pushedOptions} />
+        <Stack.Screen name="history/[id]" options={pushedOptions} />
+        <Stack.Screen name="season-setup" options={pushedOptions} />
+        <Stack.Screen name="u/[username]" options={pushedOptions} />
+        <Stack.Screen name="friends" options={pushedOptions} />
+        <Stack.Screen name="leaderboards" options={pushedOptions} />
+        <Stack.Screen name="compare/[username]" options={pushedOptions} />
       </Stack.Protected>
       <Stack.Protected guard={!auth.signedIn}>
         <Stack.Screen name="sign-in" />

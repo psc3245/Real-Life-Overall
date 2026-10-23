@@ -1,10 +1,11 @@
 import { Stack } from "expo-router";
+import { TabRootContext } from "@/components/ui";
 import { tabStackOptions } from "@/lib/stack";
 
 export default function TodayLayout() {
   return (
-    <Stack screenOptions={tabStackOptions}>
-      <Stack.Screen name="index" options={{ title: "Today", headerShown: false }} />
-    </Stack>
+    <TabRootContext.Provider value>
+      <Stack screenOptions={tabStackOptions} />
+    </TabRootContext.Provider>
   );
 }

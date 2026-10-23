@@ -434,6 +434,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - **Phase 3:** Player card, charts, badges, goals and potential, season setup and archive.
   - **Phase 4:** Profile, friends, compare, leaderboards.
   - **Refinements (before mobile):** Today is an at-a-glance overview and logging lives at `/log`; `/habits` is the habit stats glance (week / month / season; management at `/habits/manage`); the Week page adds day-by-day detail and opens earlier reviews; `/ratings/activity` holds the full change feed; every attribute and category has a page (`/ratings/node/:id`: history, changes, children, linked habits) and is linked wherever it appears; long pages get sticky section nav; heatmap days show a hover card and open their log.
+  - **iOS app:** five tabs (Today, Habits, Week, Ratings, You). Today, Habits, Week and Ratings match their web pages; You gathers the web header's links (profile, friends, leaderboards, history) with Settings. Detail screens (a day's log, attribute pages, activity, seasons, profiles, onboarding) push over the tabs. Same dark 2K look, with SF Symbols and native sheets, prompts and share sheets.
 - Responsive from the start (web first, mobile later). Consider making it an installable **PWA** before going native.
 - Light mode is optional. The 2K look is dark-first.
 
@@ -514,12 +515,14 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 
 ### Phase 5: Rich Inputs, Mobile & Monetization
 - [ ] Photos (R2 + vision model), voice notes (transcription)
-- [ ] iOS app (Expo SDK 58 + Expo Router, sharing `packages/shared`; iOS only, no Android, decided 2026-10-23). Skipped the PWA step.
-  - [x] Chunk 1, foundations: `apps/mobile`, Better Auth via `@better-auth/expo` (session cookie in the Keychain), native tabs (Today, Ratings, Settings), habit logging from Today, rating tree
-  - [ ] Journal and guided prompts, End my day and the recap view
-  - [ ] Node pages, charts, week view, player card
-  - [ ] Onboarding in the app (until then, onboard on the web)
-  - [ ] Social, push notifications (recap ready, streaks), Google sign-in
+- [x] iOS app at web parity (Expo SDK 58 + Expo Router, sharing `packages/shared`; iOS only, no Android, decided 2026-10-23). Skipped the PWA step.
+  - [x] Chunk 1, foundations: `apps/mobile`, Better Auth via `@better-auth/expo` (session cookie in the Keychain), native tabs, rating tree
+  - [x] Chunk 2, day log and Today: journal, guided prompts, every habit type, End my day and the recap, calendar picker; Today at web parity
+  - [x] Chunk 3, habits and week: habit stats glance, manage habits and the editor (AI link suggestions), weekly review, week breakdown
+  - [x] Chunk 4, ratings: player card (shared as an image), charts (react-native-svg), badges, attribute pages, activity feed, decay and pauses, History and seasons
+  - [x] Chunk 5, social and settings: profiles, friends, compare, leaderboards, profile and sharing settings (the You tab)
+  - [x] Chunk 6, onboarding and season setup: discovery chat, tree builder, weights, scouting questionnaire and follow-up, the OVR reveal
+  - [ ] Google sign-in, push notifications (recap ready, streaks)
   - [ ] EAS builds and TestFlight
 - [ ] Monetization model; per-user quotas and plan-based model tiers
 - [ ] Integrations (Strava, Health, etc.), if pursued
