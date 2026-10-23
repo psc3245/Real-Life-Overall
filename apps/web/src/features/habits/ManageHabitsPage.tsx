@@ -9,14 +9,14 @@ import { HabitEditor } from "./HabitEditor";
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function scheduleLabel(days: number[]) {
+export function scheduleLabel(days: number[]) {
   if (days.length === 7) return "Every day";
   if (days.join() === "1,2,3,4,5") return "Weekdays";
   if (days.join() === "0,6") return "Weekends";
   return days.map((d) => DAY_SHORT[d]).join(", ");
 }
 
-export function HabitsPage() {
+export function ManageHabitsPage() {
   const habits = useHabits();
   const ratings = useRatings();
   const archive = useArchiveHabit();
@@ -36,10 +36,10 @@ export function HabitsPage() {
     <div className="space-y-6 pt-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link to="/today" className="text-sm text-court-300 hover:text-neon">
-            ← Back to today
+          <Link to="/habits" className="text-sm text-court-300 hover:text-neon">
+            ← Habits at a glance
           </Link>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Habits</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Manage habits</h1>
         </div>
         {editing === null && (
           <Button variant="primary" onClick={() => setEditing("new")}>

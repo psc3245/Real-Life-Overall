@@ -1,10 +1,15 @@
 import {
+  habitStats,
   leafIds,
   linkSuggestionOutputSchema,
   localDateIn,
   normalizeHabitConfig,
+  statPeriod,
   type HabitConfig,
   type HabitDto,
+  type HabitEntryValue,
+  type HabitStatRange,
+  type HabitStatsResponseDto,
   type HabitType,
   type LinkSuggestionDto,
 } from "@rlo/shared";
@@ -187,4 +192,39 @@ export async function suggestLinks(
     ),
   ].slice(0, 3) as string[];
   return { nodeIds, reason: output.reason.trim() };
+}
+
+/**
+ * At-a-glance stats per active habit for the week, month or season containing `date` (default
+ * today). Streaks look at each habit's whole history.
+ */
+export async function getHabitStats(
+  db: Database,
+  userId: string,
+  range: HabitStatRange,
+  date?: string,
+): Promise<HabitStatsResponseDto> {
+  const user = await userRepo.findById(db, userId);
+  if (!user) throw notFound("User not found");
+  const today = localDateIn(user.timezone);
+  const period = statPeriod(range, date ?? today, user.weekStart);
+  const habits = await listHabits(db, userId);
+  const earliest = habits.reduce((min, h) => (h.startsOn < min ? h.startsOn : min), period.start);
+  const rows = await habitRepo.findEntriesBetween(
+    db,
+    habits.map((h) => h.id),
+    earliest,
+    today > period.end ? today : period.end,
+  );
+  const byHabit = new Map<string, Map<string, HabitEntryValue>>();
+  for (const r of rows) {
+    if (!byHabit.has(r.habitId)) byHabit.set(r.habitId, new Map());
+    byHabit.get(r.habitId)!.set(r.localDate, { num: r.valueNum, text: r.valueText });
+  }
+  return {
+    range,
+    ...period,
+    today,
+    habits: habits.map((h) => habitStats(h, byHabit.get(h.id) ?? new Map(), period, today)),
+  };
 }

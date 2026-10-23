@@ -132,7 +132,7 @@ function HabitsCard({ day }: { day: DayDto }) {
       {scheduled.length === 0 && extra.length === 0 ? (
         <p className="text-sm text-court-500">
           Nothing scheduled today.{" "}
-          <Link to="/habits" className="text-neon hover:underline">
+          <Link to="/habits/manage" className="text-neon hover:underline">
             Manage habits
           </Link>
         </p>

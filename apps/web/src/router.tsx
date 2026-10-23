@@ -2,7 +2,8 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
-import { HabitsPage } from "./features/habits/HabitsPage";
+import { HabitsGlancePage } from "./features/habits/HabitsGlancePage";
+import { ManageHabitsPage } from "./features/habits/ManageHabitsPage";
 import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ComparePage } from "./features/social/ComparePage";
@@ -75,7 +76,15 @@ export const router = createBrowserRouter([
         path: "habits",
         element: (
           <RequireAuth>
-            <HabitsPage />
+            <HabitsGlancePage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "habits/manage",
+        element: (
+          <RequireAuth>
+            <ManageHabitsPage />
           </RequireAuth>
         ),
       },

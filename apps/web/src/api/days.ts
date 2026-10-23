@@ -1,4 +1,12 @@
-import type { DayDto, HabitDto, HabitEntryValue, HabitType, LinkSuggestionDto } from "@rlo/shared";
+import type {
+  DayDto,
+  HabitDto,
+  HabitEntryValue,
+  HabitStatRange,
+  HabitStatsResponseDto,
+  HabitType,
+  LinkSuggestionDto,
+} from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { changesKey, ratingsKey } from "./ratings";
@@ -21,6 +29,7 @@ function useDayMutation<TInput>(request: (input: TInput) => Promise<DayDto>) {
     onSuccess: (day) => {
       queryClient.setQueryData(dayKey(day.date), day);
       if (day.date === day.today) queryClient.setQueryData(dayKey(null), day);
+      void queryClient.invalidateQueries({ queryKey: [...habitsKey, "stats"] });
     },
   });
 }
@@ -38,6 +47,15 @@ export function useSaveEntry(date: string, habitId: string) {
       body: JSON.stringify(value),
     }),
   );
+}
+
+/** At-a-glance stats for the period of `range` containing `date` (default today). */
+export function useHabitStats(range: HabitStatRange, date?: string) {
+  return useQuery({
+    queryKey: [...habitsKey, "stats", range, date ?? "today"],
+    queryFn: () =>
+      api<HabitStatsResponseDto>(`/habits/stats?range=${range}${date ? `&date=${date}` : ""}`),
+  });
 }
 
 export function useHabits() {

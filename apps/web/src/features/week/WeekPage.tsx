@@ -1,6 +1,14 @@
-import { HABIT_TYPE_LABELS, type HabitProposalDto, type WeeklyReviewDto } from "@rlo/shared";
+import {
+  HABIT_TYPE_LABELS,
+  statPeriod,
+  type HabitProposalDto,
+  type RatedNodeDto,
+  type WeekRange,
+  type WeeklyReviewDto,
+} from "@rlo/shared";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { useDay } from "../../api/days";
 import { useMe } from "../../api/hooks";
 import { useRatings } from "../../api/ratings";
 import { useResolveProposal, useRunWeekly, useSetWeekStart, useWeekly } from "../../api/weekly";
@@ -8,6 +16,7 @@ import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
 import { Delta } from "../../components/Delta";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { WeekBreakdown } from "./WeekBreakdown";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -89,6 +98,8 @@ export function WeekPage() {
 
       {review && <ReviewCard review={review} names={names} />}
 
+      <WeekDetail lastWeek={week} nodes={ratings.data?.nodes ?? []} />
+
       {history.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-display text-2xl uppercase tracking-wider">Earlier weeks</h2>
@@ -105,6 +116,52 @@ export function WeekPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/** Day-by-day specifics for the week in progress or the last finished one. */
+function WeekDetail({ lastWeek, nodes }: { lastWeek: WeekRange | null; nodes: RatedNodeDto[] }) {
+  const me = useMe();
+  const today = useDay(null).data?.today;
+  const [which, setWhich] = useState<"current" | "last">(lastWeek ? "last" : "current");
+  if (!today || !me.data) return null;
+  const current = statPeriod("week", today, me.data.weekStart);
+  const week = which === "last" && lastWeek ? lastWeek : current;
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="font-display text-2xl uppercase tracking-wider">Week in detail</h2>
+        <div
+          role="tablist"
+          aria-label="Which week"
+          className="flex rounded-lg border border-court-700"
+        >
+          {(
+            [
+              ["current", "This week"],
+              ["last", "Last week"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={which === key}
+              disabled={key === "last" && !lastWeek}
+              onClick={() => setWhich(key)}
+              className={`px-3 py-1.5 font-display text-sm uppercase tracking-wider first:rounded-l-lg last:rounded-r-lg disabled:opacity-30 ${which === key ? "bg-neon text-court-950" : "text-court-300 hover:text-court-100"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-sm text-court-500">
+        {fmt(week.start)} – {fmt(week.end)}
+        {week === current && " · so far"}
+      </p>
+      <WeekBreakdown week={week} today={today} nodes={nodes} />
+    </section>
   );
 }
 

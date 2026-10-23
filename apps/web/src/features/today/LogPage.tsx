@@ -161,14 +161,14 @@ function Habits({ day, leaves }: { day: DayDto; leaves: RatedNodeDto[] }) {
             </span>
           )}
         </h2>
-        <Link to="/habits" className="text-sm text-court-300 hover:text-neon">
+        <Link to="/habits/manage" className="text-sm text-court-300 hover:text-neon">
           Manage habits →
         </Link>
       </div>
       {day.habits.length === 0 && (
         <p className="rounded-xl border border-dashed border-court-700 p-6 text-center text-court-500">
           No habits yet.{" "}
-          <Link to="/habits" className="text-neon hover:underline">
+          <Link to="/habits/manage" className="text-neon hover:underline">
             Add one
           </Link>{" "}
           to log alongside your journal.
