@@ -9,6 +9,7 @@ import { ComparePage } from "./features/social/ComparePage";
 import { FriendsPage } from "./features/social/FriendsPage";
 import { LeaderboardsPage } from "./features/social/LeaderboardsPage";
 import { ProfilePage } from "./features/social/ProfilePage";
+import { LogPage } from "./features/today/LogPage";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
 import { HomePage } from "./routes/HomePage";
@@ -59,6 +60,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <TodayPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "log",
+        element: (
+          <RequireAuth>
+            <LogPage />
           </RequireAuth>
         ),
       },

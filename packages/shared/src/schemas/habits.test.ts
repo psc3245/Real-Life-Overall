@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays, dayOfWeek, isEditableDate, isValidDate } from "../dates";
-import { isHabitDone, normalizeHabitConfig, validateHabitEntry } from "./habits";
+import { formatHabitEntry, isHabitDone, normalizeHabitConfig, validateHabitEntry } from "./habits";
 
 describe("dates", () => {
   it("validates and shifts calendar dates", () => {
@@ -71,5 +71,22 @@ describe("lastCompletedWeek", () => {
     expect(lastCompletedWeek("2026-10-19", 1)).toEqual({ start: "2026-10-12", end: "2026-10-18" });
     expect(lastCompletedWeek("2026-10-18", 1)).toEqual({ start: "2026-10-05", end: "2026-10-11" });
     expect(lastCompletedWeek("2026-10-21", 0)).toEqual({ start: "2026-10-11", end: "2026-10-17" });
+  });
+});
+
+describe("formatHabitEntry", () => {
+  const config = { target: 8, unit: "glasses", min: null, max: null };
+  it("summarizes each type briefly", () => {
+    expect(formatHabitEntry("checkbox", config, { num: 1, text: null })).toBe("✓");
+    expect(formatHabitEntry("checknote", config, { num: 1, text: "Legs" })).toBe("✓ Legs");
+    expect(formatHabitEntry("counter", config, { num: 6, text: null })).toBe("6/8 glasses");
+    expect(formatHabitEntry("duration", { ...config, target: 30 }, { num: 25, text: null })).toBe(
+      "25/30 min",
+    );
+    expect(formatHabitEntry("rating", { ...config, max: 5 }, { num: 4, text: null })).toBe("4/5");
+    expect(formatHabitEntry("shorttext", config, { num: null, text: " Read ch. 3 " })).toBe(
+      "Read ch. 3",
+    );
+    expect(formatHabitEntry("counter", config, null)).toBe("—");
   });
 });

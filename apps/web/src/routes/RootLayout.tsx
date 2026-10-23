@@ -33,9 +33,10 @@ export function RootLayout() {
         >
           {[
             ["/today", "Today"],
+            ["/log", "Log"],
             ["/habits", "Habits"],
             ["/week", "Week"],
-            ["/ratings", "My rating"],
+            ["/ratings", "Rating"],
             ["/friends", "Friends"],
             ["/leaderboards", "Leaders"],
           ].map(([to, label]) => (
