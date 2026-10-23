@@ -134,6 +134,9 @@ function MainNav({ requests }: { requests: number }) {
         <NavLink to="/leaderboards" className={side}>
           Leaders
         </NavLink>
+        <NavLink to="/history" className={side}>
+          History
+        </NavLink>
       </div>
     </nav>
   );

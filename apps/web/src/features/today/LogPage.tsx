@@ -1,6 +1,8 @@
 import {
   addDays,
   BACKFILL_DAYS,
+  groupProgress,
+  isDayHabitDone,
   isHabitDone,
   MAX_DAY_JOURNAL,
   type DayDto,
@@ -162,9 +164,7 @@ function Habits({ day, leaves }: { day: DayDto; leaves: RatedNodeDto[] }) {
   const names = new Map(leaves.map((n) => [n.id, n.name]));
   const scheduled = day.habits.filter((h) => h.scheduled);
   const bonus = day.habits.filter((h) => !h.scheduled);
-  const done = scheduled.filter(
-    (h) => h.entry && isHabitDone(h.habit.type, h.habit.config, h.entry),
-  );
+  const done = scheduled.filter(isDayHabitDone);
 
   return (
     <section className="space-y-4">
@@ -192,7 +192,7 @@ function Habits({ day, leaves }: { day: DayDto; leaves: RatedNodeDto[] }) {
       )}
       <div className="space-y-3">
         {scheduled.map((h) => (
-          <HabitRow key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
+          <HabitItem key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
         ))}
       </div>
       {bonus.length > 0 && (
@@ -202,12 +202,38 @@ function Habits({ day, leaves }: { day: DayDto; leaves: RatedNodeDto[] }) {
           </p>
           <div className="space-y-3 opacity-80">
             {bonus.map((h) => (
-              <HabitRow key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
+              <HabitItem key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
             ))}
           </div>
         </>
       )}
     </section>
+  );
+}
+
+/** A habit row, or a group with its sub-habits indented below. */
+function HabitItem(props: { item: DayHabitDto; day: DayDto; names: Map<string, string> }) {
+  const { item } = props;
+  if (item.habit.type !== "group") return <HabitRow {...props} />;
+  const done = isDayHabitDone(item);
+  return (
+    <div
+      id={`habit-${item.habit.id}`}
+      className={`scroll-mt-16 space-y-3 rounded-xl border bg-court-900/40 p-4 ${done ? "border-neon/50" : "border-court-700"}`}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="font-medium">
+          {item.habit.name}
+          {done && <span className="ml-2 text-sm text-neon">✓ done</span>}
+        </p>
+        <span className="text-sm tabular-nums text-court-300">{groupProgress(item)}</span>
+      </div>
+      <div className="space-y-2 border-l border-court-700 pl-3">
+        {(item.children ?? []).map((c) => (
+          <HabitRow key={c.habit.id} {...props} item={c} />
+        ))}
+      </div>
+    </div>
   );
 }
 

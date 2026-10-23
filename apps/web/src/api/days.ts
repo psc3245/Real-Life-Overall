@@ -81,6 +81,7 @@ export interface HabitInput {
   days: number[];
   links: string[];
   startsOn: string;
+  parentId?: string;
 }
 
 export function useCreateHabit() {
@@ -90,8 +91,12 @@ export function useCreateHabit() {
 }
 
 export function useUpdateHabit() {
-  return useHabitMutation(({ id, ...input }: Omit<HabitInput, "type"> & { id: string }) =>
-    api<HabitDto>(`/habits/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  return useHabitMutation(
+    ({
+      id,
+      ...input
+    }: Partial<Omit<HabitInput, "type" | "parentId">> & { id: string; name: string }) =>
+      api<HabitDto>(`/habits/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   );
 }
 

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
+import { HistoryPage } from "./features/history/HistoryPage";
 import { HabitsGlancePage } from "./features/habits/HabitsGlancePage";
 import { ManageHabitsPage } from "./features/habits/ManageHabitsPage";
 import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
@@ -23,6 +24,9 @@ const ActivityPage = lazy(() =>
 );
 const NodePage = lazy(() =>
   import("./features/ratings/NodePage").then((m) => ({ default: m.NodePage })),
+);
+const SeasonPage = lazy(() =>
+  import("./features/history/SeasonPage").then((m) => ({ default: m.SeasonPage })),
 );
 const RatingsPage = lazy(() =>
   import("./features/ratings/RatingsPage").then((m) => ({ default: m.RatingsPage })),
@@ -58,6 +62,24 @@ export const router = createBrowserRouter([
           <RequireAuth>
             <Suspense fallback={loading}>
               <RatingsPage />
+            </Suspense>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "history",
+        element: (
+          <RequireAuth>
+            <HistoryPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "history/:id",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <SeasonPage />
             </Suspense>
           </RequireAuth>
         ),

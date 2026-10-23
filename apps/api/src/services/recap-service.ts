@@ -3,7 +3,10 @@ import {
   computeNodeValues,
   dailyRecapOutputSchema,
   dayOfWeek,
+  GROUP_RULE_LABELS,
+  groupProgress,
   HABIT_TYPE_LABELS,
+  isDayHabitDone,
   isHabitDone,
   leafValuesFromEvents,
   MAX_RECAPS_PER_DAY,
@@ -60,10 +63,15 @@ function describeGoal({ habit }: DayHabitDto): string {
   return "";
 }
 
+/** Every habit on the day, with groups' sub-habits listed after their group. */
+export function flatHabits(day: DayDto): DayHabitDto[] {
+  return day.habits.flatMap((h) => [h, ...(h.children ?? [])]);
+}
+
 export function hasContent(day: DayDto): boolean {
   return (
     day.journal.trim().length > 0 ||
-    day.habits.some((h) => h.entry !== null) ||
+    flatHabits(day).some((h) => h.entry !== null) ||
     day.prompts.some((p) => p.answer?.trim())
   );
 }
@@ -74,16 +82,25 @@ export function renderDay(
   refById: Map<string, string>,
   recent: { periodStart: string; narrative: string }[],
 ): string {
+  const line = (h: DayHabitDto, indent = "") => {
+    const builds = h.habit.links.map((id) => refById.get(id)).filter(Boolean);
+    const missed = !h.entry && h.scheduled ? ", scheduled today" : "";
+    return (
+      `${indent}- ${h.habit.name} (${HABIT_TYPE_LABELS[h.habit.type].toLowerCase()}${describeGoal(h)}): ` +
+      `${describeEntry(h)}${missed}.${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
+    );
+  };
   const habits = day.habits
-    .filter((h) => h.scheduled || h.entry)
-    .map((h) => {
-      const builds = h.habit.links.map((id) => refById.get(id)).filter(Boolean);
-      const missed = !h.entry && h.scheduled ? ", scheduled today" : "";
-      return (
-        `- ${h.habit.name} (${HABIT_TYPE_LABELS[h.habit.type].toLowerCase()}${describeGoal(h)}): ` +
-        `${describeEntry(h)}${missed}.${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
-      );
-    });
+    .filter((h) => h.scheduled || h.entry || h.children?.some((c) => c.entry))
+    .flatMap((h) =>
+      h.habit.type === "group"
+        ? [
+            `- ${h.habit.name} (group, ${GROUP_RULE_LABELS[h.habit.config.rule ?? "all"].toLowerCase()}): ` +
+              `${groupProgress(h)} sub-habits done${isDayHabitDone(h) ? ", group complete" : ""}.`,
+            ...(h.children ?? []).map((c) => line(c, "  ")),
+          ]
+        : [line(h)],
+    );
   const answered = day.prompts.filter((p) => p.answer?.trim());
   return [
     `Day: ${day.date} (${WEEKDAYS[dayOfWeek(day.date)]})`,
@@ -135,7 +152,12 @@ export async function runDailyRecap(
     searchMemories(
       db,
       userId,
-      [view.journal, ...view.habits.filter((h) => h.entry).map((h) => h.habit.name)].join(" "),
+      [
+        view.journal,
+        ...flatHabits(view)
+          .filter((h) => h.entry)
+          .map((h) => h.habit.name),
+      ].join(" "),
       { before: addDays(day, -7) },
     ),
   ]);

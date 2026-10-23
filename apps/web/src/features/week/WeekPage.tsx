@@ -184,7 +184,7 @@ function WeekDetail({ lastWeek, nodes }: { lastWeek: WeekRange | null; nodes: Ra
 }
 
 /** An earlier week's narrative that opens into its full review. */
-function EarlierWeek({
+export function EarlierWeek({
   week: h,
   names,
 }: {
@@ -244,7 +244,13 @@ function WeekStartPicker() {
   );
 }
 
-function ReviewCard({ review, names }: { review: WeeklyReviewDto; names: Map<string, string> }) {
+export function ReviewCard({
+  review,
+  names,
+}: {
+  review: WeeklyReviewDto;
+  names: Map<string, string>;
+}) {
   const { overallStart: start, overallEnd: end } = review;
   return (
     <article className="space-y-6 rounded-xl border border-neon/40 bg-court-900 p-5">

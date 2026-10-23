@@ -1,5 +1,7 @@
 import {
   habitStats,
+  isGroupDone,
+  isHabitDone,
   leafIds,
   linkSuggestionOutputSchema,
   localDateIn,
@@ -61,6 +63,7 @@ export function toHabitDto(row: HabitRow, lineageIds: string[], ctx: LeafContext
     links: lineageIds.map((l) => ctx?.nodeByLineage.get(l)).filter((id): id is string => !!id),
     sortOrder: row.sortOrder,
     startsOn: row.startsOn,
+    parentId: row.parentId,
   };
 }
 
@@ -115,14 +118,25 @@ export async function createHabit(
     habitRepo.findAllByUser(db, userId),
   ]);
   const lineages = linksToLineages(input.links, ctx);
+  if (input.type === "group" && lineages.length) {
+    throw badRequest("Link the group's sub-habits instead of the group");
+  }
+  // A sub-habit lives in a group and follows its schedule.
+  let parent: HabitRow | undefined;
+  if (input.parentId) {
+    parent = existing.find((h) => h.id === input.parentId && !h.archivedAt);
+    if (!parent || parent.type !== "group") throw badRequest("Sub-habits go inside a group");
+    if (input.type === "group") throw badRequest("Groups can't contain other groups yet");
+  }
   const row = await db.transaction(async (tx) => {
     const created = await habitRepo.insert(tx, {
       userId,
       name: input.name,
       type: input.type,
       config: normalizeHabitConfig(input.type, input.config),
-      days: input.days,
-      startsOn: input.startsOn ?? localDateIn(tz, new Date()),
+      days: parent ? parent.days : input.days,
+      startsOn: parent ? parent.startsOn : (input.startsOn ?? localDateIn(tz, new Date())),
+      parentId: parent?.id ?? null,
       sortOrder: existing.length,
     });
     await habitRepo.replaceLinks(tx, created.id, lineages);
@@ -141,12 +155,22 @@ export async function updateHabit(
   if (!habit || habit.archivedAt) throw notFound("Habit not found");
   const ctx = await loadLeafContext(db, userId);
   const lineages = input.links ? linksToLineages(input.links, ctx) : null;
+  if (habit.type === "group" && lineages?.length) {
+    throw badRequest("Link the group's sub-habits instead of the group");
+  }
+  // Sub-habits keep their group's schedule; the group's schedule flows down to them.
+  const schedule = habit.parentId
+    ? {}
+    : {
+        ...(input.days !== undefined && { days: input.days }),
+        ...(input.startsOn !== undefined && { startsOn: input.startsOn }),
+      };
 
   const row = await db.transaction(async (tx) => {
+    if (habit.type === "group") await habitRepo.updateChildren(tx, habit.id, schedule);
     const updated = await habitRepo.update(tx, habit.id, {
       ...(input.name !== undefined && { name: input.name }),
-      ...(input.days !== undefined && { days: input.days }),
-      ...(input.startsOn !== undefined && { startsOn: input.startsOn }),
+      ...schedule,
       ...(input.config !== undefined && {
         config: normalizeHabitConfig(habit.type, {
           ...(habit.config as HabitConfig),
@@ -166,7 +190,11 @@ export async function archiveHabit(db: Database, userId: string, habitId: string
   const habit = await habitRepo.findById(db, userId, habitId);
   if (!habit) throw notFound("Habit not found");
   if (habit.archivedAt) throw conflict("Habit is already archived");
-  await habitRepo.update(db, habit.id, { archivedAt: new Date() });
+  const archivedAt = new Date();
+  await db.transaction(async (tx) => {
+    await habitRepo.update(tx, habit.id, { archivedAt });
+    if (habit.type === "group") await habitRepo.updateChildren(tx, habit.id, { archivedAt });
+  });
 }
 
 export async function suggestLinks(
@@ -220,6 +248,23 @@ export async function getHabitStats(
   for (const r of rows) {
     if (!byHabit.has(r.habitId)) byHabit.set(r.habitId, new Map());
     byHabit.get(r.habitId)!.set(r.localDate, { num: r.valueNum, text: r.valueText });
+  }
+  // A group's "entry" each day is derived from its sub-habits: done by its rule, "2/3" to show.
+  for (const group of habits.filter((h) => h.type === "group")) {
+    const children = habits.filter((h) => h.parentId === group.id);
+    const dates = new Set(children.flatMap((c) => [...(byHabit.get(c.id)?.keys() ?? [])]));
+    const derived = new Map<string, HabitEntryValue>();
+    for (const date of dates) {
+      const done = children.map((c) => {
+        const entry = byHabit.get(c.id)?.get(date);
+        return entry ? isHabitDone(c.type, c.config, entry) : false;
+      });
+      derived.set(date, {
+        num: isGroupDone(group.config, done) ? 1 : 0,
+        text: `${done.filter(Boolean).length}/${children.length}`,
+      });
+    }
+    byHabit.set(group.id, derived);
   }
   return {
     range,

@@ -309,6 +309,7 @@ export const habitType = pgEnum("habit_type", [
   "rating",
   "shorttext",
   "journal",
+  "group",
 ]);
 
 export const habits = pgTable(
@@ -329,11 +330,13 @@ export const habits = pgTable(
       .notNull()
       .default(sql`CURRENT_DATE`),
     sortOrder: integer().notNull().default(0),
+    /** The group this is a sub-habit of (habits of type "group"). */
+    parentId: uuid().references((): AnyPgColumn => habits.id, { onDelete: "cascade" }),
     archivedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index().on(t.userId)],
+  (t) => [index().on(t.userId), index().on(t.parentId)],
 );
 
 /** Links survive seasons by pointing at a node lineage rather than a season's node row. */

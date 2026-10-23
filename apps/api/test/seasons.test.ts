@@ -6,6 +6,7 @@ import {
   type OnboardingStateDto,
   type RatingsDto,
   type SeasonCardDto,
+  type SeasonDetailDto,
   type SeasonSetupDto,
 } from "@rlo/shared";
 import { eq } from "drizzle-orm";
@@ -156,5 +157,27 @@ describe("season rollover", () => {
       setupEndsOn: null,
       previous: null,
     });
+  });
+});
+
+describe("season detail", () => {
+  it("recomputes an archived season from its ledger and shows the current one so far", async () => {
+    const t = await lastQuarter();
+    await t.request("/ratings"); // rolls over
+    const [card] = await body<SeasonCardDto[]>(await t.request("/seasons"));
+
+    const past = await body<SeasonDetailDto>(await t.request(`/seasons/${card!.id}`));
+    expect(past).toMatchObject({ label: t.prev.label, current: false, through: t.prev.endsOn });
+    const cardio = past.nodes.find((n) => n.name === "Cardio")!;
+    expect(cardio).toMatchObject({ start: 70, end: 70 });
+    expect(past.history.dates.at(-1)).toBe(t.prev.endsOn);
+    expect(past.archetype).toBe("Desk Athlete");
+
+    const ratings = await body<RatingsDto>(await t.request("/ratings"));
+    const now = await body<SeasonDetailDto>(await t.request(`/seasons/${ratings.season.id}`));
+    expect(now).toMatchObject({ current: true, through: t.today });
+
+    expect((await t.request(`/seasons/${card!.id}`, { user: "intruder" })).status).toBe(404);
+    expect((await t.request("/seasons/nope")).status).toBe(404);
   });
 });

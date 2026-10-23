@@ -5,6 +5,7 @@ import {
   localDateIn,
   validateHabitEntry,
   type DayDto,
+  type DayHabitDto,
   type GuidedPromptDto,
   type HabitConfig,
   type HabitEntryValue,
@@ -72,14 +73,33 @@ export async function getDay(db: Database, userId: string, date?: string): Promi
   const dtos = await toHabitDtos(db, rows, ctx);
   const weekday = dayOfWeek(day);
 
-  const habits = rows
+  const items = rows
     .map((row, i) => ({ row, dto: dtos[i]!, entry: entries.get(row.id) }))
     .filter(({ row, dto, entry }) => dto.startsOn <= day && (!row.archivedAt || entry))
-    .map(({ dto, entry }) => ({
+    .map(({ dto, entry }): DayHabitDto => ({
       habit: dto,
       scheduled: dto.days.includes(weekday),
       entry: entry ? { num: entry.valueNum, text: entry.valueText } : null,
-    }))
+      ...(dto.type === "group" && { children: [] }),
+    }));
+  // Sub-habits sit under their group; an archived group still shows if a sub-habit was logged.
+  const byId = new Map(items.map((item) => [item.habit.id, item]));
+  for (const item of items) {
+    const parentId = item.habit.parentId;
+    if (!parentId) continue;
+    let parent = byId.get(parentId);
+    if (!parent) {
+      const i = rows.findIndex((r) => r.id === parentId);
+      if (i < 0) continue;
+      parent = { habit: dtos[i]!, scheduled: item.scheduled, entry: null, children: [] };
+      byId.set(parentId, parent);
+      items.push(parent);
+    }
+    parent.children!.push(item);
+  }
+  const habits = items
+    .filter((item) => !item.habit.parentId)
+    .filter((item) => item.habit.type !== "group" || item.children!.length > 0)
     .sort((a, b) => Number(b.scheduled) - Number(a.scheduled));
 
   return {

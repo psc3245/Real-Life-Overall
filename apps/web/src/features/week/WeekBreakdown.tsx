@@ -34,7 +34,8 @@ export function WeekBreakdown({
   const past = dates.filter((d) => d <= today);
   const logged = past.filter((d) => byDate.get(d)?.logged).length;
   const recapped = past.filter((d) => byDate.get(d)?.recapped).length;
-  const habitRows = habits.data?.habits ?? [];
+  // Groups count once; their sub-habits are covered by the group.
+  const habitRows = (habits.data?.habits ?? []).filter((h) => !h.habit.parentId);
   const scheduled = habitRows.reduce((n, h) => n + h.scheduled, 0);
   const completed = habitRows.reduce((n, h) => n + h.completed, 0);
 

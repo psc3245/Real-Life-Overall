@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { addDays, dayOfWeek, isEditableDate, isValidDate } from "../dates";
-import { formatHabitEntry, isHabitDone, normalizeHabitConfig, validateHabitEntry } from "./habits";
+import {
+  formatHabitEntry,
+  groupProgress,
+  isDayHabitDone,
+  isGroupDone,
+  isHabitDone,
+  normalizeHabitConfig,
+  validateHabitEntry,
+} from "./habits";
 
 describe("dates", () => {
   it("validates and shifts calendar dates", () => {
@@ -88,5 +96,48 @@ describe("formatHabitEntry", () => {
       "Read ch. 3",
     );
     expect(formatHabitEntry("counter", config, null)).toBe("—");
+  });
+});
+
+describe("habit groups", () => {
+  const sub = (id: string, num: number | null) => ({
+    habit: {
+      id,
+      name: id,
+      type: "checkbox" as const,
+      config: normalizeHabitConfig("checkbox"),
+      days: [1],
+      links: [],
+      sortOrder: 0,
+      startsOn: "2026-10-01",
+    },
+    scheduled: true,
+    entry: num === null ? null : { num, text: null },
+  });
+  const group = (rule: "all" | "any" | "count", target?: number) => ({
+    ...sub("g", null),
+    habit: {
+      ...sub("g", null).habit,
+      type: "group" as const,
+      config: normalizeHabitConfig("group", { rule, target }),
+    },
+    children: [sub("a", 1), sub("b", 1), sub("c", null)],
+  });
+
+  it("normalizes the rule and only keeps N for 'count'", () => {
+    expect(normalizeHabitConfig("group")).toMatchObject({ rule: "all", target: null });
+    expect(normalizeHabitConfig("group", { rule: "count", target: 2.4 })).toMatchObject({
+      rule: "count",
+      target: 2,
+    });
+  });
+
+  it("is done by its rule over sub-habits", () => {
+    expect(isDayHabitDone(group("all"))).toBe(false);
+    expect(isDayHabitDone(group("any"))).toBe(true);
+    expect(isDayHabitDone(group("count", 2))).toBe(true);
+    expect(isDayHabitDone(group("count", 3))).toBe(false);
+    expect(isGroupDone(normalizeHabitConfig("group"), [])).toBe(false);
+    expect(groupProgress(group("count", 2))).toBe("2/3 · need 2");
   });
 });

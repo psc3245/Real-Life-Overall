@@ -28,8 +28,6 @@
 @layer base {
   html {
     color-scheme: dark;
-    /* Full-bleed bars use 100vw, which includes any scrollbar. */
-    overflow-x: clip;
   }
   body {
     @apply bg-court-950 text-court-100 font-sans antialiased;

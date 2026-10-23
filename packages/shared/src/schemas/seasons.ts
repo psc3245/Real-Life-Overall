@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { EarnedBadgeDto } from "./badges";
+import type { HistoryDto } from "./history";
 import { CONFIDENCE_LEVELS } from "./ratings";
 
 /** Days after a rollover during which the new season's tree can still be edited. */
@@ -22,6 +24,39 @@ export interface SeasonCardDto {
   overall: number | null;
   archetype: string | null;
   nodes: SeasonSnapshotNode[];
+}
+
+export interface SeasonDetailNode {
+  id: string;
+  parentId: string | null;
+  name: string;
+  depth: number;
+  /** Value on the season's first rated day, and on its last (today while it's running). */
+  start: number | null;
+  end: number | null;
+}
+
+/** Everything about one season, current or archived (the History page). */
+export interface SeasonDetailDto {
+  id: string;
+  label: string;
+  startsOn: string;
+  endsOn: string;
+  current: boolean;
+  /** Last day covered: today while the season runs, its end once archived. */
+  through: string;
+  archetype: string | null;
+  nodes: SeasonDetailNode[];
+  history: HistoryDto;
+  stats: {
+    daysLogged: number;
+    daysRecapped: number;
+    bestLoggingStreak: number;
+    habitCompletions: number;
+    weeklyReviews: number;
+  };
+  badges: EarnedBadgeDto[];
+  weeks: { id: string; weekStart: string; weekEnd: string; narrative: string }[];
 }
 
 export interface SeasonSetupDto {
