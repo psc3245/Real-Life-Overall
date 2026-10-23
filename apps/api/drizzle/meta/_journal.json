@@ -92,6 +92,13 @@
       "when": 1792684284885,
       "tag": "0012_onboarding_discovery",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792716706817,
+      "tag": "0013_social_profiles",
+      "breakpoints": true
     }
   ]
 }

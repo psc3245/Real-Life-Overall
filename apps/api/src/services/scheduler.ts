@@ -7,6 +7,7 @@ import { awardBadges } from "./badge-service";
 import { ensureCurrentSeason } from "./season-service";
 import { getDay } from "./day-service";
 import { applyDecay } from "./decay-service";
+import { getRatings } from "./ratings-service";
 import { hasContent, runDailyRecap } from "./recap-service";
 import { getWeeklyState, runWeeklyReview } from "./weekly-service";
 
@@ -77,6 +78,10 @@ export async function runForUser(
     }
   }
   await awardBadges(db, userId);
+  // Keeps the shared card (profiles, leaderboards) in step with recaps and decay.
+  await getRatings(db, userId).catch((error) =>
+    console.error(`card refresh failed for ${userId}`, error),
+  );
   return result;
 }
 

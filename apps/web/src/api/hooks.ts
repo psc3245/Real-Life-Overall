@@ -1,3 +1,4 @@
+import type { ProfileVisibility } from "@rlo/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./client";
 
@@ -7,6 +8,7 @@ export interface Me {
   displayName: string;
   timezone: string;
   weekStart: number;
+  profileVisibility: ProfileVisibility;
   createdAt: string;
 }
 

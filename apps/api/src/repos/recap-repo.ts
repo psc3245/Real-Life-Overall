@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, lte } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, lte } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { recaps } from "../db/schema";
 
@@ -109,4 +109,20 @@ export async function findDailyBetween(db: Executor, userId: string, from: strin
 
 export async function updateOutput(db: Executor, id: string, output: unknown): Promise<void> {
   await db.update(recaps).set({ output }).where(eq(recaps.id, id));
+}
+
+/** Days with a current daily recap on or after `from` (a season's start). */
+export async function countRecappedDaysSince(db: Executor, userId: string, from: string) {
+  const [row] = await db
+    .select({ n: count() })
+    .from(recaps)
+    .where(
+      and(
+        eq(recaps.userId, userId),
+        eq(recaps.kind, "daily"),
+        eq(recaps.status, "active"),
+        gte(recaps.periodStart, from),
+      ),
+    );
+  return row?.n ?? 0;
 }

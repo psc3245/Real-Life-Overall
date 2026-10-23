@@ -53,11 +53,25 @@ export function RootLayout() {
             <span className={`h-2 w-2 rounded-full ${apiUp ? "bg-neon" : "bg-flare"}`} />
             API
           </span>
-          {auth.mode === "dev" && <DevUserSwitcher />}
+          {auth.mode === "dev" && (
+            <>
+              <DevUserSwitcher />
+              <Link to="/settings" className="text-sm text-court-300 hover:text-neon">
+                Settings
+              </Link>
+            </>
+          )}
           {auth.mode === "better-auth" &&
             (auth.signedIn ? (
               <span className="flex items-center gap-2 text-sm text-court-300">
-                <span className="hidden sm:inline">{auth.name}</span>
+                <Link
+                  to="/settings"
+                  className="hover:text-neon"
+                  title="Profile and sharing settings"
+                >
+                  <span className="hidden sm:inline">{auth.name}</span>
+                  <span className="sm:hidden">Settings</span>
+                </Link>
                 <Button
                   variant="ghost"
                   onClick={async () => {

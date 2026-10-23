@@ -4,6 +4,8 @@ import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
 import { HabitsPage } from "./features/habits/HabitsPage";
 import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
+import { SettingsPage } from "./features/settings/SettingsPage";
+import { ProfilePage } from "./features/social/ProfilePage";
 import { TodayPage } from "./features/today/TodayPage";
 import { WeekPage } from "./features/week/WeekPage";
 import { HomePage } from "./routes/HomePage";
@@ -70,6 +72,15 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <WeekPage />
+          </RequireAuth>
+        ),
+      },
+      { path: "u/:username", element: <ProfilePage /> },
+      {
+        path: "settings",
+        element: (
+          <RequireAuth>
+            <SettingsPage />
           </RequireAuth>
         ),
       },

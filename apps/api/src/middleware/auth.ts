@@ -35,6 +35,30 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
+/**
+ * For pages anyone can open (public profiles): sets `userId` when the caller is signed in and
+ * leaves it unset otherwise. In dev mode only an explicit x-dev-user header counts.
+ */
+export const optionalUser = createMiddleware<AppEnv>(async (c, next) => {
+  const env = c.get("env");
+  const db = c.get("db");
+  if (env.AUTH_MODE === "better-auth") {
+    const session = await authFor(c).api.getSession({ headers: c.req.raw.headers });
+    if (session) {
+      const user =
+        (await userRepo.findByAuthSubject(db, session.user.id)) ??
+        (await userRepo.createForAuth(db, session.user));
+      c.set("userId", user.id);
+    }
+  } else {
+    const username = c.req.header(DEV_USER_HEADER)?.toLowerCase();
+    if (username && USERNAME_PATTERN.test(username)) {
+      c.set("userId", (await userRepo.findOrCreateDevUser(db, username)).id);
+    }
+  }
+  await next();
+});
+
 /** One Better Auth instance per request, created on first use. */
 export function authFor(c: Context<AppEnv>): Auth {
   let auth = c.get("auth");

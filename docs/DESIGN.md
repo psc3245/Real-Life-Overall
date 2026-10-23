@@ -2,7 +2,7 @@
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
 > **Status:** Pre-development. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
-> **Last updated:** 2026-10-20
+> **Last updated:** 2026-10-22
 
 ---
 
@@ -54,7 +54,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | LLM memory | **Full-history retrieval (RAG)**. |
 | Day boundary | **User's timezone.** The recap runs on "End my day", otherwise automatically the next morning. |
 | Social (eventual) | Public card sharing, friends and compare, leaderboards. |
-| Privacy | **Undecided.** Build private by default. |
+| Privacy | **Private by default, opt-in sharing** (decided 2026-10-22, §7.3): per-player visibility (private / friends / public) for the card only; journals, recaps, attributes, rationales and personal badges are never shared. |
 | Anti-gaming | **LLM skepticism plus caps.** Accept some cheating. |
 | Visual direction | **Video-game menu (2K-like)**: dark, bold, sporty, neon accents, animated stat bars. |
 | Visualizations | Rating history line charts, radar chart, daily change feed, calendar heatmap. |
@@ -266,7 +266,13 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 - Public profile and card link (requires real URLs, hence React Router)
 - Friends: follow or request, side-by-side card comparison
 - Leaderboards: friends and global, by Overall or by category template (custom categories aren't comparable, so global boards are probably limited to template categories)
-- **Privacy:** undecided. **Private by default.** Journals, photos and voice are never public unless an explicit future decision says otherwise. Ratings and cards are shareable only by opt-in.
+- **Privacy model** (decided 2026-10-22):
+  - Each player picks a **visibility**: `private` (default: nobody else), `friends` (accepted friends) or `public` (anyone with the link, signed in or not).
+  - Visibility covers the **card only**: Overall, archetype, season label, **category** values, recapped-day count and the highest tier of each **catalog** badge.
+  - **Never shared:** journals, guided answers, recaps and narratives, the model's rationales, **attribute names and values** (they can be personal, e.g. "Sobriety"), personal badges (written by the LLM from journals), goals and projections. Photos and voice (Phase 5) follow the same rule.
+  - Hidden profiles answer 404, the same as missing ones, so settings don't reveal who has an account.
+  - Usernames appear in links (`/u/:username`). They start as the email's local part, so the settings page lets players change them (3-24 lowercase characters; reserved words blocked).
+  - Shared cards read a per-player cache (`player_cards`) refreshed when the owner's ratings are read and by the hourly job, so other players never replay someone's ledger.
 
 ---
 
@@ -399,6 +405,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `llm_calls` | `user_id`, `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`, `error` | **From day one** |
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
 | `settings` | per-user UI prefs | Carried over pattern |
+| `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
+| `player_cards` | `user_id` pk, `season_id`, `season_label`, `overall`, `archetype`, `categories` jsonb, `recapped_days` | Shareable card cache, Phase 4 |
 
 ---
 
@@ -482,8 +490,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Seasons: lazy quarterly rollover (ratings, weights, decay rules and goals carry over), archived season cards, 14-day season setup with structure edits; new attributes rated by the model
 
 ### Phase 4: Social
-- [ ] Privacy model decision
-- [ ] Public profile and card links
+- [x] Privacy model decision (private by default; card-only visibility: private / friends / public)
+- [x] Public profile and card links (`/u/:username`, editable usernames, cached `player_cards`)
 - [ ] Friends and compare
 - [ ] Leaderboards (friends, plus global on template categories)
 - [ ] Anti-gaming hardening
@@ -507,7 +515,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 8. ~~**Mid-quarter onboarding**~~ Decided: the first season is shortened (it ends with the calendar quarter).
 9. **Display precision:** OVR shown as an integer or with one decimal?
 10. **Decay rule visibility and editability** for users.
-11. **Privacy model** for social features.
+11. ~~**Privacy model**~~ Decided: private by default, card-only opt-in visibility (§7.3).
 12. **Monetization model** (freemium, subscription, BYO key…) and quota design.
 13. **Global leaderboard comparability** across custom trees.
 14. **Data export and account deletion** (should be in place before launch).

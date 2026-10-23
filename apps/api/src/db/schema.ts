@@ -32,6 +32,8 @@ const rating = () => numeric({ precision: 5, scale: 2, mode: "number" });
 /** Postgres full-text search vector; used for long-term memory retrieval (DESIGN.md §5.5). */
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
+export const profileVisibility = pgEnum("profile_visibility", ["private", "friends", "public"]);
+
 export const users = pgTable("users", {
   id: id(),
   email: text().notNull().unique(),
@@ -44,6 +46,8 @@ export const users = pgTable("users", {
   authSubject: text().unique(),
   /** Rolling LLM-maintained profile, refreshed by weekly reviews and fed to every prompt. */
   profileSummary: text(),
+  /** Who can see the player card (DESIGN.md §7.3). */
+  profileVisibility: profileVisibility().notNull().default("private"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -496,4 +500,29 @@ export const userBadges = pgTable(
     uniqueIndex("user_badges_one_per_tier").on(t.userId, t.badgeKey, t.tier),
     index().on(t.recapId),
   ],
+);
+
+/**
+ * The shareable slice of each player's current ratings (PublicCardDto), so profiles and
+ * leaderboards don't replay other users' ledgers. Refreshed whenever the owner's ratings are
+ * read and by the hourly job.
+ */
+export const playerCards = pgTable(
+  "player_cards",
+  {
+    userId: uuid()
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid()
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    seasonLabel: text().notNull(),
+    overall: rating().notNull(),
+    archetype: text(),
+    /** PublicCategoryDto[] */
+    categories: jsonb().notNull(),
+    recappedDays: integer().notNull().default(0),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.seasonLabel, t.overall)],
 );

@@ -48,7 +48,11 @@ export function RatingsPage() {
     <div className="space-y-10 pt-4">
       <NewSeasonBanner />
       <div className="grid gap-8 md:grid-cols-[1fr_1.2fr] md:items-start">
-        <ExportableCard ratings={data} name={me.data?.displayName ?? "Player"} />
+        <ExportableCard
+          ratings={data}
+          name={me.data?.displayName ?? "Player"}
+          username={me.data?.username}
+        />
         <div className="space-y-3">
           <h1 className="font-display text-4xl font-bold uppercase">Scouting report</h1>
           {data.archetype && (
@@ -198,7 +202,15 @@ function RecentChanges() {
 }
 
 /** The player card plus a PNG export of it (DESIGN.md §7.1). */
-function ExportableCard({ ratings, name }: { ratings: RatingsDto; name: string }) {
+function ExportableCard({
+  ratings,
+  name,
+  username,
+}: {
+  ratings: RatingsDto;
+  name: string;
+  username?: string;
+}) {
   const card = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -231,6 +243,11 @@ function ExportableCard({ ratings, name }: { ratings: RatingsDto; name: string }
       </div>
       <div className="flex items-center justify-end gap-3">
         <ErrorNote error={error} />
+        {username && (
+          <Link to={`/u/${username}`} className="px-4 py-2 text-sm text-court-300 hover:text-neon">
+            Share profile
+          </Link>
+        )}
         <Button variant="ghost" disabled={exporting} onClick={download}>
           {exporting ? "Rendering…" : "↓ Download card"}
         </Button>
