@@ -99,9 +99,13 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
           </label>
         ) : (
           <p className="text-sm text-court-300">
-            {item.dayAmount > 0
-              ? `+${formatNumber(item.dayAmount)} from ${o.habitName ?? "the habit"}`
-              : `Counts ${o.habitName ?? "a habit"}`}
+            {o.source === "workouts"
+              ? item.dayAmount > 0
+                ? `+${formatNumber(item.dayAmount)} from workouts`
+                : "Counts finished workouts"
+              : item.dayAmount > 0
+                ? `+${formatNumber(item.dayAmount)} from ${o.habitName ?? "the habit"}`
+                : `Counts ${o.habitName ?? "a habit"}`}
           </p>
         )}
       </div>

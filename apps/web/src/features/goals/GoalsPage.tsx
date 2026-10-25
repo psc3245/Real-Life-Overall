@@ -177,7 +177,11 @@ function GoalCard({
       <div className="flex flex-wrap items-center justify-end gap-1 border-t border-court-800 pt-2">
         {p.status === "active" && (
           <Link to={`/log#goal-${o.id}`} className="mr-auto text-sm text-neon hover:underline">
-            {o.source === "manual" ? "Log today →" : `Log ${o.habitName ?? "the habit"} →`}
+            {o.source === "manual"
+              ? "Log today →"
+              : o.source === "workouts"
+                ? "Start a workout →"
+                : `Log ${o.habitName ?? "the habit"} →`}
           </Link>
         )}
         {confirming ? (

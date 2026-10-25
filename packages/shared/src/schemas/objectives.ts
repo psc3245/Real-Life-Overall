@@ -12,14 +12,15 @@ import {
  * Goals: a target total to reach by a deadline ("Run 100 miles before New Year's", "Gym 3 times
  * this week"). Called objectives in code so they don't clash with goal ratings (Potential).
  *
- * Progress comes from what the user logs each day on the goal itself (manual) or from a habit's
- * entries inside the goal's window.
+ * Progress comes from what the user logs each day on the goal itself (manual), a habit's entries,
+ * or completed workouts inside the goal's window.
  */
-export const OBJECTIVE_SOURCES = ["manual", "habit"] as const;
+export const OBJECTIVE_SOURCES = ["manual", "habit", "workouts"] as const;
 export type ObjectiveSource = (typeof OBJECTIVE_SOURCES)[number];
 export const OBJECTIVE_SOURCE_LABELS: Record<ObjectiveSource, string> = {
   manual: "Log progress on the goal",
   habit: "Count a habit",
+  workouts: "Count workouts",
 };
 
 /** Goals spanning up to this many days are short term; longer ones are long term. */

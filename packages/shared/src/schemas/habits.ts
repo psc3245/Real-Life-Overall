@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { DATE_PATTERN, isValidDate } from "../dates";
+import type { UnitSystem } from "../units";
+import type { DayBodyDto } from "./body";
 import type { DayObjectiveDto } from "./objectives";
+import type { DayWorkoutDto } from "./workouts";
 import type { GuidedPromptDto, RecapDto } from "./recaps";
 
 export const HABIT_TYPES = [
@@ -266,6 +269,11 @@ export interface DayDto {
   habits: DayHabitDto[];
   /** Goals whose window includes this day. */
   objectives: DayObjectiveDto[];
+  /** Completed workouts that count for this day. */
+  workouts: DayWorkoutDto[];
+  /** Height and weight for the day; null when neither is tracked. */
+  body: DayBodyDto | null;
+  units: UnitSystem;
   /** Questions from the previous day's recap. */
   prompts: GuidedPromptDto[];
   recap: RecapDto | null;

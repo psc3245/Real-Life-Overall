@@ -10,6 +10,7 @@ import { useMe, type Me } from "../../api/hooks";
 import { useUpdateProfile } from "../../api/social";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { TrackingSettings } from "../body/TrackingSettings";
 import { CopyLink } from "../social/CopyLink";
 import { VISIBILITY_LABEL } from "../social/ProfilePage";
 import { fieldClass } from "../../components/form";
@@ -28,6 +29,7 @@ export function SettingsPage() {
     <div className="mx-auto max-w-xl space-y-10 pt-4">
       <h1 className="font-display text-4xl font-bold uppercase">Settings</h1>
       <ProfileForm me={me.data} />
+      <TrackingSettings me={me.data} />
       <SharingSection me={me.data} />
     </div>
   );

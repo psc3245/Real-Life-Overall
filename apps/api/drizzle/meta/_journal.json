@@ -127,6 +127,13 @@
       "when": 1792969638017,
       "tag": "0017_objectives",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792970439913,
+      "tag": "0018_workouts_and_body",
+      "breakpoints": true
     }
   ]
 }

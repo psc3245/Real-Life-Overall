@@ -12,7 +12,12 @@ import {
   leafValuesFromEvents,
   MAX_RECAPS_PER_DAY,
   type DayDto,
+  type DayBodyDto,
   type DayHabitDto,
+  type UnitSystem,
+  formatHeight,
+  toDisplayWeight,
+  weightUnit,
   type GuidedPromptDto,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
@@ -58,6 +63,24 @@ function describeEntry({ habit, entry }: DayHabitDto): string {
 const formatNumber = (n: number) =>
   Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
 
+function formatVolume(kg: number, units: UnitSystem) {
+  return `${Math.round(toDisplayWeight(kg, units)).toLocaleString("en-US")} ${weightUnit(units)}`;
+}
+
+/** Logged weight (with the change since the last entry) and height, or null if nothing. */
+function describeBody(body: DayBodyDto, units: UnitSystem): string | null {
+  const parts: string[] = [];
+  if (body.weightKg !== null) {
+    const change =
+      body.lastWeightKg !== null
+        ? `, ${formatNumber(toDisplayWeight(body.weightKg - body.lastWeightKg, units))} ${weightUnit(units)} since the last weigh-in`
+        : "";
+    parts.push(`weight ${toDisplayWeight(body.weightKg, units)} ${weightUnit(units)}${change}`);
+  }
+  if (body.heightCm !== null) parts.push(`height ${formatHeight(body.heightCm, units)}`);
+  return parts.length ? parts.join("; ") : null;
+}
+
 function describeGoal({ habit }: DayHabitDto): string {
   const { config } = habit;
   if (habit.type === "counter") return `, goal ${config.target} ${config.unit}`;
@@ -75,6 +98,7 @@ export function hasContent(day: DayDto): boolean {
     day.journal.trim().length > 0 ||
     flatHabits(day).some((h) => h.entry !== null) ||
     day.objectives.some((o) => o.logged !== null) ||
+    day.workouts.length > 0 ||
     day.prompts.some((p) => p.answer?.trim())
   );
 }
@@ -119,11 +143,21 @@ export function renderDay(
       `This day added ${formatNumber(dayAmount)}.${reached}${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
     );
   });
+  const workouts = day.workouts.map((w) =>
+    [
+      `- ${w.name} (${Math.round(w.durationS / 60)} min${w.volumeKg ? `, ${formatVolume(w.volumeKg, day.units)} total volume` : ""}):`,
+      ...w.lines.map((l) => `  - ${l}`),
+      ...(w.prs.length ? [`  Personal records: ${w.prs.join("; ")}`] : []),
+    ].join("\n"),
+  );
+  const body = day.body ? describeBody(day.body, day.units) : null;
   const answered = day.prompts.filter((p) => p.answer?.trim());
   return [
     `Day: ${day.date} (${WEEKDAY_NAMES[dayOfWeek(day.date)]})`,
     `Journal:\n${day.journal.trim() || "(empty)"}`,
     `Habits:\n${habits.join("\n") || "(none)"}`,
+    workouts.length ? `Workouts:\n${workouts.join("\n")}` : null,
+    body ? `Body: ${body}` : null,
     goals.length
       ? `Goals with a deadline (running totals as of today):\n${goals.join("\n")}`
       : null,

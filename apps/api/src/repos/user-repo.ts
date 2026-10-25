@@ -11,6 +11,9 @@ export const publicUserColumns = {
   weekStart: users.weekStart,
   profileVisibility: users.profileVisibility,
   leaderboardOptIn: users.leaderboardOptIn,
+  unitSystem: users.unitSystem,
+  trackWeight: users.trackWeight,
+  trackHeight: users.trackHeight,
   createdAt: users.createdAt,
 };
 
@@ -54,6 +57,9 @@ export async function update(
       | "username"
       | "profileVisibility"
       | "leaderboardOptIn"
+      | "unitSystem"
+      | "trackWeight"
+      | "trackHeight"
     >
   >,
 ): Promise<PublicUser | null> {

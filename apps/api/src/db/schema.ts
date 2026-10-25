@@ -1,10 +1,18 @@
-import { OBJECTIVE_SOURCES, RATING_EVENT_SOURCES } from "@rlo/shared";
+import {
+  BODY_KINDS,
+  EXERCISE_CATEGORIES,
+  EXERCISE_TRACKING,
+  OBJECTIVE_SOURCES,
+  RATING_EVENT_SOURCES,
+  UNIT_SYSTEMS,
+} from "@rlo/shared";
 import { sql, type SQL } from "drizzle-orm";
 import {
   boolean,
   check,
   customType,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -34,6 +42,7 @@ const rating = () => numeric({ precision: 5, scale: 2, mode: "number" });
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 export const profileVisibility = pgEnum("profile_visibility", ["private", "friends", "public"]);
+export const unitSystem = pgEnum("unit_system", UNIT_SYSTEMS);
 
 export const users = pgTable("users", {
   id: id(),
@@ -51,6 +60,11 @@ export const users = pgTable("users", {
   profileVisibility: profileVisibility().notNull().default("private"),
   /** Appear on global leaderboards (also needs a public profile). */
   leaderboardOptIn: boolean().notNull().default(false),
+  /** How weights, distances and heights are shown (stored metric). */
+  unitSystem: unitSystem().notNull().default("imperial"),
+  /** Opt-in body tracking (DESIGN.md §7.5). */
+  trackWeight: boolean().notNull().default(false),
+  trackHeight: boolean().notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -615,4 +629,91 @@ export const friendships = pgTable(
     index().on(t.addresseeId),
     check("friendships_not_self", sql`${t.requesterId} <> ${t.addresseeId}`),
   ],
+);
+
+export const exerciseCategory = pgEnum("exercise_category", EXERCISE_CATEGORIES);
+export const exerciseTracking = pgEnum("exercise_tracking", EXERCISE_TRACKING);
+
+/** A user's own exercises; the built-in library lives in @rlo/shared (EXERCISE_CATALOG). */
+export const exercises = pgTable(
+  "exercises",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    category: exerciseCategory().notNull(),
+    tracking: exerciseTracking().notNull(),
+    archivedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+/** Workout plans: exercises with target sets (WorkoutExerciseDto[]). No limit per user. */
+export const workoutTemplates = pgTable(
+  "workout_templates",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    notes: text().notNull().default(""),
+    exercises: jsonb().notNull().default([]),
+    lastUsedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+/**
+ * Logged workouts. `exercises` is WorkoutExerciseDto[] (kg, m, s); the whole document is saved
+ * at once while the workout is in progress. `ended_at` is null until it's finished.
+ */
+export const workouts = pgTable(
+  "workouts",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    notes: text().notNull().default(""),
+    localDate: date().notNull(),
+    startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp({ withTimezone: true }),
+    templateId: uuid().references(() => workoutTemplates.id, { onDelete: "set null" }),
+    exercises: jsonb().notNull().default([]),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index().on(t.userId, t.localDate),
+    // One workout in progress at a time.
+    uniqueIndex("workouts_one_in_progress")
+      .on(t.userId)
+      .where(sql`${t.endedAt} is null`),
+  ],
+);
+
+export const bodyKind = pgEnum("body_kind", BODY_KINDS);
+
+/** Height and weight by day (kg, cm), one value per kind per day. */
+export const bodyMeasurements = pgTable(
+  "body_measurements",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    localDate: date().notNull(),
+    kind: bodyKind().notNull(),
+    value: doublePrecision().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex().on(t.userId, t.localDate, t.kind)],
 );

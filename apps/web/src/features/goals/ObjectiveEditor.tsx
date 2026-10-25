@@ -21,6 +21,13 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 
 const label = "block text-xs uppercase tracking-wider text-court-300";
 
+const SOURCE_DETAIL: Record<ObjectiveSource, string> = {
+  manual: "Add what you did toward it on each day's log.",
+  habit:
+    "Every entry of the habit inside the goal's dates counts: amounts for counts and time, otherwise days done.",
+  workouts: "Every workout you finish inside the goal's dates counts as one.",
+};
+
 /** Quick deadlines; a date input covers everything else. */
 function deadlinePresets(today: string, weekStart: number) {
   const year = today.slice(0, 4);
@@ -66,7 +73,13 @@ export function ObjectiveEditor({
   const countable = habits.filter((h) => h.type !== "group");
   const habit = countable.find((h) => h.id === habitId);
   const shownUnit =
-    source === "habit" ? (habit ? habitObjectiveUnit(habit.type, habit.config) : "") : unit;
+    source === "habit"
+      ? habit
+        ? habitObjectiveUnit(habit.type, habit.config)
+        : ""
+      : source === "workouts"
+        ? "workouts"
+        : unit;
   const validWindow = Boolean(startsOn && endsOn && endsOn >= startsOn);
 
   const toggleLink = (id: string) =>
@@ -125,11 +138,7 @@ export function ObjectiveEditor({
             </button>
           ))}
         </div>
-        <p className="text-sm text-court-500">
-          {source === "manual"
-            ? "Add what you did toward it on each day's log."
-            : "Every entry of the habit inside the goal's dates counts: amounts for counts and time, otherwise days done."}
-        </p>
+        <p className="text-sm text-court-500">{SOURCE_DETAIL[source]}</p>
         {source === "habit" && (
           <select
             aria-label="Habit to count"
@@ -171,7 +180,7 @@ export function ObjectiveEditor({
             aria-label="Unit"
             value={shownUnit}
             maxLength={20}
-            disabled={source === "habit"}
+            disabled={source !== "manual"}
             placeholder="miles, sessions, books…"
             onChange={(e) => setUnit(e.target.value)}
             className={`${compactFieldClass} w-44 disabled:opacity-60`}

@@ -288,7 +288,19 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 - **Progress sources:** `manual` (the day log has a field per running goal; each day stores what it added) or `habit` (the goal counts a habit's entries inside its window: amounts for counts and time, otherwise done days; groups can't be counted, their sub-habits can).
 - **Status** is computed, never stored: upcoming, active, completed (the day the running total reached the target is kept) or missed. **Pace** compares the total with an even pace through the days already behind (today is still in play), shown as a tick on the progress bar.
 - Goals link to attributes like habits (by lineage). Daily recaps see every goal running that day, its total, what the day added, and whether the target was reached that day; a manual goal entry alone counts as logging the day.
+- **Progress sources:** also `workouts` (each finished workout inside the window counts as one).
 - Screens: `/goals` (short term, long term, finished), a Goals section in the day log, and a Goals card on Today.
+
+### 7.5 Workouts and body tracking (added 2026-10-25)
+- **Model:** set-by-set logging after the Strong app. A workout holds exercises; an exercise holds sets; sets are checked off as they're done. Workouts are stored as one jsonb document (`workouts.exercises`) that the live page autosaves; personal records, "previous" sets and exercise history are computed by replaying the user's finished workouts in memory (fine at personal scale; move to SQL if it ever isn't).
+- **Generic for lifting and sport.** Each exercise has a **tracking kind**: weight × reps, reps (bodyweight), time, distance + time, or makes / attempts (free throws, penalty kicks, serves). Sets are tagged normal, warm-up, drop or failure. The built-in library (~85 exercises across strength, cardio, sport & skill and mobility) lives in `packages/shared` with slug ids; custom exercises are rows in `exercises` with uuid ids, and archived ones keep resolving for old workouts.
+- **Units:** stored metric (kg, m, s, cm); `users.unit_system` (`imperial` default, or `metric`) picks what's shown.
+- **Live workout** (`/workouts/active`): one in progress at a time (partial unique index). Elapsed timer, set table (Set · Previous · values · ✓), tapping a "Previous" cell copies it, checking a set with empty fields fills them from last time and starts a rest timer (length remembered per browser). Finishing drops unchecked sets and empty exercises; the workout counts for the local date it started.
+- **Templates:** unlimited (Strong's free tier caps at 3; we don't). Start from one (sets prefilled, unchecked), update it from a finished workout, or save any finished workout as a new one.
+- **Records** per exercise: heaviest weight, best estimated 1RM (Epley), best set volume, most reps, longest time and distance, best make percentage (5+ attempts). A workout lists the records it broke; a first-ever session sets none.
+- **Body tracking:** opt-in per measure (`users.track_weight`, `users.track_height`). One value per kind per day in `body_measurements`; the day log shows the fields when tracked, `/body` shows latest values, 30-day change, BMI (with both) and a weight chart. Never shared on cards.
+- **Ratings:** daily recaps see the day's workouts (exercises, sets, best set, records) as concrete fitness and sport evidence, and logged weight and height as context only (the prompt forbids judging body weight). A finished workout alone counts as logging the day; editing or deleting one marks its day stale.
+- Screens: `/workouts` (start, templates), `/workouts/active`, `/workouts/history`, `/workouts/:id`, `/workouts/templates/:id`, `/workouts/exercises(/:id)`, `/body`; Workouts and Body sections in the day log; units and tracking in settings.
 
 ---
 
@@ -331,7 +343,7 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 │   │   └── src/
 │   │       ├── router.tsx   # React Router routes
 │   │       ├── routes/      # layout, home and 404
-│   │       ├── features/    # pages by area: today/, habits/, week/, ratings/, history/, social/ ...
+│   │       ├── features/    # pages by area: today/, habits/, goals/, workouts/, body/, week/, ratings/, social/ ...
 │   │       ├── components/  # shared UI (cards, stat bars, charts, modal, section nav, form styles)
 │   │       ├── lib/         # formatting helpers
 │   │       ├── api/         # typed API client + TanStack Query hooks
@@ -422,7 +434,12 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `habit_entries` | `habit_id`, `local_date`, `value_num`, `value_text` | |
 | `recaps` | `user_id`, `season_id`, `kind` (`daily`/`weekly`), `period_start`, `period_end`, `narrative`, `output` jsonb, `prompt_version`, `status` (`active`/`superseded`) | One active recap per period. Weekly `output` also holds focus goals, habit proposals, decay revisions, projections and archetype changes |
 | `goals` | `node_id`, `target_value` | User half of Potential |
-| `objectives` | `user_id`, `name`, `unit`, `target`, `starts_on`, `ends_on`, `source` (`manual`/`habit`), `habit_id`, `archived_at` | Goals with a deadline (§7.4) |
+| `objectives` | `user_id`, `name`, `unit`, `target`, `starts_on`, `ends_on`, `source` (`manual`/`habit`/`workouts`), `habit_id`, `archived_at` | Goals with a deadline (§7.4) |
+| `workouts` | `user_id`, `name`, `notes`, `local_date`, `started_at`, `ended_at` (null while in progress), `template_id`, `exercises` jsonb | §7.5; one in progress per user |
+| `workout_templates` | `user_id`, `name`, `notes`, `exercises` jsonb, `last_used_at` | No cap |
+| `exercises` | `user_id`, `name`, `category`, `tracking`, `archived_at` | Custom exercises; the library is in `packages/shared` |
+| `body_measurements` | `user_id`, `local_date`, `kind` (`weight`/`height`), `value` (kg/cm) | Unique per user, day and kind |
+| `users.unit_system`, `users.track_weight`, `users.track_height` | | Units and opt-in body tracking |
 | `objective_links` / `objective_entries` | `objective_id` + `node_lineage_id`; `objective_id`, `local_date`, `value` | Links by lineage; one manual entry per goal per day |
 | `decay_runs` | `user_id`, `season_id`, `local_date`, `paused`, `voided_at` | One active run per day; backfills void later runs |
 | (memory) | `day_logs.journal_search`, `recaps.narrative_search` (generated `tsvector`, GIN) | Full-text search; no embeddings table (§5.5) |
@@ -539,7 +556,9 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 
 ### Web features (after the iOS app)
 - [x] Goals with a deadline, short and long term (§7.4)
-- [ ] Workout logging with templates, plus optional height and weight tracking
+- [x] Workout logging with unlimited templates, records and a generic set model for lifting and sport (§7.5)
+- [x] Optional height and weight tracking, units setting (§7.5)
+- [ ] iOS app parity for goals, workouts and body tracking
 
 ---
 

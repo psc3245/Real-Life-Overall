@@ -20,3 +20,7 @@ export * from "./schemas/seasons";
 export * from "./schemas/social";
 export * from "./habit-stats";
 export * from "./schemas/objectives";
+export * from "./units";
+export * from "./exercises";
+export * from "./schemas/workouts";
+export * from "./schemas/body";

@@ -5,6 +5,7 @@ import type {
   LeaderboardScope,
   ProfileDto,
   ProfileVisibility,
+  UnitSystem,
 } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
@@ -26,6 +27,9 @@ export interface ProfileSettings {
   username?: string;
   profileVisibility?: ProfileVisibility;
   leaderboardOptIn?: boolean;
+  unitSystem?: UnitSystem;
+  trackWeight?: boolean;
+  trackHeight?: boolean;
 }
 
 export function useUpdateProfile() {
@@ -38,6 +42,9 @@ export function useUpdateProfile() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["profile"] }),
         queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
+        // Units and body tracking change the day log and the body page.
+        queryClient.invalidateQueries({ queryKey: ["day"] }),
+        queryClient.invalidateQueries({ queryKey: ["body"] }),
       ]);
     },
   });
@@ -62,6 +69,9 @@ export function useFriendAction() {
         queryClient.invalidateQueries({ queryKey: friendsKey }),
         queryClient.invalidateQueries({ queryKey: ["profile"] }),
         queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
+        // Units and body tracking change the day log and the body page.
+        queryClient.invalidateQueries({ queryKey: ["day"] }),
+        queryClient.invalidateQueries({ queryKey: ["body"] }),
       ]);
     },
   });

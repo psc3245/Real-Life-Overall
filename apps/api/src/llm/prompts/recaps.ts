@@ -21,6 +21,9 @@ export const dailyRecapPrompt = {
       "- Habits list the attributes they build. A completed habit is strong evidence for those.",
       "- Goals are targets to reach by a deadline. What the day added toward one is evidence for " +
         "the attributes it builds; reaching a target on this day deserves a mention.",
+      "- Logged workouts (exercises, sets, personal records) are concrete evidence for fitness " +
+        "and sport attributes. Weight and height entries are context, not achievements: never " +
+        "judge body weight, and only mention it if the user's goals are about it.",
       "- Be skeptical of implausible claims and of sudden jumps inconsistent with recent days: " +
         "weigh them lightly and flag them.",
     ].join("\n"),

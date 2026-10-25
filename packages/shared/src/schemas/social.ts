@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CATEGORY_TEMPLATES } from "../templates";
+import type { UnitSystem } from "../units";
 import type { BadgeTier } from "./badges";
 
 /**
@@ -46,6 +47,9 @@ export interface MeDto {
   weekStart: number;
   profileVisibility: ProfileVisibility;
   leaderboardOptIn: boolean;
+  unitSystem: UnitSystem;
+  trackWeight: boolean;
+  trackHeight: boolean;
   createdAt: string;
 }
 

@@ -33,6 +33,9 @@ const day: DayDto = {
   prompts: [],
   recap: null,
   objectives: [],
+  workouts: [],
+  body: null,
+  units: "imperial",
   habits: [
     { habit: habit("gym", "Gym"), scheduled: true, entry: { num: 1, text: null } },
     {

@@ -19,6 +19,7 @@ import * as objectiveRepo from "../repos/objective-repo";
 import type { ObjectiveRow } from "../repos/objective-repo";
 import * as userRepo from "../repos/user-repo";
 import { linksToLineages, loadLeafContext, type LeafContext } from "./habit-service";
+import { workoutCountsByDate } from "./workout-service";
 
 async function todayFor(db: Database, userId: string) {
   const user = await userRepo.findById(db, userId);
@@ -64,6 +65,10 @@ async function dailyAmounts(
         if (amount) daily.set(e.localDate, amount);
       }
     }
+  }
+  if (rows.some((r) => r.source === "workouts")) {
+    const counts = await workoutCountsByDate(db, rows[0]!.userId);
+    for (const r of rows.filter((r) => r.source === "workouts")) out.set(r.id, new Map(counts));
   }
   return out;
 }
@@ -152,7 +157,7 @@ export async function createObjective(
   const startsOn = input.startsOn ?? today;
   if (input.endsOn < startsOn) throw badRequest("The deadline must be on or after the start");
 
-  let unit = input.unit || "times";
+  let unit = input.source === "workouts" ? "workouts" : input.unit || "times";
   let habitId: string | null = null;
   if (input.source === "habit") {
     const habit = await habitRepo.findById(db, userId, input.habitId!);
@@ -225,7 +230,11 @@ export async function saveObjectiveEntry(
   const objective = await objectiveRepo.findById(db, userId, objectiveId);
   if (!objective || objective.archivedAt) throw notFound("Goal not found");
   if (objective.source !== "manual") {
-    throw badRequest("This goal counts a habit; log the habit instead");
+    throw badRequest(
+      objective.source === "habit"
+        ? "This goal counts a habit; log the habit instead"
+        : "This goal counts workouts; log a workout instead",
+    );
   }
   if (day < objective.startsOn || day > objective.endsOn) {
     throw badRequest(`This goal runs ${objective.startsOn} to ${objective.endsOn}`);

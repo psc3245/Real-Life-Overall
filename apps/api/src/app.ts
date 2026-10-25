@@ -7,6 +7,7 @@ import { parseEnv, type Env } from "./env";
 import { LlmError } from "./llm/client";
 import { authFor, optionalUser, requireUser } from "./middleware/auth";
 import { badgeRoutes } from "./routes/badges";
+import { bodyRoutes } from "./routes/body";
 import { dayRoutes } from "./routes/days";
 import { devRoutes } from "./routes/dev";
 import { friendRoutes } from "./routes/friends";
@@ -21,6 +22,7 @@ import { profileRoutes } from "./routes/profiles";
 import { seasonRoutes } from "./routes/seasons";
 import { ratingsRoutes } from "./routes/ratings";
 import { weeklyRoutes } from "./routes/weekly";
+import { exerciseRoutes, templateRoutes, workoutRoutes } from "./routes/workouts";
 
 export type DepsFactory = (env: Env) => Deps;
 
@@ -103,6 +105,14 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/days/*", requireUser)
     .use("/objectives", requireUser)
     .use("/objectives/*", requireUser)
+    .use("/workouts", requireUser)
+    .use("/workouts/*", requireUser)
+    .use("/workout-templates", requireUser)
+    .use("/workout-templates/*", requireUser)
+    .use("/exercises", requireUser)
+    .use("/exercises/*", requireUser)
+    .use("/body", requireUser)
+    .use("/body/*", requireUser)
     .use("/pauses", requireUser)
     .use("/pauses/*", requireUser)
     .use("/dev/*", requireUser)
@@ -122,6 +132,10 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/habits", habitRoutes)
     .route("/days", dayRoutes)
     .route("/objectives", objectiveRoutes)
+    .route("/workouts", workoutRoutes)
+    .route("/workout-templates", templateRoutes)
+    .route("/exercises", exerciseRoutes)
+    .route("/body", bodyRoutes)
     .route("/pauses", pauseRoutes)
     .route("/dev", devRoutes)
     .route("/weekly", weeklyRoutes)

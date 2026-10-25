@@ -1,4 +1,4 @@
-import { isValidTimeZone, PROFILE_VISIBILITIES, usernameSchema } from "@rlo/shared";
+import { isValidTimeZone, PROFILE_VISIBILITIES, UNIT_SYSTEMS, usernameSchema } from "@rlo/shared";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -15,6 +15,9 @@ const updateMeSchema = z
     username: usernameSchema,
     profileVisibility: z.enum(PROFILE_VISIBILITIES),
     leaderboardOptIn: z.boolean(),
+    unitSystem: z.enum(UNIT_SYSTEMS),
+    trackWeight: z.boolean(),
+    trackHeight: z.boolean(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Provide at least one field");
