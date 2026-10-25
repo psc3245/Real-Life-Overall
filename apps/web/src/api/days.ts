@@ -30,6 +30,8 @@ function useDayMutation<TInput>(request: (input: TInput) => Promise<DayDto>) {
       queryClient.setQueryData(dayKey(day.date), day);
       if (day.date === day.today) queryClient.setQueryData(dayKey(null), day);
       void queryClient.invalidateQueries({ queryKey: [...habitsKey, "stats"] });
+      // Habit entries count toward goals that track a habit.
+      void queryClient.invalidateQueries({ queryKey: ["objectives"] });
     },
   });
 }

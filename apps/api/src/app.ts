@@ -14,6 +14,7 @@ import { goalRoutes } from "./routes/goals";
 import { habitRoutes } from "./routes/habits";
 import { leaderboardRoutes } from "./routes/leaderboards";
 import { meRoutes } from "./routes/me";
+import { objectiveRoutes } from "./routes/objectives";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
 import { profileRoutes } from "./routes/profiles";
@@ -100,6 +101,8 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/habits", requireUser)
     .use("/habits/*", requireUser)
     .use("/days/*", requireUser)
+    .use("/objectives", requireUser)
+    .use("/objectives/*", requireUser)
     .use("/pauses", requireUser)
     .use("/pauses/*", requireUser)
     .use("/dev/*", requireUser)
@@ -118,6 +121,7 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/ratings", ratingsRoutes)
     .route("/habits", habitRoutes)
     .route("/days", dayRoutes)
+    .route("/objectives", objectiveRoutes)
     .route("/pauses", pauseRoutes)
     .route("/dev", devRoutes)
     .route("/weekly", weeklyRoutes)

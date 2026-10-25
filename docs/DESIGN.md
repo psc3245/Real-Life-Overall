@@ -2,7 +2,7 @@
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
 > **Status:** In development: Phases 0–4 built, web refinements done, iOS app started. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
-> **Last updated:** 2026-10-22
+> **Last updated:** 2026-10-25
 
 ---
 
@@ -282,6 +282,14 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
   - Usernames appear in links (`/u/:username`). They start as the email's local part, so the settings page lets players change them (3-24 lowercase characters; reserved words blocked).
   - Shared cards read a per-player cache (`player_cards`) refreshed when the owner's ratings are read and by the hourly job, so other players never replay someone's ledger.
 
+### 7.4 Goals with a deadline (added 2026-10-25)
+- A **goal** is a target total to reach by a deadline: "Run 100 miles before New Year's", "Gym 3 times this week". Called **objectives** in code and tables so they don't clash with goal *ratings* (Potential, the `goals` table).
+- **Short vs long term** is derived from the window: up to 31 days is short term (`SHORT_TERM_MAX_DAYS`), longer is long term. Windows can span up to 3 years.
+- **Progress sources:** `manual` (the day log has a field per running goal; each day stores what it added) or `habit` (the goal counts a habit's entries inside its window: amounts for counts and time, otherwise done days; groups can't be counted, their sub-habits can).
+- **Status** is computed, never stored: upcoming, active, completed (the day the running total reached the target is kept) or missed. **Pace** compares the total with an even pace through the days already behind (today is still in play), shown as a tick on the progress bar.
+- Goals link to attributes like habits (by lineage). Daily recaps see every goal running that day, its total, what the day added, and whether the target was reached that day; a manual goal entry alone counts as logging the day.
+- Screens: `/goals` (short term, long term, finished), a Goals section in the day log, and a Goals card on Today.
+
 ---
 
 ## 8. Architecture
@@ -414,6 +422,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `habit_entries` | `habit_id`, `local_date`, `value_num`, `value_text` | |
 | `recaps` | `user_id`, `season_id`, `kind` (`daily`/`weekly`), `period_start`, `period_end`, `narrative`, `output` jsonb, `prompt_version`, `status` (`active`/`superseded`) | One active recap per period. Weekly `output` also holds focus goals, habit proposals, decay revisions, projections and archetype changes |
 | `goals` | `node_id`, `target_value` | User half of Potential |
+| `objectives` | `user_id`, `name`, `unit`, `target`, `starts_on`, `ends_on`, `source` (`manual`/`habit`), `habit_id`, `archived_at` | Goals with a deadline (§7.4) |
+| `objective_links` / `objective_entries` | `objective_id` + `node_lineage_id`; `objective_id`, `local_date`, `value` | Links by lineage; one manual entry per goal per day |
 | `decay_runs` | `user_id`, `season_id`, `local_date`, `paused`, `voided_at` | One active run per day; backfills void later runs |
 | (memory) | `day_logs.journal_search`, `recaps.narrative_search` (generated `tsvector`, GIN) | Full-text search; no embeddings table (§5.5) |
 | `llm_calls` | `user_id`, `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`, `error` | **From day one** |
@@ -526,6 +536,10 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - [ ] EAS builds and TestFlight
 - [ ] Monetization model; per-user quotas and plan-based model tiers
 - [ ] Integrations (Strava, Health, etc.), if pursued
+
+### Web features (after the iOS app)
+- [x] Goals with a deadline, short and long term (§7.4)
+- [ ] Workout logging with templates, plus optional height and weight tracking
 
 ---
 

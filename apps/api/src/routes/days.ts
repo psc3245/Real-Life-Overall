@@ -1,6 +1,7 @@
 import {
   dateParamSchema,
   saveEntryBodySchema,
+  saveObjectiveEntryBodySchema,
   saveJournalBodySchema,
   savePromptAnswersBodySchema,
 } from "@rlo/shared";
@@ -30,6 +31,19 @@ export const dayRoutes = new Hono<AppEnv>()
         c.get("userId"),
         date,
         idParam(c, "habitId", "Habit"),
+        value,
+      ),
+    );
+  })
+  .put("/:date/objectives/:objectiveId", async (c) => {
+    const date = dateParamSchema.parse(c.req.param("date"));
+    const { value } = await parseJson(c, saveObjectiveEntryBodySchema);
+    return c.json(
+      await days.saveObjective(
+        c.get("db"),
+        c.get("userId"),
+        date,
+        idParam(c, "objectiveId", "Goal"),
         value,
       ),
     );

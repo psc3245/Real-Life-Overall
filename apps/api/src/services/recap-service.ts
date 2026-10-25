@@ -55,6 +55,9 @@ function describeEntry({ habit, entry }: DayHabitDto): string {
   }
 }
 
+const formatNumber = (n: number) =>
+  Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
+
 function describeGoal({ habit }: DayHabitDto): string {
   const { config } = habit;
   if (habit.type === "counter") return `, goal ${config.target} ${config.unit}`;
@@ -71,6 +74,7 @@ export function hasContent(day: DayDto): boolean {
   return (
     day.journal.trim().length > 0 ||
     flatHabits(day).some((h) => h.entry !== null) ||
+    day.objectives.some((o) => o.logged !== null) ||
     day.prompts.some((p) => p.answer?.trim())
   );
 }
@@ -100,11 +104,29 @@ export function renderDay(
           ]
         : [line(h)],
     );
+  const goals = day.objectives.map(({ objective: o, dayAmount }) => {
+    const p = o.progress;
+    const builds = o.links.map((id) => refById.get(id)).filter(Boolean);
+    const reached =
+      p.completedOn === day.date
+        ? " Reached the target on this day."
+        : p.completedOn
+          ? ` Reached on ${p.completedOn}.`
+          : "";
+    return (
+      `- ${o.name}: ${formatNumber(p.current)}/${formatNumber(o.target)} ${o.unit} ` +
+      `(${o.startsOn} to ${o.endsOn}${o.habitName ? `, counts the habit "${o.habitName}"` : ""}). ` +
+      `This day added ${formatNumber(dayAmount)}.${reached}${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
+    );
+  });
   const answered = day.prompts.filter((p) => p.answer?.trim());
   return [
     `Day: ${day.date} (${WEEKDAY_NAMES[dayOfWeek(day.date)]})`,
     `Journal:\n${day.journal.trim() || "(empty)"}`,
     `Habits:\n${habits.join("\n") || "(none)"}`,
+    goals.length
+      ? `Goals with a deadline (running totals as of today):\n${goals.join("\n")}`
+      : null,
     answered.length
       ? `Answers to today's questions:\n${answered.map((p) => `Q: ${p.question}\nA: ${p.answer}`).join("\n")}`
       : null,

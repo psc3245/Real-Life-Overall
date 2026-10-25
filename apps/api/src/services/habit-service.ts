@@ -45,7 +45,7 @@ export async function loadLeafContext(db: Database, userId: string) {
     nodeByLineage: new Map(lineages.map((l) => [l.lineageId, l.id])),
   };
 }
-type LeafContext = NonNullable<Awaited<ReturnType<typeof loadLeafContext>>>;
+export type LeafContext = NonNullable<Awaited<ReturnType<typeof loadLeafContext>>>;
 
 async function timezoneOf(db: Database, userId: string) {
   const user = await userRepo.findById(db, userId);
@@ -86,9 +86,13 @@ export async function toHabitDtos(
   );
 }
 
-function linksToLineages(nodeIds: string[], ctx: LeafContext | null): string[] {
+export function linksToLineages(
+  nodeIds: string[],
+  ctx: LeafContext | null,
+  what = "habits",
+): string[] {
   const unique = [...new Set(nodeIds)];
-  if (unique.length && !ctx) throw badRequest("Finish onboarding before linking habits");
+  if (unique.length && !ctx) throw badRequest(`Finish onboarding before linking ${what}`);
   return unique.map((id) => {
     if (!ctx!.leaves.has(id)) throw badRequest(`Not a rated attribute: ${id}`);
     return ctx!.lineageByNode.get(id)!;

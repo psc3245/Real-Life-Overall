@@ -4,7 +4,6 @@ import {
   GROUP_RULES,
   HABIT_TYPE_LABELS,
   HABIT_TYPES,
-  leafIds,
   MAX_HABIT_LINKS,
   normalizeHabitConfig,
   type HabitConfig,
@@ -17,6 +16,7 @@ import {
 } from "@rlo/shared";
 import { useState, type FormEvent } from "react";
 import { useCreateHabit, useSuggestLinks, useUpdateHabit } from "../../api/days";
+import { AttributePicker } from "../../components/AttributePicker";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { compactFieldClass } from "../../components/form";
@@ -50,14 +50,6 @@ export function HabitEditor({
   const update = useUpdateHabit();
   const suggest = useSuggestLinks();
   const saving = create.isPending || update.isPending;
-
-  const leaves = new Set(leafIds(nodes));
-  const root = nodes.find((n) => n.parentId === null);
-  const categories = nodes.filter((n) => n.parentId === root?.id);
-  const leavesUnder = (id: string): RatedNodeDto[] =>
-    leaves.has(id)
-      ? nodes.filter((n) => n.id === id)
-      : nodes.filter((n) => n.parentId === id).flatMap((c) => leavesUnder(c.id));
 
   const changeType = (next: HabitType) => {
     setType(next);
@@ -298,30 +290,7 @@ export function HabitEditor({
             <p className="border-l-2 border-neon/60 pl-3 text-sm text-court-300">{reason}</p>
           )}
           <ErrorNote error={suggest.error} />
-          <div className="space-y-2">
-            {categories.map((c) => (
-              <div key={c.id} className="flex flex-wrap items-center gap-1.5">
-                <span className="w-24 shrink-0 truncate text-xs uppercase tracking-wider text-court-500">
-                  {c.name}
-                </span>
-                {leavesUnder(c.id).map((leaf) => (
-                  <button
-                    key={leaf.id}
-                    type="button"
-                    aria-pressed={links.includes(leaf.id)}
-                    onClick={() => toggleLink(leaf.id)}
-                    className={`rounded-full border px-3 py-1 text-sm ${
-                      links.includes(leaf.id)
-                        ? "border-neon bg-neon/15 text-neon"
-                        : "border-court-700 text-court-300 hover:border-court-500"
-                    }`}
-                  >
-                    {leaf.name}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
+          <AttributePicker nodes={nodes} selected={links} onToggle={toggleLink} />
         </fieldset>
       )}
 

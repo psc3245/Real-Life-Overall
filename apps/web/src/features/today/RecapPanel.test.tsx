@@ -57,6 +57,7 @@ const day = (over: Partial<DayDto>): DayDto => ({
   status: "open",
   journal: "",
   habits: [],
+  objectives: [],
   prompts: [],
   recap: null,
   ...over,

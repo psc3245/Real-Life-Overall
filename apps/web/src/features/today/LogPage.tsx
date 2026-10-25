@@ -18,6 +18,7 @@ import { SectionNav } from "../../components/SectionNav";
 import { useHashScroll } from "../../components/useHashScroll";
 import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { DayGoals } from "./DayGoals";
 import { GuidedPrompts } from "./GuidedPrompts";
 import { HabitEntryInput } from "./HabitEntryInput";
 import { RecapPanel } from "./RecapPanel";
@@ -98,6 +99,7 @@ export function LogPage() {
           ...(d.prompts.length ? [{ id: "questions", label: "Questions" }] : []),
           { id: "journal-section", label: "Journal" },
           { id: "habits", label: "Habits" },
+          { id: "goals", label: "Goals" },
           { id: "recap", label: "Recap" },
         ]}
       />
@@ -109,6 +111,9 @@ export function LogPage() {
       </div>
       <div id="habits" className="scroll-mt-16">
         <Habits day={d} leaves={ratings.data?.nodes ?? []} />
+      </div>
+      <div id="goals" className="scroll-mt-16">
+        <DayGoals day={d} />
       </div>
       <div id="recap" className="scroll-mt-16">
         <RecapPanel day={d} />

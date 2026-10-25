@@ -19,3 +19,4 @@ export * from "./schemas/badges";
 export * from "./schemas/seasons";
 export * from "./schemas/social";
 export * from "./habit-stats";
+export * from "./schemas/objectives";

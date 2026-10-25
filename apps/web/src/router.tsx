@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
+import { GoalsPage } from "./features/goals/GoalsPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { HabitsGlancePage } from "./features/habits/HabitsGlancePage";
 import { ManageHabitsPage } from "./features/habits/ManageHabitsPage";
@@ -133,6 +134,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <ManageHabitsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "goals",
+        element: (
+          <RequireAuth>
+            <GoalsPage />
           </RequireAuth>
         ),
       },

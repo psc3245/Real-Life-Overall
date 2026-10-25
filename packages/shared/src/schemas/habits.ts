@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DATE_PATTERN, isValidDate } from "../dates";
+import type { DayObjectiveDto } from "./objectives";
 import type { GuidedPromptDto, RecapDto } from "./recaps";
 
 export const HABIT_TYPES = [
@@ -263,6 +264,8 @@ export interface DayDto {
   status: "open" | "recapped" | "stale";
   journal: string;
   habits: DayHabitDto[];
+  /** Goals whose window includes this day. */
+  objectives: DayObjectiveDto[];
   /** Questions from the previous day's recap. */
   prompts: GuidedPromptDto[];
   recap: RecapDto | null;
