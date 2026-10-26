@@ -1,7 +1,9 @@
 import {
   habitStats,
+  addDays,
+  isAvoid,
+  isEntryDone,
   isGroupDone,
-  isHabitDone,
   leafIds,
   linkSuggestionOutputSchema,
   localDateIn,
@@ -179,6 +181,8 @@ export async function updateHabit(
         config: normalizeHabitConfig(habit.type, {
           ...(habit.config as HabitConfig),
           ...input.config,
+          // Like the type, the direction is fixed: it changes what past entries mean.
+          direction: (habit.config as HabitConfig).direction ?? null,
         }),
       }),
     });
@@ -257,11 +261,15 @@ export async function getHabitStats(
   for (const group of habits.filter((h) => h.type === "group")) {
     const children = habits.filter((h) => h.parentId === group.id);
     const dates = new Set(children.flatMap((c) => [...(byHabit.get(c.id)?.keys() ?? [])]));
+    // Avoid sub-habits are kept on days with no entry, so every day can count.
+    if (children.some((c) => isAvoid(c.config))) {
+      for (let d = group.startsOn; d <= today; d = addDays(d, 1)) dates.add(d);
+    }
     const derived = new Map<string, HabitEntryValue>();
     for (const date of dates) {
       const done = children.map((c) => {
         const entry = byHabit.get(c.id)?.get(date);
-        return entry ? isHabitDone(c.type, c.config, entry) : false;
+        return isEntryDone(c.type, c.config, entry ?? null);
       });
       derived.set(date, {
         num: isGroupDone(group.config, done) ? 1 : 0,

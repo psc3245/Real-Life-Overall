@@ -90,3 +90,21 @@ describe("habitStats", () => {
     expect(stats.days[0]).toMatchObject({ scheduled: false, future: true });
   });
 });
+
+describe("habitStats for avoid habits", () => {
+  it("counts unlogged days as kept and tallies slips", () => {
+    const smoke = habit({
+      type: "checkbox",
+      days: [0, 1, 2, 3, 4, 5, 6],
+      startsOn: "2026-10-12",
+      config: { target: null, unit: null, min: null, max: null, direction: "avoid" },
+    });
+    const entries = new Map<string, HabitEntryValue>([
+      ["2026-10-14", { num: 1, text: null }], // a slip on Wednesday
+      ["2026-10-15", { num: 0, text: null }],
+    ]);
+    const s = habitStats(smoke, entries, { start: "2026-10-12", end: "2026-10-18" }, "2026-10-17");
+    expect(s).toMatchObject({ scheduled: 6, completed: 5, slips: 1, currentStreak: 3 });
+    expect(s.bestStreak).toBe(3); // Thu-Sat after the slip; Mon-Tue was 2
+  });
+});

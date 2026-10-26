@@ -3,7 +3,9 @@ import {
   BACKFILL_DAYS,
   groupProgress,
   isDayHabitDone,
-  isHabitDone,
+  isAvoid,
+  isEntryDone,
+  isSlip,
   MAX_DAY_JOURNAL,
   type DayDto,
   type DayHabitDto,
@@ -255,17 +257,25 @@ function HabitRow({
 }) {
   const save = useSaveEntry(day.date, item.habit.id);
   const { habit, entry } = item;
-  const done = entry ? isHabitDone(habit.type, habit.config, entry) : false;
+  const done = isEntryDone(habit.type, habit.config, entry);
+  const slipped = isSlip(habit.type, habit.config, entry);
   const wide = habit.type === "journal" || habit.type === "shorttext" || habit.type === "slider";
 
   return (
     <div
       id={`habit-${habit.id}`}
-      className={`scroll-mt-16 rounded-xl border bg-court-900/70 p-4 transition ${done ? "border-neon/50" : "border-court-700"}`}
+      className={`scroll-mt-16 rounded-xl border bg-court-900/70 p-4 transition ${slipped ? "border-flare/60" : done ? "border-neon/50" : "border-court-700"}`}
     >
       <div className={`flex gap-3 ${wide ? "flex-col" : "flex-wrap items-center justify-between"}`}>
         <div className="min-w-0">
-          <p className="font-medium">{habit.name}</p>
+          <p className="font-medium">
+            {habit.name}
+            {isAvoid(habit.config) && (
+              <span className="ml-2 rounded bg-flare/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-flare">
+                Avoid
+              </span>
+            )}
+          </p>
           {habit.links.length > 0 && (
             <p className="mt-0.5 flex flex-wrap gap-1.5">
               {habit.links.map((id) => (

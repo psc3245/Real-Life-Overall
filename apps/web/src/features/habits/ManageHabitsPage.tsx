@@ -35,6 +35,7 @@ export function ManageHabitsPage() {
       <div className="min-w-0">
         <p className="font-medium">{h.name}</p>
         <p className="text-sm text-court-500">
+          {h.config.direction === "avoid" && <span className="text-flare">Avoid · </span>}
           {HABIT_TYPE_LABELS[h.type]}
           {h.type === "group" &&
             ` · ${GROUP_RULE_LABELS[h.config.rule ?? "all"]}${h.config.rule === "count" ? ` (${h.config.target})` : ""}`}

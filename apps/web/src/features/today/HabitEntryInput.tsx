@@ -36,9 +36,51 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
   const debounced = useDebouncedSave(onSave);
   const { config } = habit;
 
+  const avoid = config.direction === "avoid";
+
   switch (habit.type) {
     case "checkbox":
     case "checknote": {
+      if (avoid) {
+        const pick = (next: 0 | 1) => {
+          const value = num === next ? null : next;
+          setNum(value);
+          onSave({ num: value, text: value === 1 ? text || null : null });
+        };
+        const choice = (value: 0 | 1, label: string, on: string) => (
+          <button
+            type="button"
+            aria-pressed={num === value}
+            disabled={disabled}
+            onClick={() => pick(value)}
+            className={`rounded-lg border-2 px-3 py-1.5 text-sm font-semibold transition ${num === value ? on : "border-court-700 text-court-300 hover:border-court-500"}`}
+          >
+            {label}
+          </button>
+        );
+        return (
+          <div
+            className={`flex flex-wrap items-center gap-2 ${habit.type === "checknote" && num === 1 ? "w-full" : ""}`}
+          >
+            {choice(0, "✓ Avoided", "border-neon bg-neon/15 text-neon")}
+            {choice(1, "✗ Slipped", "border-flare bg-flare/15 text-flare")}
+            {habit.type === "checknote" && num === 1 && (
+              <input
+                aria-label={`${habit.name} note`}
+                value={text}
+                maxLength={MAX_HABIT_NOTE}
+                disabled={disabled}
+                placeholder="What happened?"
+                onChange={(e) => setText(e.target.value)}
+                onBlur={() =>
+                  text !== (entry?.text ?? "") && onSave({ num: 1, text: text || null })
+                }
+                className="min-w-0 flex-1 rounded-lg border border-court-700 bg-court-950 px-3 py-1.5 text-sm outline-none focus:border-neon"
+              />
+            )}
+          </div>
+        );
+      }
       const done = num === 1;
       return (
         <div
@@ -127,8 +169,10 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
           >
             +
           </button>
-          <span className="text-sm text-court-300">
-            / {config.target} {unit}
+          <span
+            className={`text-sm ${avoid && value > (config.target ?? 0) ? "text-flare" : "text-court-300"}`}
+          >
+            {avoid ? `/ ≤${config.target}` : `/ ${config.target}`} {unit}
           </span>
         </div>
       );
@@ -155,7 +199,9 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
             }
             className={`w-full accent-[var(--color-neon)] ${num === null ? "opacity-40" : ""}`}
           />
-          <span className="w-8 text-right font-display text-lg tabular-nums text-neon">
+          <span
+            className={`w-8 text-right font-display text-lg tabular-nums ${avoid && num !== null && num > (config.target ?? 0) ? "text-flare" : "text-neon"}`}
+          >
             {num ?? "–"}
           </span>
         </div>
@@ -196,7 +242,11 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
         value: text,
         maxLength: max,
         disabled,
-        placeholder: habit.type === "journal" ? "Write it down…" : "Answer…",
+        placeholder: avoid
+          ? "Only if you slipped: what happened?"
+          : habit.type === "journal"
+            ? "Write it down…"
+            : "Answer…",
         onChange: (e: { target: { value: string } }) => setText(e.target.value),
         onBlur: commit,
         className:

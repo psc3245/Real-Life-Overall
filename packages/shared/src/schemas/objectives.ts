@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { addDays, daysBetween, isValidDate } from "../dates";
 import {
+  isAvoid,
   isHabitDone,
   MAX_HABIT_LINKS,
   type HabitConfig,
@@ -69,12 +70,16 @@ export function habitContribution(
   config: HabitConfig,
   entry: HabitEntryValue,
 ): number {
-  if (type === "counter" || type === "duration") return Math.max(0, entry.num ?? 0);
+  // Avoid habits count kept days, not amounts.
+  if (!isAvoid(config) && (type === "counter" || type === "duration")) {
+    return Math.max(0, entry.num ?? 0);
+  }
   return isHabitDone(type, config, entry) ? 1 : 0;
 }
 
 /** The unit a habit-sourced goal counts in. */
 export function habitObjectiveUnit(type: HabitType, config: HabitConfig): string {
+  if (isAvoid(config)) return "days";
   if (type === "counter") return config.unit ?? "times";
   if (type === "duration") return "min";
   return "days";

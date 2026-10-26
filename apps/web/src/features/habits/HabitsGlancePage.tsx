@@ -157,7 +157,7 @@ function HabitCard({
         <p className="text-right">
           <span className="font-display text-3xl tabular-nums">{pct(s.rate)}</span>
           <span className="block text-xs text-court-500">
-            {s.completed}/{s.scheduled} done
+            {s.completed}/{s.scheduled} {habit.config.direction === "avoid" ? "kept" : "done"}
           </span>
         </p>
       </div>
@@ -185,6 +185,7 @@ function HabitCard({
           suffix={s.bestStreakEnd ? `(to ${shortDate(s.bestStreakEnd)})` : ""}
         />
         {s.bonus > 0 && <Fact label="Bonus days" value={String(s.bonus)} />}
+        {habit.config.direction === "avoid" && <Fact label="Slips" value={String(s.slips)} />}
       </dl>
 
       <DayStrip days={s.days} range={range} today={today} />

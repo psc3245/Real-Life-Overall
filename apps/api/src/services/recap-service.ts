@@ -8,6 +8,7 @@ import {
   groupProgress,
   HABIT_TYPE_LABELS,
   isDayHabitDone,
+  isAvoid,
   isHabitDone,
   leafValuesFromEvents,
   MAX_RECAPS_PER_DAY,
@@ -38,8 +39,33 @@ import * as userRepo from "../repos/user-repo";
 import { loadLeafContext } from "./habit-service";
 import { normalizePrompts, normalizeRecapChanges } from "./recap-changes";
 
-function describeEntry({ habit, entry }: DayHabitDto): string {
+/** Avoid habits read as kept or slipped; with no entry, nothing was reported (weak evidence). */
+function describeAvoidEntry({ habit, entry }: DayHabitDto): string {
   const { config } = habit;
+  if (!entry) return "no slip logged";
+  const kept = isHabitDone(habit.type, config, entry);
+  const limit = (unit: string) => ` (limit ${config.target} ${unit})`;
+  switch (habit.type) {
+    case "checkbox":
+      return kept ? "avoided" : "slipped";
+    case "checknote":
+      return `${kept ? "avoided" : "slipped"}${entry.text ? ` — "${entry.text}"` : ""}`;
+    case "counter":
+      return `${kept ? "kept" : "slipped"}: ${entry.num} ${config.unit}${limit(config.unit ?? "")}`;
+    case "duration":
+      return `${kept ? "kept" : "slipped"}: ${entry.num} min${limit("min")}`;
+    case "slider":
+    case "rating":
+      return `${kept ? "kept" : "slipped"}: ${entry.num} (stay at or below ${config.target})`;
+    default:
+      return kept ? "kept" : `slipped — "${entry.text}"`;
+  }
+}
+
+function describeEntry(item: DayHabitDto): string {
+  const { habit, entry } = item;
+  const { config } = habit;
+  if (isAvoid(config)) return describeAvoidEntry(item);
   if (!entry) return "not logged";
   const done = isHabitDone(habit.type, config, entry) ? ", done" : "";
   switch (habit.type) {
@@ -83,6 +109,7 @@ function describeBody(body: DayBodyDto, units: UnitSystem): string | null {
 
 function describeGoal({ habit }: DayHabitDto): string {
   const { config } = habit;
+  if (isAvoid(config)) return ", trying to avoid";
   if (habit.type === "counter") return `, goal ${config.target} ${config.unit}`;
   if (habit.type === "duration") return `, goal ${config.target} min`;
   return "";
@@ -111,7 +138,7 @@ export function renderDay(
 ): string {
   const line = (h: DayHabitDto, indent = "") => {
     const builds = h.habit.links.map((id) => refById.get(id)).filter(Boolean);
-    const missed = !h.entry && h.scheduled ? ", scheduled today" : "";
+    const missed = !h.entry && h.scheduled && !isAvoid(h.habit.config) ? ", scheduled today" : "";
     return (
       `${indent}- ${h.habit.name} (${HABIT_TYPE_LABELS[h.habit.type].toLowerCase()}${describeGoal(h)}): ` +
       `${describeEntry(h)}${missed}.${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`

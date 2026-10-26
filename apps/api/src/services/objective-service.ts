@@ -1,5 +1,8 @@
 import {
+  addDays,
   habitContribution,
+  isAvoid,
+  isSlip,
   habitObjectiveUnit,
   localDateIn,
   objectiveProgress,
@@ -32,6 +35,7 @@ async function dailyAmounts(
   db: Database,
   rows: ObjectiveRow[],
   habits: HabitRow[],
+  today: string,
 ): Promise<Map<string, Map<string, number>>> {
   const out = new Map(rows.map((r) => [r.id, new Map<string, number>()]));
   const manual = rows.filter((r) => r.source === "manual");
@@ -56,6 +60,20 @@ async function dailyAmounts(
       const habit = habitById.get(r.habitId!);
       if (!habit) continue;
       const daily = out.get(r.id)!;
+      const config = habit.config as HabitConfig;
+      if (isAvoid(config)) {
+        // Every day without a slip counts, logged or not ("30 days without smoking").
+        const slipped = new Set(
+          entries
+            .filter((e) => e.habitId === habit.id)
+            .filter((e) => isSlip(habit.type, config, { num: e.valueNum, text: e.valueText }))
+            .map((e) => e.localDate),
+        );
+        const from = r.startsOn > habit.startsOn ? r.startsOn : habit.startsOn;
+        const to = r.endsOn < today ? r.endsOn : today;
+        for (let d = from; d <= to; d = addDays(d, 1)) if (!slipped.has(d)) daily.set(d, 1);
+        continue;
+      }
       for (const e of entries) {
         if (e.habitId !== habit.id) continue;
         const amount = habitContribution(habit.type, habit.config as HabitConfig, {
@@ -85,7 +103,7 @@ async function toDtos(
       db,
       rows.map((r) => r.id),
     ),
-    dailyAmounts(db, rows, habits),
+    dailyAmounts(db, rows, habits, today),
   ]);
   const habitById = new Map(habits.map((h) => [h.id, h]));
   const dtos = rows.map((r): ObjectiveDto => ({

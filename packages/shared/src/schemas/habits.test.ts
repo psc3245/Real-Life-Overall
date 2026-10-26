@@ -5,7 +5,9 @@ import {
   groupProgress,
   isDayHabitDone,
   isGroupDone,
+  isEntryDone,
   isHabitDone,
+  isSlip,
   normalizeHabitConfig,
   validateHabitEntry,
 } from "./habits";
@@ -33,6 +35,7 @@ describe("normalizeHabitConfig", () => {
       unit: "pages",
       min: null,
       max: null,
+      direction: "build",
     });
     expect(normalizeHabitConfig("duration", {})).toMatchObject({ target: 30 });
     expect(normalizeHabitConfig("slider", { min: 5, max: 2 })).toMatchObject({ min: 0, max: 10 });
@@ -42,6 +45,7 @@ describe("normalizeHabitConfig", () => {
       unit: null,
       min: null,
       max: null,
+      direction: "build",
     });
   });
 });
@@ -139,5 +143,49 @@ describe("habit groups", () => {
     expect(isDayHabitDone(group("count", 3))).toBe(false);
     expect(isGroupDone(normalizeHabitConfig("group"), [])).toBe(false);
     expect(groupProgress(group("count", 2))).toBe("2/3 · need 2");
+  });
+});
+
+describe("avoid habits", () => {
+  const avoid = (type: Parameters<typeof normalizeHabitConfig>[0], config = {}) =>
+    normalizeHabitConfig(type, { direction: "avoid", ...config });
+
+  it("allow a zero limit and default thresholds for scales", () => {
+    expect(avoid("counter")).toMatchObject({ direction: "avoid", target: 0, unit: "times" });
+    expect(avoid("counter", { target: 2, unit: "coffees" }).target).toBe(2);
+    expect(avoid("slider", { min: 0, max: 10 }).target).toBe(5);
+    expect(avoid("rating", { max: 5 }).target).toBe(2);
+    expect(normalizeHabitConfig("counter", { target: 0 }).target).toBe(1); // goals can't be 0
+    expect(normalizeHabitConfig("group", { direction: "avoid" }).direction).toBeUndefined();
+  });
+
+  it("are kept unless an entry crosses the line", () => {
+    const check = avoid("checkbox");
+    expect(isEntryDone("checkbox", check, null)).toBe(true);
+    expect(isEntryDone("checkbox", check, { num: 0, text: null })).toBe(true);
+    expect(isEntryDone("checkbox", check, { num: 1, text: null })).toBe(false);
+    expect(isSlip("checkbox", check, { num: 1, text: null })).toBe(true);
+    expect(isSlip("checkbox", check, null)).toBe(false);
+
+    const coffee = avoid("counter", { target: 2 });
+    expect(isHabitDone("counter", coffee, { num: 2, text: null })).toBe(true);
+    expect(isHabitDone("counter", coffee, { num: 3, text: null })).toBe(false);
+
+    const slips = avoid("journal");
+    expect(isEntryDone("journal", slips, { num: null, text: "Had a cigarette" })).toBe(false);
+    // Build habits still need an entry.
+    expect(isEntryDone("checkbox", normalizeHabitConfig("checkbox"), null)).toBe(false);
+  });
+
+  it("format entries as kept or slipped", () => {
+    expect(formatHabitEntry("checkbox", avoid("checkbox"), { num: 1, text: null })).toBe(
+      "✗ slipped",
+    );
+    expect(
+      formatHabitEntry("counter", avoid("counter", { target: 2, unit: "coffees" }), {
+        num: 3,
+        text: null,
+      }),
+    ).toBe("3/≤2 coffees");
   });
 });

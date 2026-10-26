@@ -302,6 +302,12 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 - **Ratings:** daily recaps see the day's workouts (exercises, sets, best set, records) as concrete fitness and sport evidence, and logged weight and height as context only (the prompt forbids judging body weight). A finished workout alone counts as logging the day; editing or deleting one marks its day stale.
 - Screens: `/workouts` (start, templates), `/workouts/active`, `/workouts/history`, `/workouts/:id`, `/workouts/templates/:id`, `/workouts/exercises(/:id)`, `/body`; Workouts and Body sections in the day log; units and tracking in settings.
 
+### 7.6 Avoid habits (added 2026-10-25)
+- Every habit type except groups can be **build** (do it) or **avoid** (don't). The direction lives in `habits.config.direction` (missing = build), is chosen at creation and fixed afterwards like the type, since it changes what past entries mean.
+- **Kept vs slipped:** an avoid habit is kept on a day unless its entry crosses the line: checkbox/checknote marked "Slipped" (an explicit "Avoided" is stored as 0), counter or duration over the daily limit (which may be 0), slider or stars above the chosen line, or any text written on a short-answer/journal avoid habit (those log slips). **A day with no entry counts as kept**, so streaks run until a slip.
+- Stats count kept days as done and add a slip count. Goals that count an avoid habit count kept days, logged or not ("30 days smoke-free"). Decay, badges and weekly summaries only see logged entries, so unreported days aren't evidence.
+- Recaps read avoid habits as avoided / kept / slipped with the limit; "no slip logged" is weak evidence the model is told to credit lightly.
+
 ---
 
 ## 8. Architecture
@@ -558,7 +564,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Goals with a deadline, short and long term (§7.4)
 - [x] Workout logging with unlimited templates, records and a generic set model for lifting and sport (§7.5)
 - [x] Optional height and weight tracking, units setting (§7.5)
-- [ ] iOS app parity for goals, workouts and body tracking
+- [x] Avoid habits: a build/avoid direction for every habit type (§7.6)
+- [ ] iOS app parity for goals, workouts, body tracking and avoid habits
 
 ---
 
