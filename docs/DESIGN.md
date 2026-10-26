@@ -467,7 +467,9 @@ embed(texts: string[], ctx): Promise<number[][]>
 - Passwords use WebCrypto PBKDF2-SHA256 (`PASSWORD_HASH_ITERATIONS`, default 100k) instead of Better Auth's JS scrypt, to stay within Workers CPU limits. *Verify sign-in CPU time on the free plan at first deploy.*
 - **iOS app:** the `@better-auth/expo` plugin on both sides. The app sends its scheme (`rlo://`, a trusted origin) in an `expo-origin` header, keeps the session cookie in the Keychain (SecureStore) and attaches it as a `Cookie` header on API calls; it talks to the API directly rather than through the web origin.
 - `AUTH_MODE=dev` (the `x-dev-user` header) remains for tests and local experiments and is refused in production.
-- *Later:* email verification and password reset need an email provider (e.g. Resend).
+- **Email confirmation** (Resend, decided 2026-10-26): email + password accounts can't sign in until they click the link emailed at sign-up (valid 24h). Signing in unconfirmed re-sends it; the link signs the browser in and lands on `/signin?next=…`, which forwards to onboarding. Google accounts arrive confirmed. Accounts created before this were marked confirmed (migration 0026).
+- **Password reset**: `/forgot-password` emails a one-time link (valid 1h, same reply whether or not the email has an account) to `/reset-password?token=…`. Resetting revokes every existing session. The iOS app requests the email and the link opens on the website.
+- Emails go through Resend's HTTP API (`RESEND_API_KEY`, sender `EMAIL_FROM` on a verified domain). Without a key the email, link included, is printed to the wrangler console; production refuses to boot without one.
 
 ### 8.6 Scheduled jobs (Cloudflare Cron Triggers)
 One hourly Cron Trigger (`runHourly` in `services/scheduler.ts`) visits every user with an active season and, in order:
@@ -594,6 +596,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] First season created (current quarter, in the user's timezone)
 - [x] Calibration rubric and fixture-based sanity tests for prompt output parsing
 - [x] **Auth: Better Auth with email + password and Google (§8.5)**
+- [x] Email confirmation and password reset by email (Resend, §8.5)
 
 ### Phase 2: The Core Loop
 - [x] Day log: journal, habits (8 types, weekday schedules), backfill window (3 days)
@@ -658,7 +661,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 ---
 
 ## 13. Open Questions
-1. ~~**Auth provider**~~ Decided: Better Auth (§8.5). Still open: email provider for verification and password reset.
+1. ~~**Auth provider**~~ Decided: Better Auth (§8.5), with Resend for confirmation and reset emails.
 2. **Name and brand.**
 3. **Sanity caps vs "LLM fully decides":** are wide caps (e.g. ±3/day, ±5/week per leaf) acceptable as anti-abuse rails?
 4. **Rating disputes:** can a user contest an initial rating or a recap change? If so, how (ask the LLM to reconsider with more info, rate-limited)?

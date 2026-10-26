@@ -2,11 +2,14 @@ import type { UserRole } from "@rlo/shared";
 import type { Database } from "./db/client";
 import type { Env } from "./env";
 import type { Auth } from "./auth/auth";
+import type { Mailer } from "./auth/email";
 import type { LlmClient } from "./llm/client";
 
 export interface Deps {
   db: Database;
   llm: LlmClient;
+  /** Overrides the env-configured mailer (tests capture emails with it). */
+  mailer?: Mailer;
   /** Releases per-request resources (e.g. the Neon pool) after the response. */
   dispose?: () => Promise<void>;
 }

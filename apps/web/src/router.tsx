@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
+import { ForgotPasswordPage, ResetPasswordPage } from "./features/auth/PasswordResetPages";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
 import { AdminPage } from "./features/admin/AdminPage";
 import { FeatureGate } from "./components/FeatureGate";
@@ -73,6 +74,8 @@ export const router = createBrowserRouter([
       },
       { path: "signin", element: <AuthPage mode="signin" /> },
       { path: "signup", element: <AuthPage mode="signup" /> },
+      { path: "forgot-password", element: <ForgotPasswordPage /> },
+      { path: "reset-password", element: <ResetPasswordPage /> },
       {
         path: "onboarding",
         element: (
