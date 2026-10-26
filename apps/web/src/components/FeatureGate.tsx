@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { usePreferences, useSetPreferences } from "../api/preferences";
 import { FEATURE_INFO } from "../features/settings/featureInfo";
+import { preferencesLink } from "../features/settings/PreferencesModal";
 import { Button } from "./Button";
 
 /** Renders its page only while the feature is switched on in settings. */
@@ -22,7 +23,7 @@ export function FeatureGate({ feature, children }: { feature: Feature; children:
         >
           Turn it on
         </Button>
-        <Link to="/settings#configuration" className="text-sm text-neon hover:underline">
+        <Link to={preferencesLink("configuration")} className="text-sm text-neon hover:underline">
           Configuration →
         </Link>
       </div>

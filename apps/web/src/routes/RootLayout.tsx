@@ -8,6 +8,7 @@ import { useFriends } from "../api/social";
 import { Button } from "../components/Button";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
 import { TimezoneSync } from "../components/TimezoneSync";
+import { PreferencesModal } from "../features/settings/PreferencesModal";
 import type { Feature, Preferences } from "@rlo/shared";
 
 const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
@@ -99,6 +100,7 @@ export function RootLayout() {
       <main className="flex-1 pb-16">
         <Outlet />
       </main>
+      {auth.signedIn && <PreferencesModal />}
       <DebugPanel />
     </div>
   );

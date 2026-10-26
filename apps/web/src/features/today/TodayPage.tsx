@@ -28,6 +28,7 @@ import {
   statusTone,
 } from "../goals/ObjectiveProgress";
 import { FocusCard } from "./FocusCard";
+import { preferencesLink } from "../settings/PreferencesModal";
 import { formatElapsed, formatVolume } from "../workouts/format";
 import { dayLabel, longDate } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
@@ -99,7 +100,7 @@ export function TodayPage() {
           <p className="mt-1 text-sm uppercase tracking-wider text-court-500">
             {STATUS_LABEL[d.status]}
             <Link
-              to="/settings#today"
+              to={preferencesLink("today")}
               className="ml-3 normal-case tracking-normal text-court-500 hover:text-neon"
             >
               Customize
@@ -122,7 +123,7 @@ export function TodayPage() {
       {shown.length === 0 ? (
         <p className="rounded-xl border border-dashed border-court-700 p-8 text-center text-court-500">
           Every widget is hidden.{" "}
-          <Link to="/settings#today" className="text-neon hover:underline">
+          <Link to={preferencesLink("today")} className="text-neon hover:underline">
             Choose what Today shows
           </Link>
         </p>

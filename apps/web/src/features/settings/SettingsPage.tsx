@@ -15,11 +15,8 @@ import { CopyLink } from "../social/CopyLink";
 import { VISIBILITY_LABEL } from "../social/ProfilePage";
 import { fieldClass } from "../../components/form";
 import { DebugJson } from "../../components/debug/Debug";
-import { SectionNav } from "../../components/SectionNav";
 import { useHashScroll } from "../../components/useHashScroll";
-import { ConfigurationSection } from "./ConfigurationSection";
-import { PersonalizationSection } from "./PersonalizationSection";
-import { TodaySettings } from "./TodaySettings";
+import { preferencesLink } from "./PreferencesModal";
 
 const VISIBILITY_DETAIL: Record<ProfileVisibility, string> = {
   private: "Nobody else can open your profile.",
@@ -27,36 +24,28 @@ const VISIBILITY_DETAIL: Record<ProfileVisibility, string> = {
   public: "Anyone with your link can see your card, signed in or not.",
 };
 
-const SECTIONS = [
-  { id: "profile", label: "Profile" },
-  { id: "personalization", label: "Personalization" },
-  { id: "today", label: "Today page" },
-  { id: "configuration", label: "Configuration" },
-  { id: "units", label: "Units" },
-  { id: "sharing", label: "Sharing" },
-];
-
 export function SettingsPage() {
   const me = useMe();
   useHashScroll(me.isSuccess);
   if (me.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
   if (me.isError) return <ErrorNote error={me.error} />;
   return (
-    <div className="mx-auto max-w-2xl space-y-10 pt-4">
+    <div className="mx-auto max-w-xl space-y-10 pt-4">
       <h1 className="font-display text-4xl font-bold uppercase">Settings</h1>
-      <SectionNav sections={SECTIONS} />
-      <div id="profile" className="scroll-mt-16">
-        <ProfileForm me={me.data} />
-      </div>
-      <div id="personalization" className="scroll-mt-16">
-        <PersonalizationSection />
-      </div>
-      <div id="today" className="scroll-mt-16">
-        <TodaySettings />
-      </div>
-      <div id="configuration" className="scroll-mt-16">
-        <ConfigurationSection />
-      </div>
+      <ProfileForm me={me.data} />
+      <Link
+        to={preferencesLink()}
+        className="flex items-center justify-between gap-3 rounded-lg border border-court-700 px-4 py-3 hover:border-neon"
+      >
+        <span>
+          <span className="block font-medium">Personalize</span>
+          <span className="block text-sm text-court-500">
+            Theme, colors and fonts, the Today page, and which parts of the app are on. Also on your
+            profile page.
+          </span>
+        </span>
+        <span className="text-neon">→</span>
+      </Link>
       <div id="units" className="scroll-mt-16">
         <TrackingSettings me={me.data} />
       </div>
