@@ -26,6 +26,7 @@ import { GuidedPrompts } from "./GuidedPrompts";
 import { HabitEntryInput } from "./HabitEntryInput";
 import { RecapPanel } from "./RecapPanel";
 import { weekdayDate } from "../../lib/format";
+import { DebugId, DebugJson } from "../../components/debug/Debug";
 
 function dayTitle(date: string, today: string) {
   if (date === today) return "Today";
@@ -126,6 +127,7 @@ export function LogPage() {
       <div id="recap" className="scroll-mt-16">
         <RecapPanel day={d} />
       </div>
+      <DebugJson label="day (DayDto)" data={d} />
     </div>
   );
 }
@@ -270,6 +272,7 @@ function HabitRow({
         <div className="min-w-0">
           <p className="font-medium">
             {habit.name}
+            <DebugId id={habit.id} />
             {isAvoid(habit.config) && (
               <span className="ml-2 rounded bg-flare/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-flare">
                 Avoid

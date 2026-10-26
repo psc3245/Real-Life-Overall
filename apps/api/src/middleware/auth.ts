@@ -22,6 +22,7 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
       (await userRepo.findByAuthSubject(db, session.user.id)) ??
       (await userRepo.createForAuth(db, session.user));
     c.set("userId", user.id);
+    c.set("role", user.role);
     await next();
     return;
   }
@@ -32,6 +33,16 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   }
   const user = await userRepo.findOrCreateDevUser(c.get("db"), username);
   c.set("userId", user.id);
+  c.set("role", user.role);
+  await next();
+});
+
+/**
+ * Admin-only routes (DESIGN.md §8.7); runs after requireUser. Non-admins get a 404 so the routes
+ * don't advertise themselves.
+ */
+export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.get("role") !== "admin") throw new HTTPException(404, { message: "Not found" });
   await next();
 });
 

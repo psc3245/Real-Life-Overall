@@ -5,14 +5,20 @@ import { useEndDay } from "../../api/days";
 import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
 import { Delta } from "../../components/Delta";
+import { useRecapDebug } from "../../api/admin";
+import { DebugFacts, DebugJson } from "../../components/debug/Debug";
+import { useDebug } from "../../components/debug/debugMode";
 import { ErrorNote } from "../onboarding/ErrorNote";
 
 const WORKING = ["Reading your day…", "Weighing the evidence…", "Updating your ratings…"];
 
+/** Mirrors the API's check (recap-service hasContent). */
 function hasContent(day: DayDto) {
   return (
     day.journal.trim() !== "" ||
-    day.habits.some((h) => h.entry) ||
+    day.habits.some((h) => h.entry || h.children?.some((c) => c.entry)) ||
+    day.objectives.some((o) => o.logged !== null) ||
+    day.workouts.length > 0 ||
     day.prompts.some((p) => p.answer?.trim())
   );
 }
@@ -71,7 +77,37 @@ export function RecapPanel({ day }: { day: DayDto }) {
         </div>
       )}
       <RecapCard recap={day.recap} />
+      <RecapDebug recapId={day.recap.id} />
     </section>
+  );
+}
+
+/** Admins: the stored model output, prompt version, re-runs and the LLM call behind it. */
+function RecapDebug({ recapId }: { recapId: string }) {
+  const debug = useDebug();
+  const data = useRecapDebug(recapId, debug);
+  const d = data.data;
+  return (
+    <DebugJson label="recap model output" data={d?.output}>
+      {data.isPending && <p className="text-court-500">Loading…</p>}
+      <ErrorNote error={data.error} />
+      {d && (
+        <DebugFacts
+          facts={{
+            id: d.id.slice(0, 8),
+            prompt: d.promptVersion,
+            status: d.status,
+            runs: d.runs.length,
+            ...(d.calls[0] && {
+              model: d.calls[0].model,
+              tokens: `${d.calls[0].inputTokens ?? "?"}/${d.calls[0].outputTokens ?? "?"}`,
+              ms: d.calls[0].latencyMs.toLocaleString(),
+              cost: d.calls[0].costUsd !== null ? `$${d.calls[0].costUsd.toFixed(5)}` : "—",
+            }),
+          }}
+        />
+      )}
+    </DebugJson>
   );
 }
 

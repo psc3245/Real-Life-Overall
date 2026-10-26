@@ -9,6 +9,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { CategoryChips, filterExercises, NewExerciseForm } from "./ExercisePicker";
 import { since } from "./format";
 import { WorkoutsNav } from "./WorkoutsNav";
+import { DebugJson } from "../../components/debug/Debug";
 
 /** The exercise library: built-ins plus custom ones, with how often each was done. */
 export function ExercisesPage() {
@@ -71,6 +72,7 @@ export function ExercisesPage() {
           <li className="px-4 py-6 text-center text-sm text-court-500">No matches.</li>
         )}
       </ul>
+      <DebugJson label="exercises" data={exercises.data} />
       <Modal open={creating} onClose={() => setCreating(false)} label="New exercise">
         <h2 className="mb-4 font-display text-xl uppercase tracking-wider">New exercise</h2>
         <NewExerciseForm initialName={query} onCreated={() => setCreating(false)} />

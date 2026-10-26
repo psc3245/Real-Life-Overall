@@ -25,6 +25,7 @@ import {
 } from "../goals/ObjectiveProgress";
 import { FocusCard } from "./FocusCard";
 import { dayLabel, longDate } from "../../lib/format";
+import { DebugJson } from "../../components/debug/Debug";
 
 const STATUS_LABEL: Record<DayDto["status"], string> = {
   open: "Not recapped yet",
@@ -93,6 +94,7 @@ export function TodayPage() {
       ) : (
         <YesterdayCard today={d.today} />
       )}
+      <DebugJson label="day (DayDto)" data={d} />
     </div>
   );
 }

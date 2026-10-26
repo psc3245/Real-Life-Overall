@@ -13,6 +13,7 @@ import { Modal } from "../../components/Modal";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { since } from "./format";
 import { WorkoutsNav } from "./WorkoutsNav";
+import { DebugJson } from "../../components/debug/Debug";
 
 /** Start a workout: resume the one in progress, start empty, or start from a template. */
 export function StartWorkoutPage() {
@@ -93,6 +94,10 @@ export function StartWorkoutPage() {
         </div>
       </section>
 
+      <DebugJson
+        label="templates + active"
+        data={{ templates: templates.data, active: active.data }}
+      />
       <Modal open={preview !== null} onClose={() => setPreview(null)} label="Template">
         {preview && (
           <TemplatePreview

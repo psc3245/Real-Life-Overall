@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CATEGORY_TEMPLATES } from "../templates";
 import type { UnitSystem } from "../units";
+import type { UserRole } from "./admin";
 import type { BadgeTier } from "./badges";
 
 /**
@@ -50,6 +51,7 @@ export interface MeDto {
   unitSystem: UnitSystem;
   trackWeight: boolean;
   trackHeight: boolean;
+  role: UserRole;
   createdAt: string;
 }
 

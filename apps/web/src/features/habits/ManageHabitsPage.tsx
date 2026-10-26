@@ -6,6 +6,7 @@ import { useRatings } from "../../api/ratings";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { HabitEditor } from "./HabitEditor";
+import { DebugId } from "../../components/debug/Debug";
 
 export function scheduleLabel(days: number[]) {
   if (days.length === 7) return "Every day";
@@ -33,7 +34,10 @@ export function ManageHabitsPage() {
   const row = (h: HabitDto) => (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-court-700 bg-court-900/70 p-4">
       <div className="min-w-0">
-        <p className="font-medium">{h.name}</p>
+        <p className="font-medium">
+          {h.name}
+          <DebugId id={h.id} />
+        </p>
         <p className="text-sm text-court-500">
           {h.config.direction === "avoid" && <span className="text-flare">Avoid · </span>}
           {HABIT_TYPE_LABELS[h.type]}

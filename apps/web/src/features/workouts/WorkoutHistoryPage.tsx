@@ -12,6 +12,7 @@ import { dayLabel } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { formatElapsed, formatVolume } from "./format";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
+import { DebugJson } from "../../components/debug/Debug";
 
 export function WorkoutHistoryPage() {
   const history = useWorkoutHistory();
@@ -45,6 +46,7 @@ export function WorkoutHistoryPage() {
           <WorkoutCard key={w.id} workout={w} byId={byId} units={units} />
         ))}
       </div>
+      <DebugJson label="history pages" data={history.data?.pages} />
       {history.hasNextPage && (
         <div className="text-center">
           <Button

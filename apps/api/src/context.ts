@@ -1,3 +1,4 @@
+import type { UserRole } from "@rlo/shared";
 import type { Database } from "./db/client";
 import type { Env } from "./env";
 import type { Auth } from "./auth/auth";
@@ -13,5 +14,5 @@ export interface Deps {
 /** Hono generics shared by every route module. */
 export interface AppEnv {
   Bindings: Record<string, unknown>;
-  Variables: Omit<Deps, "dispose"> & { env: Env; userId: string; auth?: Auth };
+  Variables: Omit<Deps, "dispose"> & { env: Env; userId: string; role?: UserRole; auth?: Auth };
 }

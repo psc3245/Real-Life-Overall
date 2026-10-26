@@ -23,6 +23,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { formatElapsed, formatVolume } from "./format";
 import { WorkoutEditor } from "./WorkoutEditor";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
+import { DebugId, DebugJson } from "../../components/debug/Debug";
 
 /** A finished workout: summary, records, and editing. */
 export function WorkoutPage() {
@@ -53,7 +54,10 @@ function FinishedWorkout({ workout: w }: { workout: WorkoutDto }) {
         )}
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-neon">{longDate(w.localDate)}</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">{w.name}</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+            {w.name}
+            <DebugId id={w.id} />
+          </h1>
         </div>
       </header>
 
@@ -94,6 +98,7 @@ function FinishedWorkout({ workout: w }: { workout: WorkoutDto }) {
             ))}
           </div>
           <Actions workout={w} onEdit={() => setEditing(true)} />
+          <DebugJson label="workout (WorkoutDto)" data={w} />
         </>
       )}
     </div>
