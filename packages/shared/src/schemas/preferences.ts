@@ -67,6 +67,7 @@ export const FEATURES = [
   "reports",
   "history",
   "focus",
+  "adaptiveRating",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

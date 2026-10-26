@@ -3,6 +3,13 @@ import { addDays, dayOfWeek } from "../dates";
 import { HABIT_TYPES, type HabitType } from "./habits";
 import type { EarnedBadgeDto } from "./badges";
 import type { RecapChangeDto } from "./recaps";
+import { scoutingReportOutputSchema } from "./scouting-report";
+import {
+  treeChangeOutputSchema,
+  weightShiftsOutputSchema,
+  type TreeProposalDto,
+  type WeightChangeDto,
+} from "./tree-evolution";
 
 /** Largest weekly correction to one attribute (DESIGN.md §5.6). */
 export const WEEKLY_DELTA_CAP = 5;
@@ -67,6 +74,10 @@ export interface WeeklyReviewDto {
   badges: EarnedBadgeDto[];
   /** Set when this review renamed the archetype. */
   archetypeChange: { from: string | null; to: string; description: string } | null;
+  /** Weights this review shifted (DESIGN.md §4.5). */
+  weightShifts: WeightChangeDto[];
+  /** A tree change this review proposed, if any. */
+  treeProposal: TreeProposalDto | null;
   createdAt: string;
 }
 
@@ -149,4 +160,9 @@ export const weeklyReviewOutputSchema = z.object({
     })
     .nullable()
     .describe("Only for a genuinely notable, specific achievement this week; usually null"),
+  scoutingReport: scoutingReportOutputSchema.describe(
+    "The updated Scouting Report: keep what still holds, add what this week revealed",
+  ),
+  weightShifts: weightShiftsOutputSchema,
+  treeChange: treeChangeOutputSchema,
 });

@@ -2,7 +2,7 @@
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
 > **Status:** In development: Phases 0–4 built, web refinements done, iOS app started. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
-> **Last updated:** 2026-10-25
+> **Last updated:** 2026-10-26
 
 ---
 
@@ -34,7 +34,8 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Scale | **0–100 with decimals** (e.g. 74.3). |
 | Overall calculation | Weighted roll-up. **User and LLM collaborate** on weights: the LLM proposes and the user adjusts. |
 | Categories | **Templates + custom.** |
-| Category edits | **Only at season start.** The structure is locked for the season. |
+| Category edits | **Mostly at season start.** Mid-season the tree changes only through weekly-review proposals the user accepts (at most one every 4 weeks), decided 2026-10-26 (§4.5). |
+| Weight evolution | **Automatic, small steps** with an undo history: weekly reviews shift weights toward what the Scouting Report says matters (decided 2026-10-26, §4.5). |
 | Inputs (eventual) | Free-text daily journal, habit check-ins, LLM-guided prompts, photos and voice notes. |
 | Update cadence | **Daily recap + weekly review.** |
 | LLM authority | **LLM fully decides** deltas. Code enforces only hard invariants and wide anti-abuse rails (§5.6). |
@@ -92,6 +93,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | **Pause** | A user-declared period (vacation or injury) during which decay doesn't apply. |
 | **Archetype** | The LLM-assigned build label for the user's attribute profile. |
 | **Potential** | The user's goal rating plus the LLM's projected end-of-season rating. |
+| **Scouting Report** | The structured picture of what the player wants out of life (aspirations, priorities, focuses, constraints) that the tree is tuned against (§5.8). Not to be confused with the onboarding "scouting" questionnaire. |
 
 ---
 
@@ -112,7 +114,7 @@ Overall (depth 0, computed)
 - The default template shape is Overall → Category → Attribute (2K-style).
 - Max depth is **3 below Overall**. Keep it as a named constant (`MAX_RATING_DEPTH = 3`) in `packages/shared`.
 - A category with no children is itself a leaf. That's allowed, though templates always give attributes.
-- **The structure is locked during a season.** Add, remove, rename and reweight only happen during season setup (first onboarding or a new season). *Open question: are typo-only renames allowed mid-season? (§13)*
+- **The structure is mostly locked during a season.** Renames and free-form edits only happen during season setup (first onboarding or a new season). Mid-season, weekly reviews may propose adding or removing a category or attribute, which applies only if the user accepts it (§4.5). *Open question: are typo-only renames allowed mid-season? (§13)*
 
 ### 4.2 Values
 - Scale is **0–100**, stored as `numeric(5,2)`. Display rules:
@@ -124,7 +126,7 @@ Overall (depth 0, computed)
 ### 4.3 Weights
 - During onboarding the LLM proposes weights per sibling group, based on the questionnaire and the user's stated priorities. The user adjusts them with sliders.
 - Weights are normalized within each sibling group, so they don't need to sum to 1 in storage.
-- Weights are locked for the season like the rest of the structure.
+- Weights start the season where the user set them, then evolve in small automatic steps from weekly reviews (§4.5).
 
 ### 4.4 Why a ledger (event-sourced ratings)
 - **Explainability**: every change has a reason row, which feeds the change feed directly.
@@ -132,6 +134,15 @@ Overall (depth 0, computed)
   - *Known caveat:* later recaps were written when the value was different, so re-runs can drift slightly from what the LLM "would have" done. That's acceptable.
 - **Charts**: history comes from cumulative sums. Nightly snapshots exist only as a read optimization.
 - **Seasons**: each season starts with a recalibration event per leaf.
+
+### 4.5 The tree evolves with the player (added 2026-10-26)
+The tree should measure what the player actually cares about, weighted the way they care about it. The yardstick is the **Scouting Report** (§5.8); the evidence is weeks of behavior: what they write about, the habits and goals they keep, where daily recaps find gains ("days with gains in the last 4 weeks" per attribute goes into the prompt). A low rating in something they care about is a gap, not a reason to shrink it.
+- **Weights shift automatically**, in small steps. Each weekly review may change up to 3 weights (`MAX_WEIGHT_SHIFTS`), each by at most ±15% of its current value (`WEIGHT_SHIFT_CAP`), and a weight stays within half to double its season-start value (`WEIGHT_DRIFT`). Every shift is a `weight_changes` row (from/to weight and share of parent, reason, review). The player can **undo** any shift this season: the weight is scaled back by the same factor, so later shifts still hold.
+- **Tree changes are proposals**, rare by design: at most one every 28 days (`TREE_PROPOSAL_COOLDOWN_DAYS`), none while one is pending, none in a season's last 14 days (season setup covers those). A proposal has 1-3 changes: add a category (with 1-4 attributes), add an attribute to a category that already has attributes, or remove a category or attribute (a category keeps at least one attribute and Overall keeps a category; renames and reshuffles are never proposed). Accepting inserts the nodes (weight = siblings' average), archives removed nodes and their descendants, and rates the new attributes with `season.newLeaves`; if that call fails, accepting again retries it. Dismissing just records it. Pending proposals from an earlier season show as expired.
+- New attributes start their decay clock on the day they're rated (`computeDecay`'s `startedOn`), not at the season's start.
+- Changing weights mid-season changes how history rolls up: charts replay the ledger with current weights, so a category's past Overall contribution is re-weighted too. Accepted as a trade-off.
+- The `adaptiveRating` configuration switch (on by default) turns both off; the review is then told not to shift weights or propose changes.
+- Screens: `/scouting-report` (the report, "Rating shape": share now vs season start per node, weight shifts with undo, tree proposals), plus weight shifts and the proposal on the weekly review card. Routes: `/scouting-report` (GET, PUT), `/weights` (GET, `POST /weights/changes/:id/undo`), `/tree-proposals` (GET, `POST /tree-proposals/:id/accept|dismiss`).
 
 ---
 
@@ -223,6 +234,13 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 ### 5.7 Prompt management
 - Prompts live in `apps/api/src/llm/prompts/` as versioned TypeScript modules. Each prompt has a `version` string that is stored on every `llm_calls` and `recaps` row.
 - Calibration rubrics, persona and tone rules, and anti-gaming instructions are shared prompt fragments.
+
+### 5.8 The Scouting Report (added 2026-10-26)
+A structured picture of what the player wants out of life, stored as `users.scouting_report` (jsonb, read through `parseScoutingReport`, which drops anything malformed):
+- **aspirations** (up to 6): what they want out of life, in their words;
+- **priorities** (up to 10): life areas with importance 1-5, each mapped to the rating node that measures it (by **lineage**, so it survives seasons) or to nothing ("Not in your tree", the main signal for adding a category);
+- **focuses** (up to 5) and **constraints** (up to 5: schedule, injuries, caregiving).
+The weekly review rewrites it each week alongside the profile summary. When the player edited it last (`updatedBy: "user"`), the review keeps their entries and only adds. It feeds weight shifts and tree proposals (§4.5) and, next, the coach chat.
 
 ---
 
@@ -465,6 +483,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `habit_entries` | `habit_id`, `local_date`, `value_num`, `value_text` | |
 | `recaps` | `user_id`, `season_id`, `kind` (`daily`/`weekly`), `period_start`, `period_end`, `narrative`, `output` jsonb, `prompt_version`, `status` (`active`/`superseded`) | One active recap per period. Weekly `output` also holds focus goals, habit proposals, decay revisions, projections and archetype changes |
 | `goals` | `node_id`, `target_value` | User half of Potential |
+| `weight_changes` | `season_id`, `node_id`, `recap_id`, `from_weight`, `to_weight`, `from_share`, `to_share`, `reason`, `reverted_at` | Weekly weight shifts (§4.5) |
+| `tree_proposals` | `season_id`, `recap_id`, `reason`, `changes` jsonb, `status` (`pending`/`accepted`/`dismissed`/`expired`), `resolved_at` | Proposed tree changes (§4.5) |
 | `objectives` | `user_id`, `name`, `unit`, `target`, `starts_on`, `ends_on`, `source` (`manual`/`habit`/`workouts`), `habit_id`, `archived_at` | Goals with a deadline (§7.4) |
 | `workouts` | `user_id`, `name`, `notes`, `local_date`, `started_at`, `ended_at` (null while in progress), `template_id`, `exercises` jsonb | §7.5; one in progress per user |
 | `workout_templates` | `user_id`, `name`, `notes`, `exercises` jsonb, `last_used_at` | No cap |
@@ -597,6 +617,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Charts for everything: metric catalog, chart explorer with trend modeling, saved and pinned charts (§7.7)
 - [x] Reports: chart collections run over any period, with summaries and AI write-ups and suggestions (§7.8)
 - [x] Personalization and configuration: themes, accents, fonts and layout options; switch parts of the app off; a customizable Today page (§7.9)
+- [x] Scouting Report and an evolving tree: automatic capped weight shifts with undo, rare tree change proposals the player accepts (§4.5, §5.8)
+- [ ] Coach chat: ask the scout for advice; it suggests habits and goals you add with one tap
 - [ ] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 
 ---

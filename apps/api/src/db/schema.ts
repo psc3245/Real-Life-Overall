@@ -71,6 +71,8 @@ export const users = pgTable("users", {
   role: userRole().notNull().default("user"),
   /** Personalization and configuration (DESIGN.md §7.9); read through `parsePreferences`. */
   preferences: jsonb().notNull().default({}),
+  /** What the player wants out of life (DESIGN.md §5.8); read through `parseScoutingReport`. */
+  scoutingReport: jsonb().notNull().default({}),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -781,4 +783,59 @@ export const reportRuns = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index().on(t.reportId, t.createdAt), index().on(t.userId, t.createdAt)],
+);
+
+/** Weight shifts made by weekly reviews (DESIGN.md §4.5); the player can undo each one. */
+export const weightChanges = pgTable(
+  "weight_changes",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid()
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    nodeId: uuid()
+      .notNull()
+      .references(() => ratingNodes.id, { onDelete: "cascade" }),
+    recapId: uuid().references(() => recaps.id, { onDelete: "set null" }),
+    fromWeight: numeric({ precision: 8, scale: 4, mode: "number" }).notNull(),
+    toWeight: numeric({ precision: 8, scale: 4, mode: "number" }).notNull(),
+    /** Share of the parent (0-100) before and after, as shown at the time. */
+    fromShare: doublePrecision().notNull(),
+    toShare: doublePrecision().notNull(),
+    reason: text().notNull(),
+    revertedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.seasonId, t.createdAt), index().on(t.recapId)],
+);
+
+export const treeProposalStatus = pgEnum("tree_proposal_status", [
+  "pending",
+  "accepted",
+  "dismissed",
+  "expired",
+]);
+
+/** Tree changes a weekly review proposed (DESIGN.md §4.5). `changes` holds StoredTreeChange[]. */
+export const treeProposals = pgTable(
+  "tree_proposals",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid()
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    recapId: uuid().references(() => recaps.id, { onDelete: "set null" }),
+    reason: text().notNull(),
+    changes: jsonb().notNull(),
+    status: treeProposalStatus().notNull().default("pending"),
+    resolvedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.userId, t.createdAt), index().on(t.recapId)],
 );

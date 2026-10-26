@@ -91,6 +91,9 @@ describe("badges", () => {
         projections: [],
         archetype: null,
         personalBadge: name ? { name, description: "First 10k run." } : null,
+        scoutingReport: { aspirations: [], priorities: [], focuses: [], constraints: [] },
+        weightShifts: [],
+        treeChange: null,
       });
     const t = await createRatedApp([review("Ten-K Club")]);
     await t.db.update(ratingEvents).set({ createdAt: new Date(Date.now() - 14 * 86_400_000) });

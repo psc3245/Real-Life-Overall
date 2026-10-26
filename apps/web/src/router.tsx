@@ -16,6 +16,7 @@ import { WorkoutPage } from "./features/workouts/WorkoutPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { HabitsGlancePage } from "./features/habits/HabitsGlancePage";
 import { ManageHabitsPage } from "./features/habits/ManageHabitsPage";
+import { ScoutingReportPage } from "./features/scouting/ScoutingReportPage";
 import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ComparePage } from "./features/social/ComparePage";
@@ -128,6 +129,14 @@ export const router = createBrowserRouter([
             <Suspense fallback={loading}>
               <ActivityPage />
             </Suspense>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "scouting-report",
+        element: (
+          <RequireAuth>
+            <ScoutingReportPage />
           </RequireAuth>
         ),
       },
