@@ -2,12 +2,13 @@ import {
   ALL_DAYS,
   GROUP_RULE_LABELS,
   GROUP_RULES,
+  HABIT_DIRECTIONS,
   HABIT_TYPE_LABELS,
   HABIT_TYPES,
-  leafIds,
   MAX_HABIT_LINKS,
   normalizeHabitConfig,
   type HabitConfig,
+  type HabitDirection,
   type HabitDto,
   type GroupRule,
   type HabitType,
@@ -17,9 +18,22 @@ import {
 } from "@rlo/shared";
 import { useState, type FormEvent } from "react";
 import { useCreateHabit, useSuggestLinks, useUpdateHabit } from "../../api/days";
+import { AttributePicker } from "../../components/AttributePicker";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { compactFieldClass } from "../../components/form";
+
+/** What "kept" means for an avoid habit, by how it's logged. */
+const AVOID_HELP: Partial<Record<HabitType, string>> = {
+  checkbox: 'Every day counts as kept until you mark a slip. Mark "Avoided" to report a clean day.',
+  checknote: "Every day counts as kept until you mark a slip; add a note about what happened.",
+  counter: "Log how many. Staying at or under the limit keeps the day; a limit of 0 means none.",
+  duration: "Log the minutes. Staying at or under the limit keeps the day.",
+  slider: "Log the level. At or below your line keeps the day.",
+  rating: "Log the stars. At or below your line keeps the day.",
+  shorttext: "Write down slips only. A day with nothing written counts as kept.",
+  journal: "Write down slips only. A day with nothing written counts as kept.",
+};
 
 export function HabitEditor({
   habit,
@@ -51,18 +65,13 @@ export function HabitEditor({
   const suggest = useSuggestLinks();
   const saving = create.isPending || update.isPending;
 
-  const leaves = new Set(leafIds(nodes));
-  const root = nodes.find((n) => n.parentId === null);
-  const categories = nodes.filter((n) => n.parentId === root?.id);
-  const leavesUnder = (id: string): RatedNodeDto[] =>
-    leaves.has(id)
-      ? nodes.filter((n) => n.id === id)
-      : nodes.filter((n) => n.parentId === id).flatMap((c) => leavesUnder(c.id));
-
+  const avoid = config.direction === "avoid";
   const changeType = (next: HabitType) => {
     setType(next);
-    setConfig(normalizeHabitConfig(next));
+    setConfig(normalizeHabitConfig(next, { direction: config.direction }));
   };
+  const changeDirection = (direction: HabitDirection) =>
+    setConfig(normalizeHabitConfig(type, { ...config, direction, target: null }));
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
   const toggleLink = (id: string) =>
@@ -116,6 +125,29 @@ export function HabitEditor({
       onSubmit={onSubmit}
       className="space-y-6 rounded-xl border border-neon/40 bg-court-900 p-5"
     >
+      {type !== "group" && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs uppercase tracking-wider text-court-300">Goal</legend>
+          <div className="flex flex-wrap gap-2">
+            {HABIT_DIRECTIONS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={(config.direction ?? "build") === d}
+                disabled={Boolean(habit)}
+                onClick={() => changeDirection(d)}
+                className={`rounded-lg border px-3 py-2 text-sm disabled:opacity-60 ${(config.direction ?? "build") === d ? (d === "avoid" ? "border-flare bg-flare/10 text-flare" : "border-neon bg-neon/10 text-neon") : "border-court-700 text-court-300 hover:border-court-500"}`}
+              >
+                {d === "build" ? "Build: do it" : "Avoid: don't do it"}
+              </button>
+            ))}
+          </div>
+          {avoid && (
+            <p className="text-sm text-court-500">{AVOID_HELP[type] ?? AVOID_HELP.checkbox}</p>
+          )}
+        </fieldset>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-[1fr_14rem]">
         <label className="space-y-1">
           <span className="text-xs uppercase tracking-wider text-court-300">Name</span>
@@ -124,7 +156,13 @@ export function HabitEditor({
             maxLength={60}
             required
             autoFocus
-            placeholder={parent ? `e.g. Stretch (in ${parent.name})` : "e.g. Morning run"}
+            placeholder={
+              parent
+                ? `e.g. Stretch (in ${parent.name})`
+                : avoid
+                  ? "e.g. No smoking, Coffee, Social media"
+                  : "e.g. Morning run"
+            }
             onChange={(e) => setName(e.target.value)}
             className={`${compactFieldClass} w-full`}
           />
@@ -152,9 +190,13 @@ export function HabitEditor({
             <>
               <label className="space-y-1">
                 <span className="block text-xs uppercase tracking-wider text-court-300">
-                  Daily goal
+                  {avoid ? "Daily limit (at most)" : "Daily goal"}
                 </span>
-                <input aria-label="Daily goal" min={1} {...num("target")} />
+                <input
+                  aria-label={avoid ? "Daily limit" : "Daily goal"}
+                  min={avoid ? 0 : 1}
+                  {...num("target")}
+                />
               </label>
               <label className="space-y-1">
                 <span className="block text-xs uppercase tracking-wider text-court-300">Unit</span>
@@ -172,9 +214,13 @@ export function HabitEditor({
           {type === "duration" && (
             <label className="space-y-1">
               <span className="block text-xs uppercase tracking-wider text-court-300">
-                Daily goal (min)
+                {avoid ? "Daily limit (min)" : "Daily goal (min)"}
               </span>
-              <input aria-label="Daily goal in minutes" min={1} {...num("target")} />
+              <input
+                aria-label={avoid ? "Daily limit in minutes" : "Daily goal in minutes"}
+                min={avoid ? 0 : 1}
+                {...num("target")}
+              />
             </label>
           )}
           {type === "slider" && (
@@ -193,6 +239,14 @@ export function HabitEditor({
             <label className="space-y-1">
               <span className="block text-xs uppercase tracking-wider text-court-300">Stars</span>
               <input aria-label="Number of stars" min={3} max={10} {...num("max")} />
+            </label>
+          )}
+          {avoid && (type === "slider" || type === "rating") && (
+            <label className="space-y-1">
+              <span className="block text-xs uppercase tracking-wider text-court-300">
+                Stay at or below
+              </span>
+              <input aria-label="Stay at or below" {...num("target")} />
             </label>
           )}
         </div>
@@ -298,30 +352,7 @@ export function HabitEditor({
             <p className="border-l-2 border-neon/60 pl-3 text-sm text-court-300">{reason}</p>
           )}
           <ErrorNote error={suggest.error} />
-          <div className="space-y-2">
-            {categories.map((c) => (
-              <div key={c.id} className="flex flex-wrap items-center gap-1.5">
-                <span className="w-24 shrink-0 truncate text-xs uppercase tracking-wider text-court-500">
-                  {c.name}
-                </span>
-                {leavesUnder(c.id).map((leaf) => (
-                  <button
-                    key={leaf.id}
-                    type="button"
-                    aria-pressed={links.includes(leaf.id)}
-                    onClick={() => toggleLink(leaf.id)}
-                    className={`rounded-full border px-3 py-1 text-sm ${
-                      links.includes(leaf.id)
-                        ? "border-neon bg-neon/15 text-neon"
-                        : "border-court-700 text-court-300 hover:border-court-500"
-                    }`}
-                  >
-                    {leaf.name}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
+          <AttributePicker nodes={nodes} selected={links} onToggle={toggleLink} />
         </fieldset>
       )}
 

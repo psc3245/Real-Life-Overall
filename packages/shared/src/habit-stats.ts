@@ -2,7 +2,8 @@ import { addDays, dayOfWeek } from "./dates";
 import { seasonForDate } from "./season";
 import {
   formatHabitEntry,
-  isHabitDone,
+  isEntryDone,
+  isSlip,
   type HabitDto,
   type HabitEntryValue,
 } from "./schemas/habits";
@@ -32,6 +33,8 @@ export interface HabitStatsDto {
   completed: number;
   /** Done on days it wasn't scheduled. */
   bonus: number;
+  /** Avoid habits: days in the period an entry crossed the line. */
+  slips: number;
   /** Scheduled days still ahead in the period, including today if not done yet. */
   remaining: number;
   /** completed / scheduled, or null with nothing scheduled yet. */
@@ -109,16 +112,17 @@ export function habitStats(
   period: { start: string; end: string },
   today: string,
 ): HabitStatsDto {
-  const isDone = (date: string) => {
-    const entry = entries.get(date);
-    return entry ? isHabitDone(habit.type, habit.config, entry) : false;
-  };
-  const doneDates = new Set([...entries.keys()].filter(isDone));
+  const doneDates = new Set<string>();
+  // Every day counts, not just logged ones: an avoid habit with no entry was kept.
+  for (let d = habit.startsOn; d <= today; d = addDays(d, 1)) {
+    if (isEntryDone(habit.type, habit.config, entries.get(d) ?? null)) doneDates.add(d);
+  }
   const streaks = habitStreaks(habit.startsOn, habit.days, doneDates, today);
 
   let scheduled = 0;
   let completed = 0;
   let bonus = 0;
+  let slips = 0;
   let remaining = 0;
   const values: number[] = [];
   const days: HabitDayStat[] = [];
@@ -135,6 +139,7 @@ export function habitStats(
       value: entry ? formatHabitEntry(habit.type, habit.config, entry) : null,
       future,
     });
+    if (!future && isSlip(habit.type, habit.config, entry)) slips++;
     if (entry && !future) {
       if (AVERAGED.has(habit.type) && entry.num !== null) values.push(entry.num);
       recent.unshift({ date: d, value: formatHabitEntry(habit.type, habit.config, entry) });
@@ -162,6 +167,7 @@ export function habitStats(
     scheduled,
     completed,
     bonus,
+    slips,
     remaining,
     rate: scheduled ? completed / scheduled : null,
     average: values.length

@@ -17,6 +17,12 @@ import { DayPicker } from "../../components/DayPicker";
 import { Delta } from "../../components/Delta";
 import { OvrBadge } from "../../components/OvrBadge";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import {
+  ObjectiveAmount,
+  ObjectiveBar,
+  objectiveStatusText,
+  statusTone,
+} from "../goals/ObjectiveProgress";
 import { FocusCard } from "./FocusCard";
 import { dayLabel, longDate } from "../../lib/format";
 
@@ -70,7 +76,10 @@ export function TodayPage() {
       <MissedRecaps today={d.today} />
 
       <div className="grid gap-6 md:grid-cols-2">
-        <HabitsCard day={d} />
+        <div className="space-y-6">
+          <HabitsCard day={d} />
+          <GoalsCard day={d} />
+        </div>
         <div className="space-y-6">
           {ratings.data && <RatingCard nodes={ratings.data.nodes} />}
           <JournalCard day={d} />
@@ -251,6 +260,49 @@ function RatingCard({ nodes }: { nodes: RatedNodeDto[] }) {
                 {n.name}
               </Link>
               <Delta value={n.trend!} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function GoalsCard({ day }: { day: DayDto }) {
+  const running = day.objectives
+    .filter((o) => o.objective.progress.status === "active")
+    .sort((a, b) => a.objective.endsOn.localeCompare(b.objective.endsOn));
+  const shown = running.slice(0, 4);
+  return (
+    <Card
+      title="Goals"
+      action={
+        <Link to="/goals" className={cardLink}>
+          {running.length > shown.length ? `All ${running.length} →` : "All goals →"}
+        </Link>
+      }
+    >
+      {shown.length === 0 ? (
+        <p className="text-sm text-court-500">
+          No goals running.{" "}
+          <Link to="/goals" className="text-neon hover:underline">
+            Set one
+          </Link>
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {shown.map(({ objective: o }) => (
+            <li key={o.id}>
+              <Link to={`/log#goal-${o.id}`} className="block space-y-1.5 hover:text-neon">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate">{o.name}</span>
+                  <span className="shrink-0 text-sm">
+                    <ObjectiveAmount objective={o} />
+                  </span>
+                </span>
+                <ObjectiveBar objective={o} thin />
+                <span className={`block text-xs ${statusTone(o)}`}>{objectiveStatusText(o)}</span>
+              </Link>
             </li>
           ))}
         </ul>

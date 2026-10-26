@@ -8,11 +8,17 @@ import {
   groupProgress,
   HABIT_TYPE_LABELS,
   isDayHabitDone,
+  isAvoid,
   isHabitDone,
   leafValuesFromEvents,
   MAX_RECAPS_PER_DAY,
   type DayDto,
+  type DayBodyDto,
   type DayHabitDto,
+  type UnitSystem,
+  formatHeight,
+  toDisplayWeight,
+  weightUnit,
   type GuidedPromptDto,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
@@ -33,8 +39,33 @@ import * as userRepo from "../repos/user-repo";
 import { loadLeafContext } from "./habit-service";
 import { normalizePrompts, normalizeRecapChanges } from "./recap-changes";
 
-function describeEntry({ habit, entry }: DayHabitDto): string {
+/** Avoid habits read as kept or slipped; with no entry, nothing was reported (weak evidence). */
+function describeAvoidEntry({ habit, entry }: DayHabitDto): string {
   const { config } = habit;
+  if (!entry) return "no slip logged";
+  const kept = isHabitDone(habit.type, config, entry);
+  const limit = (unit: string) => ` (limit ${config.target} ${unit})`;
+  switch (habit.type) {
+    case "checkbox":
+      return kept ? "avoided" : "slipped";
+    case "checknote":
+      return `${kept ? "avoided" : "slipped"}${entry.text ? ` — "${entry.text}"` : ""}`;
+    case "counter":
+      return `${kept ? "kept" : "slipped"}: ${entry.num} ${config.unit}${limit(config.unit ?? "")}`;
+    case "duration":
+      return `${kept ? "kept" : "slipped"}: ${entry.num} min${limit("min")}`;
+    case "slider":
+    case "rating":
+      return `${kept ? "kept" : "slipped"}: ${entry.num} (stay at or below ${config.target})`;
+    default:
+      return kept ? "kept" : `slipped — "${entry.text}"`;
+  }
+}
+
+function describeEntry(item: DayHabitDto): string {
+  const { habit, entry } = item;
+  const { config } = habit;
+  if (isAvoid(config)) return describeAvoidEntry(item);
   if (!entry) return "not logged";
   const done = isHabitDone(habit.type, config, entry) ? ", done" : "";
   switch (habit.type) {
@@ -55,8 +86,30 @@ function describeEntry({ habit, entry }: DayHabitDto): string {
   }
 }
 
+const formatNumber = (n: number) =>
+  Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "");
+
+function formatVolume(kg: number, units: UnitSystem) {
+  return `${Math.round(toDisplayWeight(kg, units)).toLocaleString("en-US")} ${weightUnit(units)}`;
+}
+
+/** Logged weight (with the change since the last entry) and height, or null if nothing. */
+function describeBody(body: DayBodyDto, units: UnitSystem): string | null {
+  const parts: string[] = [];
+  if (body.weightKg !== null) {
+    const change =
+      body.lastWeightKg !== null
+        ? `, ${formatNumber(toDisplayWeight(body.weightKg - body.lastWeightKg, units))} ${weightUnit(units)} since the last weigh-in`
+        : "";
+    parts.push(`weight ${toDisplayWeight(body.weightKg, units)} ${weightUnit(units)}${change}`);
+  }
+  if (body.heightCm !== null) parts.push(`height ${formatHeight(body.heightCm, units)}`);
+  return parts.length ? parts.join("; ") : null;
+}
+
 function describeGoal({ habit }: DayHabitDto): string {
   const { config } = habit;
+  if (isAvoid(config)) return ", trying to avoid";
   if (habit.type === "counter") return `, goal ${config.target} ${config.unit}`;
   if (habit.type === "duration") return `, goal ${config.target} min`;
   return "";
@@ -71,6 +124,8 @@ export function hasContent(day: DayDto): boolean {
   return (
     day.journal.trim().length > 0 ||
     flatHabits(day).some((h) => h.entry !== null) ||
+    day.objectives.some((o) => o.logged !== null) ||
+    day.workouts.length > 0 ||
     day.prompts.some((p) => p.answer?.trim())
   );
 }
@@ -83,7 +138,7 @@ export function renderDay(
 ): string {
   const line = (h: DayHabitDto, indent = "") => {
     const builds = h.habit.links.map((id) => refById.get(id)).filter(Boolean);
-    const missed = !h.entry && h.scheduled ? ", scheduled today" : "";
+    const missed = !h.entry && h.scheduled && !isAvoid(h.habit.config) ? ", scheduled today" : "";
     return (
       `${indent}- ${h.habit.name} (${HABIT_TYPE_LABELS[h.habit.type].toLowerCase()}${describeGoal(h)}): ` +
       `${describeEntry(h)}${missed}.${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
@@ -100,11 +155,39 @@ export function renderDay(
           ]
         : [line(h)],
     );
+  const goals = day.objectives.map(({ objective: o, dayAmount }) => {
+    const p = o.progress;
+    const builds = o.links.map((id) => refById.get(id)).filter(Boolean);
+    const reached =
+      p.completedOn === day.date
+        ? " Reached the target on this day."
+        : p.completedOn
+          ? ` Reached on ${p.completedOn}.`
+          : "";
+    return (
+      `- ${o.name}: ${formatNumber(p.current)}/${formatNumber(o.target)} ${o.unit} ` +
+      `(${o.startsOn} to ${o.endsOn}${o.habitName ? `, counts the habit "${o.habitName}"` : ""}). ` +
+      `This day added ${formatNumber(dayAmount)}.${reached}${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
+    );
+  });
+  const workouts = day.workouts.map((w) =>
+    [
+      `- ${w.name} (${Math.round(w.durationS / 60)} min${w.volumeKg ? `, ${formatVolume(w.volumeKg, day.units)} total volume` : ""}):`,
+      ...w.lines.map((l) => `  - ${l}`),
+      ...(w.prs.length ? [`  Personal records: ${w.prs.join("; ")}`] : []),
+    ].join("\n"),
+  );
+  const body = day.body ? describeBody(day.body, day.units) : null;
   const answered = day.prompts.filter((p) => p.answer?.trim());
   return [
     `Day: ${day.date} (${WEEKDAY_NAMES[dayOfWeek(day.date)]})`,
     `Journal:\n${day.journal.trim() || "(empty)"}`,
     `Habits:\n${habits.join("\n") || "(none)"}`,
+    workouts.length ? `Workouts:\n${workouts.join("\n")}` : null,
+    body ? `Body: ${body}` : null,
+    goals.length
+      ? `Goals with a deadline (running totals as of today):\n${goals.join("\n")}`
+      : null,
     answered.length
       ? `Answers to today's questions:\n${answered.map((p) => `Q: ${p.question}\nA: ${p.answer}`).join("\n")}`
       : null,

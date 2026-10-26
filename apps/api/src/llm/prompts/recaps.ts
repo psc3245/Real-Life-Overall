@@ -2,7 +2,7 @@ import { DAILY_DELTA_CAP, MAX_GUIDED_PROMPTS } from "@rlo/shared";
 import { CALIBRATION_RUBRIC, NEUTRAL_TONE, PRODUCT_CONTEXT } from "./shared";
 
 export const dailyRecapPrompt = {
-  version: "daily-recap-v3",
+  version: "daily-recap-v5",
   system: [
     PRODUCT_CONTEXT,
     "You review one day of the user's life and decide how their ratings move. You see their " +
@@ -19,6 +19,14 @@ export const dailyRecapPrompt = {
       "- Lower a rating for clear setbacks (a missed scheduled habit, a described lapse), not " +
         "for simply not mentioning an area. Inactivity is handled separately by decay.",
       "- Habits list the attributes they build. A completed habit is strong evidence for those.",
+      '- Habits marked "trying to avoid" are things the user wants to stop or limit. A ' +
+        "reported clean day (avoided, within the limit) is evidence for the linked attributes; a " +
+        'slip is a setback. "No slip logged" is weak evidence: credit it lightly, if at all.',
+      "- Goals are targets to reach by a deadline. What the day added toward one is evidence for " +
+        "the attributes it builds; reaching a target on this day deserves a mention.",
+      "- Logged workouts (exercises, sets, personal records) are concrete evidence for fitness " +
+        "and sport attributes. Weight and height entries are context, not achievements: never " +
+        "judge body weight, and only mention it if the user's goals are about it.",
       "- Be skeptical of implausible claims and of sudden jumps inconsistent with recent days: " +
         "weigh them lightly and flag them.",
     ].join("\n"),

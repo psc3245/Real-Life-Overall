@@ -32,6 +32,10 @@ const day: DayDto = {
   journal: "Long day at work, shipped the migration.",
   prompts: [],
   recap: null,
+  objectives: [],
+  workouts: [],
+  body: null,
+  units: "imperial",
   habits: [
     { habit: habit("gym", "Gym"), scheduled: true, entry: { num: 1, text: null } },
     {

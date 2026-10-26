@@ -3,7 +3,7 @@ import {
   BACKFILL_DAYS,
   groupProgress,
   isDayHabitDone,
-  isHabitDone,
+  isEntryDone,
   MAX_DAY_JOURNAL,
   type DayDto,
   type DayHabitDto,
@@ -222,7 +222,7 @@ function HabitCard({
 }) {
   const save = useSaveEntry(day.date, item.habit.id);
   const { habit, entry } = item;
-  const done = entry ? isHabitDone(habit.type, habit.config, entry) : false;
+  const done = isEntryDone(habit.type, habit.config, entry);
   const body = (
     <View style={{ gap: space.sm }}>
       <Body style={{ fontWeight: "600" }}>{habit.name}</Body>

@@ -2,6 +2,13 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
+import { GoalsPage } from "./features/goals/GoalsPage";
+import { ActiveWorkoutPage } from "./features/workouts/ActiveWorkoutPage";
+import { ExercisesPage } from "./features/workouts/ExercisesPage";
+import { StartWorkoutPage } from "./features/workouts/StartWorkoutPage";
+import { TemplatePage } from "./features/workouts/TemplatePage";
+import { WorkoutHistoryPage } from "./features/workouts/WorkoutHistoryPage";
+import { WorkoutPage } from "./features/workouts/WorkoutPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { HabitsGlancePage } from "./features/habits/HabitsGlancePage";
 import { ManageHabitsPage } from "./features/habits/ManageHabitsPage";
@@ -30,6 +37,12 @@ const SeasonPage = lazy(() =>
 );
 const RatingsPage = lazy(() =>
   import("./features/ratings/RatingsPage").then((m) => ({ default: m.RatingsPage })),
+);
+const ExercisePage = lazy(() =>
+  import("./features/workouts/ExercisePage").then((m) => ({ default: m.ExercisePage })),
+);
+const BodyPage = lazy(() =>
+  import("./features/body/BodyPage").then((m) => ({ default: m.BodyPage })),
 );
 const loading = <p className="pt-10 text-court-500">Loading…</p>;
 
@@ -133,6 +146,82 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <ManageHabitsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "goals",
+        element: (
+          <RequireAuth>
+            <GoalsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts",
+        element: (
+          <RequireAuth>
+            <StartWorkoutPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts/active",
+        element: (
+          <RequireAuth>
+            <ActiveWorkoutPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts/history",
+        element: (
+          <RequireAuth>
+            <WorkoutHistoryPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts/templates/:id",
+        element: (
+          <RequireAuth>
+            <TemplatePage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts/exercises",
+        element: (
+          <RequireAuth>
+            <ExercisesPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts/exercises/:id",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <ExercisePage />
+            </Suspense>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts/:id",
+        element: (
+          <RequireAuth>
+            <WorkoutPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "body",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <BodyPage />
+            </Suspense>
           </RequireAuth>
         ),
       },

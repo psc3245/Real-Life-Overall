@@ -20,6 +20,9 @@ import * as userRepo from "../repos/user-repo";
 import { loadLeafContext, toHabitDtos } from "./habit-service";
 import { badgesByRecap } from "./badge-service";
 import { invalidateDecay } from "./decay-service";
+import { bodyForDay } from "./body-service";
+import { objectivesForDay, saveObjectiveEntry } from "./objective-service";
+import { workoutsForDay } from "./workout-service";
 import { toRecapDto } from "./recap-view";
 
 async function resolveDate(db: Database, userId: string, date: string | undefined) {
@@ -29,7 +32,7 @@ async function resolveDate(db: Database, userId: string, date: string | undefine
   const day = date ?? today;
   if (!isValidDate(day)) throw badRequest("Invalid date");
   if (day > today) throw badRequest("Can't log days in the future");
-  return { day, today };
+  return { day, today, user };
 }
 
 export async function requireEditable(db: Database, userId: string, date: string) {
@@ -45,12 +48,15 @@ export async function requireEditable(db: Database, userId: string, date: string
  * weekday are still listed (logging them is a bonus). Archived habits show only if logged.
  */
 export async function getDay(db: Database, userId: string, date?: string): Promise<DayDto> {
-  const { day, today } = await resolveDate(db, userId, date);
-  const [log, rows, ctx, recap] = await Promise.all([
+  const { day, today, user } = await resolveDate(db, userId, date);
+  const [log, rows, ctx, recap, objectives, workouts, body] = await Promise.all([
     dayRepo.find(db, userId, day),
     habitRepo.findAllByUser(db, userId),
     loadLeafContext(db, userId),
     recapRepo.findActiveDaily(db, userId, day),
+    objectivesForDay(db, userId, day),
+    workoutsForDay(db, userId, day, user.unitSystem),
+    bodyForDay(db, user, day),
   ]);
   const recapDto =
     recap && ctx
@@ -109,6 +115,10 @@ export async function getDay(db: Database, userId: string, date?: string): Promi
     status: log?.status ?? "open",
     journal: log?.journal ?? "",
     habits,
+    objectives,
+    workouts,
+    body,
+    units: user.unitSystem,
     prompts: (log?.prompts ?? []) as GuidedPromptDto[],
     recap: recapDto,
   };
@@ -148,6 +158,20 @@ export async function saveEntry(
   await dayRepo.markStaleIfRecapped(db, userId, day);
   // Completing (or un-completing) a linked habit on a past day changes that day's decay.
   await invalidateDecay(db, userId, day);
+  return getDay(db, userId, day);
+}
+
+/** Sets what a manual goal gained on the day; null or 0 clears it. */
+export async function saveObjective(
+  db: Database,
+  userId: string,
+  date: string,
+  objectiveId: string,
+  value: number | null,
+) {
+  const { day } = await requireEditable(db, userId, date);
+  await saveObjectiveEntry(db, userId, day, objectiveId, value);
+  await dayRepo.markStaleIfRecapped(db, userId, day);
   return getDay(db, userId, day);
 }
 

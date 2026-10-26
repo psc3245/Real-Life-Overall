@@ -106,6 +106,12 @@ function MainNav({ requests }: { requests: number }) {
           <NavLink to="/habits" className={side}>
             Habits
           </NavLink>
+          <NavLink to="/goals" className={side}>
+            Goals
+          </NavLink>
+          <NavLink to="/workouts" className={side}>
+            Train
+          </NavLink>
           <NavLink to="/week" className={side}>
             Week
           </NavLink>
