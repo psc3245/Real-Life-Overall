@@ -16,6 +16,7 @@ import { goalRoutes } from "./routes/goals";
 import { habitRoutes } from "./routes/habits";
 import { leaderboardRoutes } from "./routes/leaderboards";
 import { meRoutes } from "./routes/me";
+import { chartViewRoutes, metricRoutes } from "./routes/metrics";
 import { objectiveRoutes } from "./routes/objectives";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
@@ -112,6 +113,10 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/workout-templates/*", requireUser)
     .use("/exercises", requireUser)
     .use("/exercises/*", requireUser)
+    .use("/metrics", requireUser)
+    .use("/metrics/*", requireUser)
+    .use("/chart-views", requireUser)
+    .use("/chart-views/*", requireUser)
     .use("/body", requireUser)
     .use("/body/*", requireUser)
     .use("/pauses", requireUser)
@@ -138,6 +143,8 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/workout-templates", templateRoutes)
     .route("/exercises", exerciseRoutes)
     .route("/body", bodyRoutes)
+    .route("/metrics", metricRoutes)
+    .route("/chart-views", chartViewRoutes)
     .route("/pauses", pauseRoutes)
     .route("/dev", devRoutes)
     .route("/weekly", weeklyRoutes)

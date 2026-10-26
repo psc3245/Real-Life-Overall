@@ -308,6 +308,12 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 - Stats count kept days as done and add a slip count. Goals that count an avoid habit count kept days, logged or not ("30 days smoke-free"). Decay, badges and weekly summaries only see logged entries, so unreported days aren't evidence.
 - Recaps read avoid habits as avoided / kept / slipped with the limit; "no slip logged" is weak evidence the model is told to credit lightly.
 
+### 7.7 Charts for everything (added 2026-10-25)
+- **Metrics:** every number the app tracks has a stable id: `rating:<nodeId>`, `habit:<habitId>`, `habits:done`, `goal:<objectiveId>`, `workouts:count|volume|duration|sets`, `exercise:<exerciseId>`, `body:weight|height`, `journal:words`. `GET /metrics` lists what this user can chart; `GET /metrics/series?ids=…&from=&to=` returns daily points in the user's units. Rating history stays within the current season (it replays the ledger per day).
+- **Kinds** decide aggregation: *level* (keeps its value: ratings, weight, a goal's running total; weekly/monthly keep the last), *amount* (per-day quantity, dense with 0 on quiet days; buckets sum), *session* (sporadic bests like an exercise's estimated 1RM; buckets keep the best).
+- **Explorer** (`/charts`): up to 6 metrics at once, one scale per unit, range (30 days to all time), daily/weekly/monthly buckets, line/area/bar, target lines, and modeling: a 7-point moving average, a least-squares trend projected forward (with r²), per-series stats, and the correlation between the first two series. The config lives in the URL, so every habit, goal, attribute, exercise, workout history and body page links straight to its chart.
+- **Saved charts** (`chart_views`, `/chart-views`): name, config, and `pinned`; pinned charts show on Today.
+
 ---
 
 ## 8. Architecture
@@ -453,6 +459,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `body_measurements` | `user_id`, `local_date`, `kind` (`weight`/`height`), `value` (kg/cm) | Unique per user, day and kind |
 | `users.unit_system`, `users.track_weight`, `users.track_height` | | Units and opt-in body tracking |
 | `users.role` | `user` / `admin` | §8.7 |
+| `chart_views` | `user_id`, `name`, `config` jsonb (ChartConfig), `pinned` | §7.7 |
 | `objective_links` / `objective_entries` | `objective_id` + `node_lineage_id`; `objective_id`, `local_date`, `value` | Links by lineage; one manual entry per goal per day |
 | `decay_runs` | `user_id`, `season_id`, `local_date`, `paused`, `voided_at` | One active run per day; backfills void later runs |
 | (memory) | `day_logs.journal_search`, `recaps.narrative_search` (generated `tsvector`, GIN) | Full-text search; no embeddings table (§5.5) |
@@ -573,6 +580,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Optional height and weight tracking, units setting (§7.5)
 - [x] Avoid habits: a build/avoid direction for every habit type (§7.6)
 - [x] User roles, an admin page and admin-only debug info across the web app (§8.7)
+- [x] Charts for everything: metric catalog, chart explorer with trend modeling, saved and pinned charts (§7.7)
 - [ ] iOS app parity for goals, workouts, body tracking and avoid habits
 
 ---

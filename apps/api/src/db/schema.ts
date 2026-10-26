@@ -721,3 +721,20 @@ export const bodyMeasurements = pgTable(
   },
   (t) => [uniqueIndex().on(t.userId, t.localDate, t.kind)],
 );
+
+/** Saved charts (ChartConfig in `config`); pinned ones also show on Today (DESIGN.md §7.7). */
+export const chartViews = pgTable(
+  "chart_views",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    config: jsonb().notNull(),
+    pinned: boolean().notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);

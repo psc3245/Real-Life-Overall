@@ -45,6 +45,9 @@ const ExercisePage = lazy(() =>
 const BodyPage = lazy(() =>
   import("./features/body/BodyPage").then((m) => ({ default: m.BodyPage })),
 );
+const ChartsPage = lazy(() =>
+  import("./features/charts/ChartsPage").then((m) => ({ default: m.ChartsPage })),
+);
 const loading = <p className="pt-10 text-court-500">Loading…</p>;
 
 export const router = createBrowserRouter([
@@ -264,6 +267,16 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <SettingsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "charts",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <ChartsPage />
+            </Suspense>
           </RequireAuth>
         ),
       },

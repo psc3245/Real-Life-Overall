@@ -13,6 +13,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { formatElapsed, formatVolume } from "./format";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
 import { DebugJson } from "../../components/debug/Debug";
+import { ChartLink } from "../charts/ChartLink";
 
 export function WorkoutHistoryPage() {
   const history = useWorkoutHistory();
@@ -29,6 +30,11 @@ export function WorkoutHistoryPage() {
           <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">History</h1>
         </div>
         <WorkoutsNav />
+        <ChartLink
+          ids={["workouts:volume", "workouts:count"]}
+          config={{ bucket: "week", style: "bar" }}
+          label="Chart weekly volume and workouts →"
+        />
       </header>
       {history.isPending && <p className="text-court-500">Loading…</p>}
       <ErrorNote error={history.error} />

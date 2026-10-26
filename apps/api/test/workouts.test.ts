@@ -134,6 +134,16 @@ describe("workouts", () => {
     expect(updated!.exercises[0]!.sets[0]).toMatchObject({ weightKg: 105, done: false });
     expect(updated!.lastUsedAt).not.toBeNull();
 
+    // Renaming keeps the exercises.
+    const renamed = await body<WorkoutTemplateDto>(
+      await request(`/workout-templates/${template.id}`, {
+        method: "PATCH",
+        ...json({ name: "Leg Day" }),
+      }),
+    );
+    expect(renamed).toMatchObject({ name: "Leg Day" });
+    expect(renamed.exercises).toHaveLength(1);
+
     // Templates aren't capped.
     for (let i = 0; i < 5; i++) {
       await request("/workout-templates", { method: "POST", ...json({ name: `T${i}` }) });

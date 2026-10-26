@@ -136,6 +136,12 @@ async function load(db: Database, userId: string) {
   return { rows, habits, ctx, today };
 }
 
+/** Every goal with its per-day amounts (charts). */
+export async function objectivesWithDaily(db: Database, userId: string) {
+  const { rows, habits, ctx, today } = await load(db, userId);
+  return toDtos(db, rows, today, ctx, habits);
+}
+
 export async function listObjectives(db: Database, userId: string): Promise<ObjectiveDto[]> {
   const { rows, habits, ctx, today } = await load(db, userId);
   return (await toDtos(db, rows, today, ctx, habits)).dtos;
