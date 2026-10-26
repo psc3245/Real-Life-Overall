@@ -25,6 +25,7 @@ import { reportRoutes } from "./routes/reports";
 import { seasonRoutes } from "./routes/seasons";
 import { ratingsRoutes } from "./routes/ratings";
 import { weeklyRoutes } from "./routes/weekly";
+import { scoutingReportRoutes, treeProposalRoutes, weightRoutes } from "./routes/evolution";
 import { exerciseRoutes, templateRoutes, workoutRoutes } from "./routes/workouts";
 
 export type DepsFactory = (env: Env) => Deps;
@@ -134,6 +135,11 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/friends", requireUser)
     .use("/friends/*", requireUser)
     .use("/leaderboards", requireUser)
+    .use("/scouting-report", requireUser)
+    .use("/weights", requireUser)
+    .use("/weights/*", requireUser)
+    .use("/tree-proposals", requireUser)
+    .use("/tree-proposals/*", requireUser)
     .use("/profiles/*", optionalUser)
     .use("/admin/*", requireUser, requireAdmin)
     .route("/me", meRoutes)
@@ -158,6 +164,9 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/profiles", profileRoutes)
     .route("/friends", friendRoutes)
     .route("/leaderboards", leaderboardRoutes)
+    .route("/scouting-report", scoutingReportRoutes)
+    .route("/weights", weightRoutes)
+    .route("/tree-proposals", treeProposalRoutes)
     .route("/admin", adminRoutes);
 
   return routes;

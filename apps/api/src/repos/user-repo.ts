@@ -1,4 +1,10 @@
-import { parsePreferences, type Preferences, type PreferencesPatch } from "@rlo/shared";
+import {
+  parsePreferences,
+  parseScoutingReport,
+  type Preferences,
+  type PreferencesPatch,
+  type ScoutingReport,
+} from "@rlo/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Database, Executor } from "../db/client";
 import { users } from "../db/schema";
@@ -98,6 +104,18 @@ export async function findProfileSummary(db: Database, id: string): Promise<stri
 
 export async function setProfileSummary(db: Executor, id: string, profileSummary: string) {
   await db.update(users).set({ profileSummary }).where(eq(users.id, id));
+}
+
+export async function findScoutingReport(db: Executor, id: string): Promise<ScoutingReport> {
+  const rows = await db
+    .select({ scoutingReport: users.scoutingReport })
+    .from(users)
+    .where(eq(users.id, id));
+  return parseScoutingReport(rows[0]?.scoutingReport);
+}
+
+export async function setScoutingReport(db: Executor, id: string, report: ScoutingReport) {
+  await db.update(users).set({ scoutingReport: report }).where(eq(users.id, id));
 }
 
 export async function findByAuthSubject(db: Database, subject: string): Promise<PublicUser | null> {

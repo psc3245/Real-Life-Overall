@@ -25,6 +25,8 @@ import {
   type HabitDto,
   type HabitProposalDto,
   type RatingNodeDto,
+  type TreeProposalDto,
+  type WeightChangeDto,
   type WeeklyReviewDto,
   type WeeklyStateDto,
   type WeekRange,
@@ -36,6 +38,7 @@ import type { LlmClient } from "../llm/client";
 import { refsFor, renderTree, toPromptNodes } from "../llm/prompts/tree";
 import { weeklyReviewPrompt } from "../llm/prompts/weekly";
 import * as decayRepo from "../repos/decay-repo";
+import * as evolutionRepo from "../repos/evolution-repo";
 import * as dayRepo from "../repos/day-repo";
 import * as decayRuleRepo from "../repos/decay-rule-repo";
 import * as habitRepo from "../repos/habit-repo";
@@ -53,6 +56,18 @@ import { datedEvents, type DatedEvent } from "./event-dates";
 import { ensureCurrentSeason } from "./season-service";
 import { renderMemories, searchMemories } from "./memory-service";
 import { normalizeRecapChanges } from "./recap-changes";
+import {
+  applyWeightShifts,
+  canProposeTreeChange,
+  normalizeTreeChange,
+  planWeightShifts,
+  renderScoutingReport,
+  renderWeights,
+  reportFromOutput,
+  startWeights,
+  toProposalDto,
+  toWeightChangeDto,
+} from "./evolution-service";
 
 type Output = z.infer<typeof weeklyReviewOutputSchema>;
 type LeafContext = NonNullable<Awaited<ReturnType<typeof loadLeafContext>>>;
@@ -93,6 +108,7 @@ export function toWeeklyDto(
   nodes: RatingNodeDto[],
   events: DatedEvent[],
   badges: EarnedBadgeDto[] = [],
+  evolution: Evolution = NO_EVOLUTION,
 ): WeeklyReviewDto {
   const output = recap.output as WeeklyOutput;
   const names = new Map(nodes.map((n) => [n.id, n.name]));
@@ -124,8 +140,55 @@ export function toWeeklyDto(
     habitProposals: output.habitProposals,
     archetypeChange: output.archetypeChange ?? null,
     badges,
+    ...evolution,
     createdAt: recap.createdAt.toISOString(),
   };
+}
+
+interface Evolution {
+  weightShifts: WeightChangeDto[];
+  treeProposal: TreeProposalDto | null;
+}
+const NO_EVOLUTION: Evolution = { weightShifts: [], treeProposal: null };
+
+/** Weight shifts and tree proposals made by one review. */
+async function evolutionOf(
+  db: Database,
+  recapId: string,
+  nodes: RatingNodeDto[],
+  currentSeasonId: string | null,
+): Promise<Evolution> {
+  const [shifts, proposals] = await Promise.all([
+    evolutionRepo.findWeightChangesByRecaps(db, [recapId]),
+    evolutionRepo.findProposalsByRecaps(db, [recapId]),
+  ]);
+  const names = new Map(nodes.map((n) => [n.id, n.name]));
+  return {
+    weightShifts: shifts.map((s) => toWeightChangeDto(s, names)),
+    treeProposal: proposals[0] ? toProposalDto(proposals[0], currentSeasonId) : null,
+  };
+}
+
+/** Per rated attribute, days with gains from daily recaps over the 4 weeks to `end`. */
+function renderEngagement(
+  ctx: LeafContext,
+  events: DatedEvent[],
+  end: string,
+  refById: Map<string, string>,
+) {
+  const from = addDays(end, -27);
+  const days = new Map<string, Set<string>>();
+  for (const e of events) {
+    if (e.source !== "daily_recap" || e.delta <= 0 || !e.date || e.date < from || e.date > end) {
+      continue;
+    }
+    if (!days.has(e.nodeId)) days.set(e.nodeId, new Set());
+    days.get(e.nodeId)!.add(e.date);
+  }
+  return ctx.nodes
+    .filter((n) => ctx.leaves.has(n.id))
+    .map((n) => `- [${refById.get(n.id)}] ${n.name}: ${days.get(n.id)?.size ?? 0} days`)
+    .join("\n");
 }
 
 export async function getWeeklyState(db: Database, userId: string): Promise<WeeklyStateDto> {
@@ -146,6 +209,7 @@ export async function getWeeklyState(db: Database, userId: string): Promise<Week
           ctx.nodes,
           datedEvents(rows),
           (await badgesByRecap(db, [current.id])).get(current.id),
+          await evolutionOf(db, current.id, ctx.nodes, ctx.season.id),
         )
       : null,
     ready: Boolean(week && !current),
@@ -168,12 +232,19 @@ export async function getWeeklyReview(
 ): Promise<WeeklyReviewDto> {
   const recap = await recapRepo.findById(db, userId, id);
   if (!recap || recap.kind !== "weekly") throw notFound("Weekly review not found");
-  const [nodes, rows, badges] = await Promise.all([
+  const [nodes, rows, badges, current] = await Promise.all([
     nodeRepo.findActiveBySeason(db, recap.seasonId),
     eventRepo.findActiveWithDates(db, recap.seasonId),
     badgesByRecap(db, [recap.id]),
+    seasonRepo.findLatestActive(db, userId),
   ]);
-  return toWeeklyDto(recap, nodes, datedEvents(rows), badges.get(recap.id));
+  return toWeeklyDto(
+    recap,
+    nodes,
+    datedEvents(rows),
+    badges.get(recap.id),
+    await evolutionOf(db, recap.id, nodes, current?.id ?? null),
+  );
 }
 
 /** Focus goals from the latest weekly review, for Today and the daily recap prompt. */
@@ -383,15 +454,28 @@ export async function runWeeklyReview(
 ): Promise<WeeklyStateDto> {
   const ctx = await loadLeafContext(db, userId);
   if (!ctx) throw conflict("Finish onboarding first");
-  const { week } = await reviewableWeek(db, userId, ctx);
+  const { user, week } = await reviewableWeek(db, userId, ctx);
   if (!week) throw conflict("No finished week to review yet");
   if (await recapRepo.findActiveWeekly(db, userId, week.start)) return getWeeklyState(db, userId);
+  // The tree evolves only when the player leaves adaptive rating on (DESIGN.md §4.5).
+  const adaptive = user.preferences.features.adaptiveRating;
 
   const events = datedEvents(await eventRepo.findActiveWithDates(db, ctx.season.id));
   const values = leafValuesFromEvents(events);
   const nodeValues = computeNodeValues(ctx.nodes, values);
   const { refById, idByRef } = refsFor(ctx.nodes);
-  const [profile, lastFocus, habits, weekRecaps, weekLogs, goals, archetype] = await Promise.all([
+  const [
+    profile,
+    lastFocus,
+    habits,
+    weekRecaps,
+    weekLogs,
+    goals,
+    archetype,
+    report,
+    weightHistory,
+    treeOpen,
+  ] = await Promise.all([
     userRepo.findProfileSummary(db, userId),
     currentFocus(db, userId),
     habitRepo.findAllByUser(db, userId),
@@ -402,7 +486,11 @@ export async function runWeeklyReview(
       ctx.nodes.map((n) => n.id),
     ),
     seasonRepo.findArchetype(db, ctx.season.id),
+    userRepo.findScoutingReport(db, userId),
+    evolutionRepo.findWeightChangesBySeason(db, ctx.season.id),
+    adaptive ? canProposeTreeChange(db, userId, ctx, localDateIn(user.timezone)) : false,
   ]);
+  const seasonStart = startWeights(ctx.nodes, weightHistory);
   const names = new Map(ctx.nodes.map((n) => [n.id, n.name]));
   const goalLines = goals.map((g) => `- ${names.get(g.nodeId)}: ${g.targetValue}`);
   // Older days related to this week, matched on both journals and recap narratives.
@@ -428,6 +516,15 @@ export async function runWeeklyReview(
       `Season: ${ctx.season.label}, ends ${ctx.season.endsOn} (${daysBetween(week.end, ctx.season.endsOn)} days after this week).`,
       `Current archetype: ${archetype ? `${archetype.name}: ${archetype.description}` : "(none)"}`,
       `Related older days:\n${renderMemories(memories) || "(none)"}`,
+      `Scouting Report:\n${renderScoutingReport(report, ctx, refById)}`,
+      `Importance weights (share of parent):\n${renderWeights(ctx.nodes, seasonStart, refById)}`,
+      `Days with gains in the last 4 weeks:\n${renderEngagement(ctx, events, week.end, refById)}`,
+      adaptive
+        ? "Weight shifts: allowed."
+        : "Weight shifts: switched off by the user. Return weightShifts: [].",
+      treeOpen
+        ? "Tree change: allowed this week, if clearly warranted."
+        : "Tree change: not allowed this week. Return treeChange: null.",
     ].join("\n\n"),
     promptVersion: weeklyReviewPrompt.version,
     maxOutputTokens: 16_000,
@@ -439,6 +536,12 @@ export async function runWeeklyReview(
     values,
     habits.filter((h) => !h.archivedAt).map((h) => h.name),
   );
+  const shifts = adaptive
+    ? planWeightShifts(output.weightShifts, ctx.nodes, seasonStart, idByRef)
+    : [];
+  const treeChanges =
+    treeOpen && output.treeChange ? normalizeTreeChange(output.treeChange, ctx.nodes, idByRef) : [];
+  const scoutingReport = reportFromOutput(output.scoutingReport, ctx, idByRef);
 
   let recapId: string | null = null;
   try {
@@ -511,6 +614,17 @@ export async function runWeeklyReview(
       }
       if (normalized.profileSummary) {
         await userRepo.setProfileSummary(tx, userId, normalized.profileSummary);
+      }
+      await userRepo.setScoutingReport(tx, userId, scoutingReport);
+      await applyWeightShifts(tx, userId, ctx.season.id, recap.id, shifts);
+      if (treeChanges.length) {
+        await evolutionRepo.insertProposal(tx, {
+          userId,
+          seasonId: ctx.season.id,
+          recapId: recap.id,
+          reason: output.treeChange!.reason.trim(),
+          changes: treeChanges,
+        });
       }
     });
   } catch (error) {

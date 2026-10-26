@@ -31,6 +31,16 @@ describe("computeDecay", () => {
     ]);
   });
 
+  it("starts a leaf added mid-period on the day it was rated", () => {
+    const startedOn = new Map([["cardio", "2026-10-04"]]);
+    // Nothing before or on the 4th; grace runs 5th-7th, decay from the 8th.
+    expect(summary(computeDecay(base({ startedOn })))).toEqual(["2026-10-08:-0.5@4"]);
+    // Catching up later counts idle days from the start date, not the baseline.
+    expect(summary(computeDecay(base({ startedOn, from: "2026-10-07" })))).toEqual([
+      "2026-10-08:-0.5@4",
+    ]);
+  });
+
   it("resets on activity", () => {
     const activity = new Map([["cardio", new Set(["2026-10-04"])]]);
     expect(summary(computeDecay(base({ activity })))).toEqual(["2026-10-08:-0.5@4"]);

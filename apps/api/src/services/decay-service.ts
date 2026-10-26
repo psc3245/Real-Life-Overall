@@ -86,10 +86,20 @@ export async function applyDecay(db: Database, userId: string): Promise<number> 
     }
   }
 
+  // Leaves rated after onboarding (added by a tree change) start their own clock.
+  const startedOn = new Map<string, string>();
+  for (const e of events) {
+    if ((e.source === "onboarding" || e.source === "recalibration") && !startedOn.has(e.nodeId)) {
+      const date = localDateIn(user.timezone, e.createdAt);
+      if (date > baseline) startedOn.set(e.nodeId, date);
+    }
+  }
+
   const days = computeDecay({
     from,
     through,
     baseline,
+    startedOn,
     rules: new Map(rules.map((r) => [r.nodeId, r])),
     values: leafValuesFromEvents(events),
     activity,

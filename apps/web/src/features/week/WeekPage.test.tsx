@@ -55,6 +55,36 @@ const review: WeeklyReviewDto = {
   ],
   archetypeChange: { from: "Desk Athlete", to: "Two-Way Grinder", description: "More balanced." },
   badges: [],
+  weightShifts: [
+    {
+      id: "s1",
+      nodeId: "c",
+      nodeName: "Career",
+      fromShare: 50,
+      toShare: 54.2,
+      reason: "Career fills every journal.",
+      recapId: "w1",
+      createdAt: "2026-10-19T09:00:00Z",
+      revertedAt: null,
+    },
+  ],
+  treeProposal: {
+    id: "p1",
+    reason: "Family is a core priority the tree doesn't measure.",
+    changes: [
+      {
+        kind: "add_category",
+        name: "Family",
+        description: "",
+        attributes: [{ name: "Presence", description: "" }],
+      },
+      { kind: "remove", nodeId: "s", nodeName: "Strength" },
+    ],
+    status: "pending",
+    recapId: "w1",
+    createdAt: "2026-10-19T09:00:00Z",
+    resolvedAt: null,
+  },
   createdAt: "2026-10-19T09:00:00Z",
 };
 
@@ -101,6 +131,23 @@ describe("WeekPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add habit" }));
     await waitFor(() =>
       expect(mockedApi).toHaveBeenCalledWith("/weekly/w1/proposals/0/accept", { method: "POST" }),
+    );
+  });
+
+  it("shows weight shifts and a tree proposal, each actionable", async () => {
+    setup({ week, review, ready: false, history: [] });
+    expect(await screen.findByText("Career fills every journal.")).toBeInTheDocument();
+    expect(screen.getByText("54.2%")).toBeInTheDocument();
+    expect(screen.getByText(/Family is a core priority/)).toBeInTheDocument();
+    expect(screen.getByText("Presence")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith("/weights/changes/s1/undo", { method: "POST" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply change" }));
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith("/tree-proposals/p1/accept", { method: "POST" }),
     );
   });
 

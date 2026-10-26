@@ -18,6 +18,8 @@ export interface DecayInput {
   values: ReadonlyMap<string, number>;
   /** Dates each leaf saw relevant activity. */
   activity: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Leaves rated after `baseline` (added mid-season): no decay through this date. */
+  startedOn?: ReadonlyMap<string, string>;
   isPaused: (date: string) => boolean;
 }
 
@@ -46,7 +48,9 @@ export function computeDecay(input: DecayInput): DecayDay[] {
   const idle = new Map<string, number>();
   for (const nodeId of input.rules.keys()) {
     let count = 0;
-    for (let d = addDays(input.from, -1); d > input.baseline; d = addDays(d, -1)) {
+    const start = input.startedOn?.get(nodeId);
+    const since = start && start > input.baseline ? start : input.baseline;
+    for (let d = addDays(input.from, -1); d > since; d = addDays(d, -1)) {
       if (input.activity.get(nodeId)?.has(d)) break;
       if (!input.isPaused(d)) count += 1;
     }
@@ -58,7 +62,8 @@ export function computeDecay(input: DecayInput): DecayDay[] {
     const paused = input.isPaused(date);
     const changes: DecayChange[] = [];
     for (const [nodeId, rule] of input.rules) {
-      if (input.activity.get(nodeId)?.has(date)) {
+      const start = input.startedOn?.get(nodeId);
+      if (input.activity.get(nodeId)?.has(date) || (start && date <= start)) {
         idle.set(nodeId, 0);
         continue;
       }

@@ -62,7 +62,7 @@ export function RatingsPage() {
           username={me.data?.username}
         />
         <div className="space-y-3">
-          <h1 className="font-display text-4xl font-bold uppercase">Scouting report</h1>
+          <h1 className="font-display text-4xl font-bold uppercase">Player profile</h1>
           {data.archetype && (
             <p className="text-court-300">
               <span className="font-semibold text-neon">{data.archetype.name}.</span>{" "}
@@ -78,6 +78,17 @@ export function RatingsPage() {
               <GoalEditor node={root} />
             </div>
           )}
+          <Link
+            to="/scouting-report"
+            className="block rounded-lg border border-court-700 p-3 hover:border-neon"
+          >
+            <span className="font-display uppercase tracking-wider text-neon">
+              Scouting Report →
+            </span>
+            <span className="block text-sm text-court-300">
+              What you're playing for, and how your rating is adapting to it.
+            </span>
+          </Link>
           <p className="text-sm text-court-500">
             Tap any attribute to see why it's rated that way.
           </p>

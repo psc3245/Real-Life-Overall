@@ -61,6 +61,9 @@ const review = (over: Record<string, unknown> = {}) =>
     ],
     archetype: { name: "Desk Athlete", description: "Unchanged." },
     personalBadge: null,
+    scoutingReport: { aspirations: [], priorities: [], focuses: [], constraints: [] },
+    weightShifts: [],
+    treeChange: null,
     ...over,
   });
 

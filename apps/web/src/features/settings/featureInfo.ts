@@ -33,6 +33,12 @@ export const FEATURE_INFO: Record<Feature, { label: string; detail: string }> = 
   reports: { label: "Reports", detail: "Chart collections run over a period, with write-ups." },
   history: { label: "History", detail: "Past seasons and their archives." },
   focus: { label: "Focus card", detail: "The suggested focus areas on Today." },
+  adaptiveRating: {
+    label: "Adaptive rating",
+    detail:
+      "Weekly reviews tune your weights to your Scouting Report and now and then suggest " +
+      "adding or removing part of your tree. Off keeps the tree as you set it.",
+  },
 };
 
 /** How the configuration section groups the switches. */
@@ -40,4 +46,5 @@ export const FEATURE_GROUPS: { label: string; features: Feature[] }[] = [
   { label: "Daily logging", features: ["habits", "goals", "workouts", "journal", "guidedPrompts"] },
   { label: "Insights", features: ["week", "charts", "reports", "history", "focus"] },
   { label: "Social", features: ["friends", "leaderboards"] },
+  { label: "Rating", features: ["adaptiveRating"] },
 ];

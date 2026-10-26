@@ -30,6 +30,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { WeekBreakdown } from "./WeekBreakdown";
 import { shortDate } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
+import { TreeProposalCard, WeightShiftList } from "../scouting/TreeEvolution";
 
 const WORKING = ["Reading your week…", "Checking habits and decay…", "Setting next week's focus…"];
 
@@ -323,6 +324,23 @@ export function ReviewCard({
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {review.treeProposal && <TreeProposalCard proposal={review.treeProposal} />}
+
+      {review.weightShifts.length > 0 && (
+        <section className="space-y-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="font-display text-lg uppercase tracking-wider">Weight shifts</h3>
+            <Link
+              to="/scouting-report#shape"
+              className="text-xs uppercase tracking-wider text-court-300 hover:text-neon"
+            >
+              Rating shape →
+            </Link>
+          </div>
+          <WeightShiftList changes={review.weightShifts} />
         </section>
       )}
 
