@@ -79,7 +79,9 @@ const evening = (date: string) => new Date(`${date}T23:00:00Z`);
 /**
  * Other players for the social features: just a user, a season row and a cached card each (they
  * have no ledger and can't sign in). Their cards only change when the seed runs again. Public
- * rivals opt in to global boards; lucas has too few recaps to count there yet.
+ * rivals opt in to global boards; lucas and nina have too few recaps to count there yet. Each
+ * category lists its rating and its growth this season; growth-mode rivals fill the Most
+ * Improved boards (DESIGN.md §4.6).
  */
 const RIVAL_EMAIL_DOMAIN = "demo-rival.test";
 const RIVALS: {
@@ -87,9 +89,10 @@ const RIVALS: {
   name: string;
   visibility: "friends" | "public";
   link: "friends" | "incoming" | "none";
+  mode?: "rating" | "growth";
   archetype: string;
   recappedDays: number;
-  categories: [name: string, templateKey: string | null, value: number][];
+  categories: [name: string, templateKey: string | null, value: number, growth: number][];
 }[] = [
   {
     username: "maya",
@@ -99,10 +102,10 @@ const RIVALS: {
     archetype: "Endurance Engine",
     recappedDays: 18,
     categories: [
-      ["Fitness", "fitness", 78.4],
-      ["Career", "career", 61.2],
-      ["Social", "social", 66.0],
-      ["Health", "health", 71.5],
+      ["Fitness", "fitness", 78.4, 3.1],
+      ["Career", "career", 61.2, 1.4],
+      ["Social", "social", 66.0, 2.2],
+      ["Health", "health", 71.5, 2.6],
     ],
   },
   {
@@ -113,10 +116,10 @@ const RIVALS: {
     archetype: "Floor General",
     recappedDays: 21,
     categories: [
-      ["Career", "career", 74.9],
-      ["Mind", "mind", 69.3],
-      ["Social", "social", 72.1],
-      ["Guitar", null, 58.0],
+      ["Career", "career", 74.9, 1.8],
+      ["Mind", "mind", 69.3, 2.9],
+      ["Social", "social", 72.1, 0.9],
+      ["Guitar", null, 58.0, 4.4],
     ],
   },
   {
@@ -127,9 +130,9 @@ const RIVALS: {
     archetype: "Two-Way Scholar",
     recappedDays: 15,
     categories: [
-      ["Mind", "mind", 81.0],
-      ["Career", "career", 70.4],
-      ["Fitness", "fitness", 55.7],
+      ["Mind", "mind", 81.0, 1.2],
+      ["Career", "career", 70.4, 2.0],
+      ["Fitness", "fitness", 55.7, 5.3],
     ],
   },
   {
@@ -140,9 +143,80 @@ const RIVALS: {
     archetype: "Raw Prospect",
     recappedDays: 4,
     categories: [
-      ["Fitness", "fitness", 88.0],
-      ["Career", "career", 52.3],
-      ["Social", "social", 60.5],
+      ["Fitness", "fitness", 88.0, 0.6],
+      ["Career", "career", 52.3, 3.8],
+      ["Social", "social", 60.5, 1.5],
+    ],
+  },
+  {
+    username: "marcus",
+    name: "Marcus Bell",
+    visibility: "friends",
+    link: "friends",
+    mode: "growth",
+    archetype: "Late Bloomer",
+    recappedDays: 20,
+    categories: [
+      ["Fitness", "fitness", 48.2, 9.6],
+      ["Health", "health", 52.0, 7.1],
+      ["Career", "career", 63.5, 3.4],
+      ["Social", "social", 55.1, 5.8],
+    ],
+  },
+  {
+    username: "sofia",
+    name: "Sofia Alvarez",
+    visibility: "public",
+    link: "friends",
+    mode: "growth",
+    archetype: "Grinder",
+    recappedDays: 23,
+    categories: [
+      ["Career", "career", 58.7, 8.2],
+      ["Mind", "mind", 61.4, 6.5],
+      ["Finance", "finance", 44.9, 10.3],
+    ],
+  },
+  {
+    username: "theo",
+    name: "Theo Park",
+    visibility: "friends",
+    link: "friends",
+    mode: "growth",
+    archetype: "Steady Climber",
+    recappedDays: 14,
+    categories: [
+      ["Fitness", "fitness", 66.3, 2.7],
+      ["Mind", "mind", 59.8, 4.1],
+      ["Social", "social", 62.0, 3.3],
+      ["Creativity", "creativity", 50.5, 6.0],
+    ],
+  },
+  {
+    username: "aisha",
+    name: "Aisha Okafor",
+    visibility: "public",
+    link: "none",
+    mode: "growth",
+    archetype: "Comeback Story",
+    recappedDays: 19,
+    categories: [
+      ["Health", "health", 41.6, 12.4],
+      ["Fitness", "fitness", 45.0, 11.1],
+      ["Career", "career", 67.2, 2.5],
+    ],
+  },
+  {
+    username: "nina",
+    name: "Nina Kowalski",
+    visibility: "public",
+    link: "none",
+    mode: "growth",
+    archetype: "Fresh Start",
+    recappedDays: 5,
+    categories: [
+      ["Mind", "mind", 53.3, 3.9],
+      ["Social", "social", 49.7, 4.6],
     ],
   },
 ];
@@ -356,7 +430,9 @@ async function main() {
   if (!url) throw new Error("DATABASE_URL is not set (apps/api/.env)");
   const { db, dispose } = createNeonDb(url);
   try {
-    await seedDemo(db);
+    // `--rivals` refreshes only the other players, keeping the demo account's own data.
+    if (process.argv.includes("--rivals")) await reseedRivals(db);
+    else await seedDemo(db);
   } finally {
     await dispose();
   }
@@ -1159,6 +1235,15 @@ async function seedRoutine(
   if (entries.length) await db.insert(habitEntries).values(entries);
 }
 
+async function reseedRivals(db: ReturnType<typeof createNeonDb>["db"]) {
+  const [demo] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, DEMO_USERNAME));
+  if (!demo) throw new Error("No demo account yet; run the full seed first");
+  await seedRivals(db, demo.id, seasonForDate(localDateIn(TIMEZONE)));
+}
+
 async function seedRivals(
   db: ReturnType<typeof createNeonDb>["db"],
   demoUserId: string,
@@ -1180,19 +1265,28 @@ async function seedRivals(
     // "setup" keeps them out of the hourly job, which only visits active seasons.
     const [rivalSeason] = await db
       .insert(seasons)
-      .values({ userId: user!.id, ...season, status: "setup", archetype: r.archetype })
+      .values({
+        userId: user!.id,
+        ...season,
+        status: "setup",
+        mode: r.mode ?? "rating",
+        archetype: r.archetype,
+      })
       .returning({ id: seasons.id });
-    const categories = r.categories.map(([name, templateKey, value]) => ({
+    const categories = r.categories.map(([name, templateKey, value, growth]) => ({
       name,
       templateKey,
       value,
+      growth,
     }));
-    const values = categories.map((c) => c.value);
+    const mean = (ns: number[]) => round(ns.reduce((a, b) => a + b, 0) / ns.length);
     await db.insert(playerCards).values({
       userId: user!.id,
       seasonId: rivalSeason!.id,
       seasonLabel: season.label,
-      overall: round(values.reduce((a, b) => a + b, 0) / values.length),
+      mode: r.mode ?? "rating",
+      overall: mean(categories.map((c) => c.value)),
+      growth: mean(categories.map((c) => c.growth)),
       archetype: r.archetype,
       categories,
       recappedDays: r.recappedDays,

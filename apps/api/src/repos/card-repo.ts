@@ -1,16 +1,50 @@
-import type { PublicCardDto, PublicCategoryDto } from "@rlo/shared";
+import type { PublicCardDto, PublicCategoryDto, SeasonMode } from "@rlo/shared";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { playerCards, users } from "../db/schema";
 
 export type CardRow = typeof playerCards.$inferSelect;
 
+/** A stored card category: its rating (`value`) and growth (absent on cards from before). */
+export interface CardCategory extends PublicCategoryDto {
+  growth?: number;
+}
+
+/**
+ * The card's numbers in `mode`: ratings, or points gained. Growth cards always show growth,
+ * so a growth player's ratings never leave the server (DESIGN.md §4.6).
+ */
+export function cardScores(
+  row: { overall: number; growth: number; categories: unknown },
+  mode: SeasonMode,
+): { overall: number; categories: PublicCategoryDto[] } {
+  const categories = row.categories as CardCategory[];
+  return mode === "growth"
+    ? {
+        overall: row.growth,
+        categories: categories.map((c) => ({
+          name: c.name,
+          templateKey: c.templateKey,
+          value: c.growth ?? 0,
+        })),
+      }
+    : {
+        overall: row.overall,
+        categories: categories.map((c) => ({
+          name: c.name,
+          templateKey: c.templateKey,
+          value: c.value,
+        })),
+      };
+}
+
 export function toCardDto(row: CardRow): PublicCardDto {
   return {
-    overall: row.overall,
+    mode: row.mode,
+    ...cardScores(row, row.mode),
+    growth: cardScores(row, "growth"),
     archetype: row.archetype,
     seasonLabel: row.seasonLabel,
-    categories: row.categories as PublicCategoryDto[],
     recappedDays: row.recappedDays,
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -30,7 +64,9 @@ export async function upsert(db: Executor, row: Omit<CardRow, "updatedAt">): Pro
 
 const boardColumns = {
   userId: playerCards.userId,
+  mode: playerCards.mode,
   overall: playerCards.overall,
+  growth: playerCards.growth,
   archetype: playerCards.archetype,
   categories: playerCards.categories,
   recappedDays: playerCards.recappedDays,

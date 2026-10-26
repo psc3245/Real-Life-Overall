@@ -1,4 +1,4 @@
-import type { RatedNodeDto, SeasonDetailDto, SeasonDetailNode } from "@rlo/shared";
+import type { RatedNodeDto, SeasonDetailDto, SeasonDetailNode, SeasonMode } from "@rlo/shared";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { ApiError } from "../../api/client";
@@ -8,6 +8,7 @@ import { HistoryChart } from "../../components/charts/HistoryChart";
 import { Delta } from "../../components/Delta";
 import { OvrBadge } from "../../components/OvrBadge";
 import { SectionNav } from "../../components/SectionNav";
+import { formatScore, ScoreProvider } from "../../components/score";
 import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { EarlierWeek } from "../week/WeekPage";
@@ -27,6 +28,7 @@ const asRated = (nodes: SeasonDetailNode[]): RatedNodeDto[] =>
     sortOrder: i,
     templateKey: null,
     value: n.end,
+    rating: null,
     rationale: null,
     confidence: null,
     decay: null,
@@ -56,7 +58,11 @@ export function SeasonPage() {
     }
     return <ErrorNote error={detail.error} />;
   }
-  return <Season s={detail.data} />;
+  return (
+    <ScoreProvider mode={detail.data.mode} values={detail.data.nodes.map((n) => n.end)}>
+      <Season s={detail.data} />
+    </ScoreProvider>
+  );
 }
 
 function Season({ s }: { s: SeasonDetailDto }) {
@@ -101,13 +107,19 @@ function Season({ s }: { s: SeasonDetailDto }) {
         {root?.end != null && (
           <div className="flex items-center gap-4">
             <OvrBadge value={root.end} />
-            {root.start !== null && (
+            {s.mode === "growth" ? (
               <p className="text-sm text-court-300">
-                Started at {root.start.toFixed(1)}
-                <br />
-                <Delta value={root.end - root.start} className="text-lg" />{" "}
-                {s.current ? "so far" : "over the season"}
+                Gained {s.current ? "so far" : "over the season"}
               </p>
+            ) : (
+              root.start !== null && (
+                <p className="text-sm text-court-300">
+                  Started at {root.start.toFixed(1)}
+                  <br />
+                  <Delta value={root.end - root.start} className="text-lg" />{" "}
+                  {s.current ? "so far" : "over the season"}
+                </p>
+              )
             )}
           </div>
         )}
@@ -152,13 +164,13 @@ function Season({ s }: { s: SeasonDetailDto }) {
                 className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-5"
               >
                 {nodeLink(c, <StatBar label={c.name} value={c.end ?? 0} />)}
-                <StartEnd node={c} />
+                <StartEnd node={c} mode={s.mode} />
                 {attrs.length > 0 && (
                   <ul className="space-y-1 border-t border-court-800 pt-3 text-sm">
                     {attrs.map((a) => (
                       <li key={a.id} className="flex items-center justify-between gap-3">
                         <span className="truncate">{nodeLink(a, a.name)}</span>
-                        <StartEnd node={a} />
+                        <StartEnd node={a} mode={s.mode} />
                       </li>
                     ))}
                   </ul>
@@ -218,8 +230,15 @@ function Season({ s }: { s: SeasonDetailDto }) {
   );
 }
 
-function StartEnd({ node }: { node: SeasonDetailNode }) {
+function StartEnd({ node, mode }: { node: SeasonDetailNode; mode: SeasonMode }) {
   const d = change(node);
+  if (mode === "growth") {
+    return (
+      <span className="text-sm tabular-nums text-court-300">
+        {node.end === null ? "–" : `${formatScore(mode, node.end)} gained`}
+      </span>
+    );
+  }
   return (
     <span className="flex items-center gap-2 text-sm tabular-nums">
       <span className="text-court-500">

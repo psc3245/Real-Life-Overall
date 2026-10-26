@@ -112,7 +112,7 @@ export async function catalog(db: Database, userId: string): Promise<MetricDto[]
       id: `rating:${node.id}`,
       group: "ratings",
       ...nodeLabel(node, ctx!.nodes),
-      unit: "rating",
+      unit: ctx!.season.mode === "growth" ? "gained" : "rating",
       kind: "level",
       target: null,
     });
@@ -246,7 +246,16 @@ export async function series(
     const onboarded = await decayRepo.onboardedAt(db, ctx.season.id);
     const start = onboarded ? localDateIn(user.timezone, onboarded) : ctx.season.startsOn;
     const hFrom = from > start ? from : start;
-    if (hFrom <= to) ratingHistory = await historyBetween(db, ctx.season.id, ctx.nodes, hFrom, to);
+    if (hFrom <= to) {
+      ratingHistory = await historyBetween(
+        db,
+        ctx.season.id,
+        ctx.nodes,
+        hFrom,
+        to,
+        ctx.season.mode,
+      );
+    }
   }
 
   let habitEntries: Awaited<ReturnType<typeof habitRepo.findEntriesBetween>> = [];

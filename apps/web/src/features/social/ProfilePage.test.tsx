@@ -20,6 +20,7 @@ const profile: ProfileDto = {
   friendship: "none",
   visibility: null,
   card: {
+    mode: "rating",
     overall: 71.4,
     archetype: "Ambitious Builder",
     seasonLabel: "2026-Q4",
@@ -27,6 +28,7 @@ const profile: ProfileDto = {
       { name: "Career", templateKey: "career", value: 80.2 },
       { name: "Fitness", templateKey: "fitness", value: 62.5 },
     ],
+    growth: { overall: 0, categories: [] },
     recappedDays: 12,
     updatedAt: "2026-10-22T00:00:00Z",
   },

@@ -17,6 +17,7 @@ const review: WeeklyReviewDto = {
   weekStart: "2026-10-12",
   weekEnd: "2026-10-18",
   narrative: "A steady week.",
+  mode: "rating",
   overallStart: 60,
   overallEnd: 61.2,
   corrections: [
@@ -24,6 +25,7 @@ const review: WeeklyReviewDto = {
       nodeId: "c",
       nodeName: "Career",
       delta: 1,
+      growth: 1.0,
       reason: "Shipped all week.",
       evidence: null,
       valueAfter: 81,

@@ -1,14 +1,16 @@
 import {
   LEADERBOARD_BOARDS,
   LEADERBOARD_MIN_RECAPPED_DAYS,
-  ratingTier,
+  SEASON_MODES,
   type LeaderboardDto,
   type LeaderboardEntryDto,
   type LeaderboardScope,
+  type SeasonMode,
 } from "@rlo/shared";
 import { Link, useSearchParams } from "react-router";
 import { useLeaderboard } from "../../api/social";
-import { tierColor } from "../../components/tier";
+import { formatScore, scoreColor } from "../../components/score";
+import { useTalk } from "../../lib/talk";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { DebugJson } from "../../components/debug/Debug";
 
@@ -16,14 +18,23 @@ const chip = (active: boolean) =>
   `whitespace-nowrap rounded-full border px-3 py-1 text-sm ${active ? "border-neon bg-neon/10 text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`;
 
 export function LeaderboardsPage() {
+  const talk = useTalk();
   const [params, setParams] = useSearchParams();
   const scope: LeaderboardScope = params.get("scope") === "global" ? "global" : "friends";
   const board = LEADERBOARD_BOARDS.some((b) => b.key === params.get("board"))
     ? params.get("board")!
     : "overall";
-  const leaderboard = useLeaderboard(scope, board);
+  // Rating and growth boards are separate (DESIGN.md §4.6); no choice means your own mode's.
+  const chosenMode = SEASON_MODES.find((m) => m === params.get("mode"));
+  const leaderboard = useLeaderboard(scope, board, chosenMode);
+  const mode = leaderboard.data?.mode ?? chosenMode ?? "rating";
   const set = (changes: Record<string, string>) =>
-    setParams({ scope, board, ...changes }, { replace: true });
+    setParams(
+      { scope, board, ...(chosenMode ? { mode: chosenMode } : {}), ...changes },
+      {
+        replace: true,
+      },
+    );
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pt-4">
@@ -51,6 +62,21 @@ export function LeaderboardsPage() {
         ))}
       </div>
 
+      <div role="tablist" aria-label="Mode" className="flex gap-2">
+        {SEASON_MODES.map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => set({ mode: m })}
+            className={`flex-1 rounded-lg border py-1.5 text-sm uppercase tracking-wider ${mode === m ? "border-neon text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`}
+          >
+            {m === "growth" ? talk.growthMode : talk.ratingMode}
+          </button>
+        ))}
+      </div>
+
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" aria-label="Board">
         {LEADERBOARD_BOARDS.map((b) => (
           <button
@@ -69,8 +95,23 @@ export function LeaderboardsPage() {
       <ErrorNote error={leaderboard.error} />
       {leaderboard.data && (
         <>
-          {scope === "global" && !leaderboard.data.me && (
-            <GlobalStatus status={leaderboard.data.globalStatus} />
+          {leaderboard.data.myMode && leaderboard.data.myMode !== leaderboard.data.mode ? (
+            <p className="rounded-xl border border-court-700 bg-court-900/60 p-4 text-sm text-court-300">
+              You're playing{" "}
+              {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} this
+              season, so you rank on the{" "}
+              <button
+                type="button"
+                onClick={() => set({ mode: leaderboard.data.myMode! })}
+                className="text-neon hover:underline"
+              >
+                {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} board
+              </button>
+              .
+            </p>
+          ) : (
+            scope === "global" &&
+            !leaderboard.data.me && <GlobalStatus status={leaderboard.data.globalStatus} />
           )}
           <Board data={leaderboard.data} />
         </>
@@ -96,22 +137,22 @@ function Board({ data }: { data: LeaderboardDto }) {
   return (
     <ol className="space-y-2" aria-label="Rankings">
       {data.entries.map((e) => (
-        <EntryRow key={e.username} entry={e} />
+        <EntryRow key={e.username} entry={e} mode={data.mode} />
       ))}
       {meBelow && (
         <>
           <li aria-hidden className="text-center text-court-700">
             ⋯
           </li>
-          <EntryRow entry={data.me!} />
+          <EntryRow entry={data.me!} mode={data.mode} />
         </>
       )}
     </ol>
   );
 }
 
-function EntryRow({ entry }: { entry: LeaderboardEntryDto }) {
-  const color = tierColor(ratingTier(entry.value));
+function EntryRow({ entry, mode }: { entry: LeaderboardEntryDto; mode: SeasonMode }) {
+  const color = scoreColor(mode, entry.value);
   return (
     <li
       className={`flex items-center gap-3 rounded-xl border p-3 ${entry.isMe ? "border-neon/60 bg-neon/5" : "border-court-700 bg-court-900/70"}`}
@@ -139,7 +180,7 @@ function EntryRow({ entry }: { entry: LeaderboardEntryDto }) {
         </p>
       </Link>
       <span className="font-display text-3xl font-semibold tabular-nums" style={{ color }}>
-        {entry.value.toFixed(1)}
+        {formatScore(mode, entry.value)}
       </span>
     </li>
   );

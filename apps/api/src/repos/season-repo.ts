@@ -1,4 +1,4 @@
-import type { SeasonDto } from "@rlo/shared";
+import type { SeasonDto, SeasonMode } from "@rlo/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { seasons as seasonsTable, users, type seasonStatus } from "../db/schema";
 import type { Executor } from "../db/client";
@@ -10,6 +10,7 @@ const seasonColumns = {
   startsOn: seasons.startsOn,
   endsOn: seasons.endsOn,
   status: seasons.status,
+  mode: seasons.mode,
 };
 
 export async function findLatest(db: Executor, userId: string): Promise<SeasonDto | null> {
@@ -62,6 +63,7 @@ export async function update(
   id: string,
   changes: {
     status?: (typeof seasonStatus.enumValues)[number];
+    mode?: SeasonMode;
     archetype?: string | null;
     archetypeDescription?: string | null;
     finalSnapshot?: unknown;

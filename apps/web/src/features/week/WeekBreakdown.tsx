@@ -11,6 +11,7 @@ import { Link } from "react-router";
 import { useHabitStats } from "../../api/days";
 import { useActivity, useHistory } from "../../api/ratings";
 import { Delta } from "../../components/Delta";
+import { formatScore, useScore } from "../../components/score";
 import { DayStrip } from "../habits/DayStrip";
 import { StatTile } from "../../components/StatTile";
 import { shortDate } from "../../lib/format";
@@ -33,6 +34,7 @@ export function WeekBreakdown({
   const activity = useActivity(span);
   const history = useHistory(span);
   const habits = useHabitStats("week", week.start);
+  const { mode } = useScore();
 
   const dates = Array.from({ length: 7 }, (_, i) => addDays(week.start, i));
   const byDate = new Map((activity.data ?? []).map((a) => [a.date, a]));
@@ -86,7 +88,7 @@ export function WeekBreakdown({
         />
         <StatTile
           label="Overall"
-          value={overall ? overall.to.toFixed(1) : "—"}
+          value={overall ? formatScore(mode, overall.to) : "—"}
           detail={overall ? <Delta value={overall.delta} /> : undefined}
         />
       </dl>
@@ -107,7 +109,7 @@ export function WeekBreakdown({
                     {m ? (
                       <>
                         <span className="text-sm text-court-500">
-                          {m.from.toFixed(1)} → {m.to.toFixed(1)}
+                          {formatScore(mode, m.from)} → {formatScore(mode, m.to)}
                         </span>
                         <Delta value={m.delta} />
                       </>

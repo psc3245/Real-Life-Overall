@@ -2,6 +2,7 @@ import type {
   AnswerValue,
   AttributeSuggestionDto,
   OnboardingStateDto,
+  SeasonMode,
   TreeDraftNode,
   WeightSuggestionDto,
 } from "@rlo/shared";
@@ -110,4 +111,14 @@ export function useSkipDiscovery() {
 
 export function useDraftTemplate() {
   return useStateMutation(() => post("/onboarding/template")());
+}
+
+/** The first season's mode (DESIGN.md §4.6); open until onboarding is complete. */
+export function useSetOnboardingMode() {
+  return useStateMutation((mode: SeasonMode) =>
+    api<OnboardingStateDto>("/onboarding/mode", {
+      method: "PUT",
+      body: JSON.stringify({ mode }),
+    }),
+  );
 }

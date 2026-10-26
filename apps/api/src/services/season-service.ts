@@ -4,6 +4,7 @@ import {
   DECAY_LIMITS,
   draftToRatingNodes,
   DRAFT_ROOT_KEY,
+  leafGrowthFromEvents,
   leafIds,
   leafValuesFromEvents,
   localDateIn,
@@ -12,6 +13,7 @@ import {
   seasonForDate,
   type SeasonCardDto,
   type SeasonDto,
+  type SeasonMode,
   type SeasonSetupDto,
   type TreeDraft,
 } from "@rlo/shared";
@@ -38,7 +40,9 @@ function toCard(row: Awaited<ReturnType<typeof seasonRepo.findArchived>>[number]
     label: row.label,
     startsOn: row.startsOn,
     endsOn: row.endsOn,
+    mode: row.mode,
     overall: snap.overall ?? null,
+    growth: snap.growth ?? null,
     archetype: snap.archetype ?? row.archetype,
     nodes: snap.nodes ?? [],
   };
@@ -47,8 +51,9 @@ function toCard(row: Awaited<ReturnType<typeof seasonRepo.findArchived>>[number]
 /**
  * Rolls the user into the current calendar quarter if their active season has ended
  * (DESIGN.md §7.1): the old season is frozen into a season card, and the new one starts with
- * the same tree (same lineages), weights, decay rules and goals, and ratings carried over as
- * recalibration events. Safe to call on every request; returns the active season.
+ * the same tree (same lineages), weights, decay rules, goals and mode, and ratings carried over
+ * as recalibration events (growth starts again from 0). Safe to call on every request; returns
+ * the active season.
  */
 export async function ensureCurrentSeason(db: Database, userId: string): Promise<SeasonDto | null> {
   const active = await seasonRepo.findLatestActive(db, userId);
@@ -64,9 +69,12 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
   const events = await eventRepo.findActiveBySeason(db, active.id);
   const leafValues = leafValuesFromEvents(events);
   const values = computeNodeValues(nodes, leafValues);
+  const growth = computeNodeValues(nodes, leafGrowthFromEvents(events));
   const root = nodes.find((n) => n.parentId === null);
   const snapshot: Omit<SeasonCardDto, "id" | "label" | "startsOn" | "endsOn"> = {
+    mode: active.mode,
     overall: root ? (values.get(root.id) ?? null) : null,
+    growth: root ? (growth.get(root.id) ?? null) : null,
     archetype: old?.archetype ?? null,
     nodes: nodes.map((n) => ({
       id: n.id,
@@ -75,6 +83,7 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
       name: n.name,
       depth: n.depth,
       value: values.get(n.id) ?? null,
+      growth: growth.get(n.id) ?? null,
     })),
   };
   const leaves = new Set(leafIds(nodes));
@@ -93,6 +102,7 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
     await nodeRepo.deleteBySeason(tx, next.id);
     await seasonRepo.update(tx, next.id, {
       status: "active",
+      mode: active.mode,
       archetype: old?.archetype ?? null,
       archetypeDescription: old?.archetypeDescription ?? null,
       setupEndsOn: addDays(today, SEASON_SETUP_DAYS),
@@ -160,12 +170,45 @@ export async function getSeasonSetup(db: Database, userId: string): Promise<Seas
   ]);
   const today = localDateIn(user?.timezone ?? "UTC");
   const setupEndsOn = row?.setupEndsOn ?? null;
+  const editable = setupEndsOn !== null && today <= setupEndsOn;
   return {
     label: season.label,
+    mode: season.mode,
+    modeEditable: editable,
     setupEndsOn,
-    editable: setupEndsOn !== null && today <= setupEndsOn,
+    editable,
     previous: archived[0] ? toCard(archived[0]) : null,
   };
+}
+
+/**
+ * Picks how a season is scored (DESIGN.md §4.6). Only while it's being set up, so nobody
+ * switches to whichever mode looks better mid-season. Goals are in the old mode's units, so
+ * switching clears them.
+ */
+export async function setSeasonMode(
+  db: Database,
+  seasonId: string,
+  mode: SeasonMode,
+): Promise<void> {
+  const season = await seasonRepo.findById(db, seasonId);
+  if (!season || season.mode === mode) return;
+  const nodes = await nodeRepo.findActiveBySeason(db, seasonId);
+  await db.transaction(async (tx) => {
+    await seasonRepo.update(tx, seasonId, { mode });
+    await goalRepo.deleteByNodes(
+      tx,
+      nodes.map((n) => n.id),
+    );
+  });
+}
+
+/** Changes the new season's mode during its setup window. */
+export async function editSeasonMode(db: Database, userId: string, mode: SeasonMode) {
+  const setup = await getSeasonSetup(db, userId);
+  if (!setup.modeEditable) throw conflict("The mode is locked once the season is set up");
+  const season = (await seasonRepo.findLatestActive(db, userId))!;
+  await setSeasonMode(db, season.id, mode);
 }
 
 /**

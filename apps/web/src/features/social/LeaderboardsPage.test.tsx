@@ -50,6 +50,8 @@ describe("LeaderboardsPage", () => {
       const global = path.includes("scope=global");
       const data: LeaderboardDto = {
         scope: global ? "global" : "friends",
+        mode: "rating",
+        myMode: "rating",
         board: "overall",
         seasonLabel: "2026-Q4",
         entries: global

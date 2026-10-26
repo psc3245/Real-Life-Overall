@@ -1,8 +1,9 @@
-import type { ChangeFeedItemDto } from "@rlo/shared";
+import { growthDelta, type ChangeFeedItemDto, type SeasonMode } from "@rlo/shared";
 import { Link, useSearchParams } from "react-router";
 import { useChangeFeed, useRatings, type ChangeSource } from "../../api/ratings";
 import { Button } from "../../components/Button";
-import { Delta } from "../../components/Delta";
+import { ChangeDelta, Delta } from "../../components/Delta";
+import { useScore } from "../../components/score";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { dayLabel } from "../../lib/format";
 
@@ -29,6 +30,7 @@ export function ActivityPage() {
   const nodeId = params.get("node") ?? undefined;
   const ratings = useRatings();
   const feed = useChangeFeed({ sources: filter.sources, nodeId });
+  const { mode } = useScore();
 
   const nodes = ratings.data?.nodes ?? [];
   const root = nodes.find((n) => n.parentId === null);
@@ -41,7 +43,7 @@ export function ActivityPage() {
   };
 
   const items = feed.data?.pages.flat() ?? [];
-  const groups = groupByDay(items);
+  const groups = groupByDay(items, mode);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pt-4">
@@ -134,7 +136,7 @@ export function ChangeList({
     <ul className="divide-y divide-court-800 rounded-xl border border-court-700 bg-court-900/70">
       {items.map((c) => (
         <li key={c.id} className="grid grid-cols-[4rem_1fr_auto] items-baseline gap-3 px-4 py-2.5">
-          <Delta value={c.delta} className="text-lg" />
+          <ChangeDelta delta={c.delta} growth={growthDelta(c)} className="text-lg" />
           <div className="min-w-0">
             <Link to={`/ratings/node/${c.nodeId}`} className="font-medium hover:text-neon">
               {c.nodeName}
@@ -158,7 +160,7 @@ export function ChangeList({
   );
 }
 
-function groupByDay(items: ChangeFeedItemDto[]) {
+function groupByDay(items: ChangeFeedItemDto[], mode: SeasonMode) {
   const groups: { key: string; date: string | null; net: number; items: ChangeFeedItemDto[] }[] =
     [];
   for (const item of items) {
@@ -170,7 +172,8 @@ function groupByDay(items: ChangeFeedItemDto[]) {
       groups.push(group);
     }
     group.items.push(item);
-    group.net = Math.round((group.net + item.delta) * 100) / 100;
+    const counted = mode === "growth" ? growthDelta(item) : item.delta;
+    group.net = Math.round((group.net + counted) * 100) / 100;
   }
   return groups;
 }

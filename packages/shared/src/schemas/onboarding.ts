@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SeasonMode } from "../rating/growth";
 import type { Answers, ChatMessageDto, QuestionDto } from "./questionnaire";
 import {
   IMPORTANCE_MAX,
@@ -37,6 +38,7 @@ export interface SeasonDto {
   startsOn: string;
   endsOn: string;
   status: "setup" | "active" | "archived";
+  mode: SeasonMode;
 }
 
 export interface OnboardingStateDto {

@@ -2,6 +2,7 @@ import {
   followupMessageBodySchema,
   saveAnswersBodySchema,
   saveWeightsBodySchema,
+  setSeasonModeBodySchema,
   suggestAttributesBodySchema,
   suggestWeightsBodySchema,
   treeDraftSchema,
@@ -13,6 +14,10 @@ import { parseJson, parseOptionalJson } from "../validation";
 
 export const onboardingRoutes = new Hono<AppEnv>()
   .get("/", async (c) => c.json(await onboarding.getState(c.get("db"), c.get("userId"))))
+  .put("/mode", async (c) => {
+    const { mode } = await parseJson(c, setSeasonModeBodySchema);
+    return c.json(await onboarding.setMode(c.get("db"), c.get("userId"), mode));
+  })
   .put("/tree", async (c) => {
     const draft = await parseJson(c, treeDraftSchema);
     return c.json(await onboarding.saveTree(c.get("db"), c.get("userId"), draft));

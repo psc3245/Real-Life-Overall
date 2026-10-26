@@ -17,6 +17,7 @@ const detail: SeasonDetailDto = {
   startsOn: "2026-07-01",
   endsOn: "2026-09-30",
   current: false,
+  mode: "rating",
   through: "2026-09-30",
   archetype: "Steady Generalist",
   nodes: [

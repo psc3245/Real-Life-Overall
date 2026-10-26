@@ -23,7 +23,8 @@ import {
 } from "../../api/weekly";
 import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
-import { Delta } from "../../components/Delta";
+import { ChangeDelta, OverallMove } from "../../components/Delta";
+import { ScoreProvider } from "../../components/score";
 import { SectionNav } from "../../components/SectionNav";
 import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -252,116 +253,115 @@ export function ReviewCard({
 }) {
   const { overallStart: start, overallEnd: end } = review;
   return (
-    <article className="space-y-6 rounded-xl border border-neon/40 bg-court-900 p-5">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="font-display text-2xl uppercase tracking-wider text-neon">The week</h2>
-        {start !== null && end !== null && (
-          <p className="font-display text-lg tabular-nums text-court-300">
-            OVR {start.toFixed(1)} → <span className="text-court-100">{end.toFixed(1)}</span>{" "}
-            {Math.abs(end - start) >= 0.05 && <Delta value={end - start} className="text-base" />}
+    <ScoreProvider mode={review.mode} values={[]}>
+      <article className="space-y-6 rounded-xl border border-neon/40 bg-court-900 p-5">
+        <header className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="font-display text-2xl uppercase tracking-wider text-neon">The week</h2>
+          {start !== null && end !== null && (
+            <OverallMove mode={review.mode} before={start} after={end} />
+          )}
+        </header>
+        <p className="text-court-100">{review.narrative}</p>
+        <EarnedBadges badges={review.badges} />
+        {review.archetypeChange && (
+          <p className="rounded-lg border border-neon/40 bg-neon/5 p-3 text-sm">
+            <span className="font-display uppercase tracking-wider text-neon">New archetype: </span>
+            {review.archetypeChange.from && (
+              <span className="text-court-500 line-through">{review.archetypeChange.from}</span>
+            )}{" "}
+            <span className="font-semibold">{review.archetypeChange.to}</span>.{" "}
+            <span className="text-court-300">{review.archetypeChange.description}</span>
           </p>
         )}
-      </header>
-      <p className="text-court-100">{review.narrative}</p>
-      <EarnedBadges badges={review.badges} />
-      {review.archetypeChange && (
-        <p className="rounded-lg border border-neon/40 bg-neon/5 p-3 text-sm">
-          <span className="font-display uppercase tracking-wider text-neon">New archetype: </span>
-          {review.archetypeChange.from && (
-            <span className="text-court-500 line-through">{review.archetypeChange.from}</span>
-          )}{" "}
-          <span className="font-semibold">{review.archetypeChange.to}</span>.{" "}
-          <span className="text-court-300">{review.archetypeChange.description}</span>
-        </p>
-      )}
 
-      {review.focusGoals.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="font-display text-lg uppercase tracking-wider">Next week's focus</h3>
-          <ol className="space-y-2">
-            {review.focusGoals.map((g, i) => (
-              <li key={g.title} className="flex gap-3">
-                <span className="font-display text-xl text-neon tabular-nums">{i + 1}</span>
-                <div>
-                  <p className="font-medium">{g.title}</p>
-                  <p className="text-sm text-court-300">{g.detail}</p>
-                  {g.nodeIds.length > 0 && (
-                    <p className="mt-1 flex flex-wrap gap-1.5">
-                      {g.nodeIds.map((id) => (
-                        <NodeChip key={id} id={id} name={names.get(id)} />
-                      ))}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+        {review.focusGoals.length > 0 && (
+          <section className="space-y-2">
+            <h3 className="font-display text-lg uppercase tracking-wider">Next week's focus</h3>
+            <ol className="space-y-2">
+              {review.focusGoals.map((g, i) => (
+                <li key={g.title} className="flex gap-3">
+                  <span className="font-display text-xl text-neon tabular-nums">{i + 1}</span>
+                  <div>
+                    <p className="font-medium">{g.title}</p>
+                    <p className="text-sm text-court-300">{g.detail}</p>
+                    {g.nodeIds.length > 0 && (
+                      <p className="mt-1 flex flex-wrap gap-1.5">
+                        {g.nodeIds.map((id) => (
+                          <NodeChip key={id} id={id} name={names.get(id)} />
+                        ))}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
-      {review.habitProposals.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="font-display text-lg uppercase tracking-wider">Suggested habits</h3>
-          <ul className="space-y-2">
-            {review.habitProposals.map((p) => (
-              <Proposal key={p.index} reviewId={review.id} proposal={p} names={names} />
-            ))}
-          </ul>
-        </section>
-      )}
+        {review.habitProposals.length > 0 && (
+          <section className="space-y-2">
+            <h3 className="font-display text-lg uppercase tracking-wider">Suggested habits</h3>
+            <ul className="space-y-2">
+              {review.habitProposals.map((p) => (
+                <Proposal key={p.index} reviewId={review.id} proposal={p} names={names} />
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {review.corrections.length > 0 && (
-        <section className="space-y-1">
-          <h3 className="font-display text-lg uppercase tracking-wider">Weekly adjustments</h3>
-          <ul className="divide-y divide-court-800">
-            {review.corrections.map((c) => (
-              <li key={c.nodeId} className="grid grid-cols-[4rem_1fr] gap-3 py-2">
-                <Delta value={c.delta} className="text-lg" />
-                <div>
-                  <Link to={`/ratings/node/${c.nodeId}`} className="font-medium hover:text-neon">
-                    {c.nodeName}
-                  </Link>
-                  <p className="text-sm text-court-300">{c.reason}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {review.corrections.length > 0 && (
+          <section className="space-y-1">
+            <h3 className="font-display text-lg uppercase tracking-wider">Weekly adjustments</h3>
+            <ul className="divide-y divide-court-800">
+              {review.corrections.map((c) => (
+                <li key={c.nodeId} className="grid grid-cols-[4rem_1fr] gap-3 py-2">
+                  <ChangeDelta delta={c.delta} growth={c.growth} className="text-lg" />
+                  <div>
+                    <Link to={`/ratings/node/${c.nodeId}`} className="font-medium hover:text-neon">
+                      {c.nodeName}
+                    </Link>
+                    <p className="text-sm text-court-300">{c.reason}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {review.treeProposal && <TreeProposalCard proposal={review.treeProposal} />}
+        {review.treeProposal && <TreeProposalCard proposal={review.treeProposal} />}
 
-      {review.weightShifts.length > 0 && (
-        <section className="space-y-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="font-display text-lg uppercase tracking-wider">Weight shifts</h3>
-            <Link
-              to="/scouting-report#shape"
-              className="text-xs uppercase tracking-wider text-court-300 hover:text-neon"
-            >
-              Rating shape →
-            </Link>
-          </div>
-          <WeightShiftList changes={review.weightShifts} />
-        </section>
-      )}
+        {review.weightShifts.length > 0 && (
+          <section className="space-y-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="font-display text-lg uppercase tracking-wider">Weight shifts</h3>
+              <Link
+                to="/scouting-report#shape"
+                className="text-xs uppercase tracking-wider text-court-300 hover:text-neon"
+              >
+                Rating shape →
+              </Link>
+            </div>
+            <WeightShiftList changes={review.weightShifts} />
+          </section>
+        )}
 
-      {review.decayRevisions.length > 0 && (
-        <section className="space-y-1">
-          <h3 className="font-display text-lg uppercase tracking-wider">Decay rule changes</h3>
-          <ul className="space-y-1 text-sm">
-            {review.decayRevisions.map((d) => (
-              <li key={d.nodeId}>
-                <span className="font-medium">{d.nodeName}:</span>{" "}
-                <span className="text-court-300">
-                  fades {d.perDay}/day after {d.graceDays} idle days, floor {d.floor}. {d.reason}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </article>
+        {review.decayRevisions.length > 0 && (
+          <section className="space-y-1">
+            <h3 className="font-display text-lg uppercase tracking-wider">Decay rule changes</h3>
+            <ul className="space-y-1 text-sm">
+              {review.decayRevisions.map((d) => (
+                <li key={d.nodeId}>
+                  <span className="font-medium">{d.nodeName}:</span>{" "}
+                  <span className="text-court-300">
+                    fades {d.perDay}/day after {d.graceDays} idle days, floor {d.floor}. {d.reason}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </article>
+    </ScoreProvider>
   );
 }
 

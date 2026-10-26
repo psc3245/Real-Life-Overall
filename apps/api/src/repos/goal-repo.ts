@@ -17,3 +17,7 @@ export async function upsert(db: Executor, nodeId: string, targetValue: number):
 export async function remove(db: Executor, nodeId: string): Promise<void> {
   await db.delete(goals).where(eq(goals.nodeId, nodeId));
 }
+
+export async function deleteByNodes(db: Executor, nodeIds: string[]): Promise<void> {
+  if (nodeIds.length) await db.delete(goals).where(inArray(goals.nodeId, nodeIds));
+}

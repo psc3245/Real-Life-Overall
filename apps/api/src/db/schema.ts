@@ -4,6 +4,7 @@ import {
   EXERCISE_TRACKING,
   OBJECTIVE_SOURCES,
   RATING_EVENT_SOURCES,
+  SEASON_MODES,
   UNIT_SYSTEMS,
   USER_ROLES,
 } from "@rlo/shared";
@@ -78,6 +79,7 @@ export const users = pgTable("users", {
 });
 
 export const seasonStatus = pgEnum("season_status", ["setup", "active", "archived"]);
+export const seasonMode = pgEnum("season_mode", SEASON_MODES);
 
 export const seasons = pgTable(
   "seasons",
@@ -90,6 +92,8 @@ export const seasons = pgTable(
     startsOn: date().notNull(),
     endsOn: date().notNull(),
     status: seasonStatus().notNull().default("setup"),
+    /** How the season is scored: OVR, or points gained (DESIGN.md §4.6). Locked after setup. */
+    mode: seasonMode().notNull().default("rating"),
     archetype: text(),
     archetypeDescription: text(),
     /** SeasonCardDto content, frozen when the season is archived. */
@@ -599,8 +603,12 @@ export const playerCards = pgTable(
       .references(() => seasons.id, { onDelete: "cascade" }),
     seasonLabel: text().notNull(),
     overall: rating().notNull(),
+    /** The season's mode; growth cards show and rank by growth and never share the rating. */
+    mode: seasonMode().notNull().default("rating"),
+    /** Overall points gained this season, kept for every player. */
+    growth: numeric({ precision: 7, scale: 2, mode: "number" }).notNull().default(0),
     archetype: text(),
-    /** PublicCategoryDto[] */
+    /** CardCategory[]: each top-level category's rating and growth. */
     categories: jsonb().notNull(),
     recappedDays: integer().notNull().default(0),
     /** Recapped days where the model flagged implausible or ambiguous claims. Owner-only. */

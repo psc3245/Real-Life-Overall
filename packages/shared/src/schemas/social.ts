@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SEASON_MODES, type SeasonMode } from "../rating/growth";
 import { CATEGORY_TEMPLATES } from "../templates";
 import type { UnitSystem } from "../units";
 import type { UserRole } from "./admin";
@@ -62,15 +63,22 @@ export interface PublicCategoryDto {
   name: string;
   /** Set when the category came from a template; only these compare across players. */
   templateKey: string | null;
+  /** The card's score: the rating, or on a growth card the points gained. */
   value: number;
 }
 
-/** The shareable slice of a player's ratings, cached per user (refreshed on change). */
+/**
+ * The shareable slice of a player's ratings, cached per user (refreshed on change). A growth
+ * card's numbers are points gained; its ratings are never shared (DESIGN.md §4.6).
+ */
 export interface PublicCardDto {
+  mode: SeasonMode;
   overall: number;
   archetype: string | null;
   seasonLabel: string;
   categories: PublicCategoryDto[];
+  /** Growth on every card, so compare can line up players across modes. */
+  growth: { overall: number; categories: PublicCategoryDto[] };
   /** Days this season the model has recapped (the evidence behind the ratings). */
   recappedDays: number;
   updatedAt: string;
@@ -108,8 +116,8 @@ export interface ProfileDto {
 export interface FriendDto {
   username: string;
   displayName: string;
-  /** Overall and archetype, when their visibility lets you see their card. */
-  card: { overall: number; archetype: string | null } | null;
+  /** Overall (growth on a growth card) and archetype, when their visibility allows. */
+  card: { mode: SeasonMode; overall: number; archetype: string | null } | null;
   /** When the request was sent or accepted. */
   since: string;
 }
@@ -179,6 +187,8 @@ export const LEADERBOARD_BOARDS = [
 ];
 export const leaderboardQuerySchema = z.object({
   scope: z.enum(LEADERBOARD_SCOPES).default("friends"),
+  /** Rating boards rank rating-mode players by OVR; growth boards rank growth-mode players. */
+  mode: z.enum(SEASON_MODES).optional(),
   board: z
     .string()
     .default("overall")
@@ -217,6 +227,9 @@ export interface LeaderboardEntryDto {
 
 export interface LeaderboardDto {
   scope: LeaderboardScope;
+  mode: SeasonMode;
+  /** Your own season's mode, the board you're ranked on. */
+  myMode: SeasonMode | null;
   board: string;
   seasonLabel: string;
   entries: LeaderboardEntryDto[];

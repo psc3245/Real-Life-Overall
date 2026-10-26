@@ -42,9 +42,9 @@ export async function getSeasonDetail(
   const nodes = await nodeRepo.findActiveBySeason(db, season.id);
   const [history, activity, weekly, badgeRows, habits] = await Promise.all([
     nodes.length && from <= through
-      ? historyBetween(db, season.id, nodes, from, through)
+      ? historyBetween(db, season.id, nodes, from, through, season.mode)
       : { dates: [], series: [] },
-    from <= through ? activityBetween(db, userId, season.id, from, through) : [],
+    from <= through ? activityBetween(db, userId, season.id, from, through, season.mode) : [],
     recapRepo.findWeeklyBySeason(db, userId, season.id),
     badgeRepo.findByUser(db, userId),
     habitRepo.findAllByUser(db, userId),
@@ -84,7 +84,7 @@ export async function getSeasonDetail(
         name: n.name,
         depth: n.depth,
         start: null,
-        end: n.value,
+        end: season.mode === "growth" ? (n.growth ?? null) : n.value,
       }));
 
   const logged = activity.filter((a) => a.logged).map((a) => a.date);
@@ -94,6 +94,7 @@ export async function getSeasonDetail(
     startsOn: season.startsOn,
     endsOn: season.endsOn,
     current,
+    mode: season.mode,
     through,
     archetype: season.archetype ?? snapshot?.archetype ?? null,
     nodes: detailNodes,

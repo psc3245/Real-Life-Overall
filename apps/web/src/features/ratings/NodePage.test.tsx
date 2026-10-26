@@ -22,6 +22,7 @@ const node = (over: Partial<RatedNodeDto>): RatedNodeDto => ({
   sortOrder: 0,
   templateKey: null,
   value: 60,
+  rating: null,
   rationale: null,
   confidence: null,
   decay: null,

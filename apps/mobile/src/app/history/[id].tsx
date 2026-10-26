@@ -26,6 +26,7 @@ const asRated = (nodes: SeasonDetailNode[]): RatedNodeDto[] =>
     sortOrder: i,
     templateKey: null,
     value: n.end,
+    rating: null,
     rationale: null,
     confidence: null,
     decay: null,

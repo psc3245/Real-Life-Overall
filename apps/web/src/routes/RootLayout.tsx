@@ -11,6 +11,7 @@ import { TimezoneSync } from "../components/TimezoneSync";
 import { PreferencesModal } from "../features/settings/PreferencesModal";
 import type { Feature, Preferences } from "@rlo/shared";
 import { useTalk } from "../lib/talk";
+import { OwnScoreProvider } from "../components/score";
 
 const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
   narrow: "max-w-3xl",
@@ -99,7 +100,9 @@ export function RootLayout() {
         <MainNav requests={requests} features={prefs.features} sticky={prefs.stickyNav} />
       )}
       <main className="flex-1 pb-16">
-        <Outlet />
+        <OwnScoreProvider enabled={auth.signedIn}>
+          <Outlet />
+        </OwnScoreProvider>
       </main>
       {auth.signedIn && <PreferencesModal />}
       <DebugPanel />

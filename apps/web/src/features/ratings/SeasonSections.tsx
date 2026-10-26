@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { useSeasonCards, useSeasonSetup } from "../../api/seasons";
 import { OvrBadge } from "../../components/OvrBadge";
+import { formatScore, seasonCardScores } from "../../components/score";
 
 /** Shown while a freshly rolled season can still be reshaped. */
 export function NewSeasonBanner() {
@@ -13,7 +14,8 @@ export function NewSeasonBanner() {
           Season {setup.data.label} has begun.
         </span>{" "}
         <span className="text-court-300">
-          Your ratings carried over. You can reshape your categories until {setup.data.setupEndsOn}.
+          Your ratings carried over. You can reshape your categories and pick how the season is
+          scored until {setup.data.setupEndsOn}.
         </span>
       </p>
       <Link
@@ -39,20 +41,23 @@ export function PastSeasons() {
       </div>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.data.map((c) => {
-          const categories = c.nodes.filter((n) => n.depth === 1);
+          const { mode, overall, categories } = seasonCardScores(c);
           return (
             <li key={c.id}>
               <Link
                 to={`/history/${c.id}`}
                 className="flex gap-4 rounded-xl border border-court-700 bg-court-900/70 p-4 hover:border-neon/60"
               >
-                {c.overall !== null && <OvrBadge value={c.overall} size="md" />}
+                {overall !== null && <OvrBadge value={overall} size="md" mode={mode} />}
                 <div className="min-w-0 text-sm">
                   <p className="font-display text-lg uppercase tracking-wider">{c.label}</p>
                   {c.archetype && <p className="truncate text-court-300">{c.archetype}</p>}
                   <p className="mt-1 text-court-500">
                     {categories
-                      .map((n) => `${n.name} ${n.value === null ? "–" : n.value.toFixed(0)}`)
+                      .map(
+                        (n) =>
+                          `${n.name} ${n.value === null ? "–" : formatScore(mode, n.value, 0)}`,
+                      )
                       .join(" · ")}
                   </p>
                 </div>

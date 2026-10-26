@@ -24,6 +24,7 @@ import {
   weightSuggestionOutputSchema,
   type AttributeSuggestionDto,
   type OnboardingStateDto,
+  type SeasonMode,
   type TreeDraft,
   type WeightSuggestionDto,
 } from "@rlo/shared";
@@ -50,7 +51,7 @@ import * as userRepo from "../repos/user-repo";
 import * as decayRuleRepo from "../repos/decay-rule-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import { awardBadges } from "./badge-service";
-import { ensureCurrentSeason } from "./season-service";
+import { ensureCurrentSeason, setSeasonMode } from "./season-service";
 import { initialRatingsSchemaFor, normalizeInitialRatings } from "./initial-ratings";
 import { templateSchema, templateToDraft } from "./template";
 import { normalizeQuestions, questionnaireSchemaFor, targetQuestionCount } from "./questionnaire";
@@ -99,6 +100,18 @@ const discoveryOf = (s: OnboardingSessionRow) =>
 const questionsOf = (s: OnboardingSessionRow) => s.questionnaire as QuestionDto[] | null;
 const answersOf = (s: OnboardingSessionRow) => (s.answers ?? {}) as Answers;
 const chatOf = (s: OnboardingSessionRow) => (s.chat ?? []) as ChatMessageDto[];
+
+/** Picks the first season's mode (DESIGN.md §4.6); open until onboarding is complete. */
+export async function setMode(
+  db: Database,
+  userId: string,
+  mode: SeasonMode,
+): Promise<OnboardingStateDto> {
+  const { season, session } = await loadSession(db, userId);
+  if (session.stage === "complete") throw conflict("The mode is locked for this season");
+  await setSeasonMode(db, season.id, mode);
+  return getState(db, userId);
+}
 
 /** Replaces the season's whole tree. Safe because nothing is rated during onboarding. */
 export async function saveTree(

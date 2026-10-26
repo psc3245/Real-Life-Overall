@@ -2,6 +2,7 @@ import type {
   RatingsDto,
   SeasonCardDto,
   SeasonDetailDto,
+  SeasonMode,
   SeasonSetupDto,
   TreeDraftNode,
 } from "@rlo/shared";
@@ -39,6 +40,20 @@ export function useSaveSeasonTree() {
       queryClient.setQueryData(ratingsKey, ratings);
       await queryClient.invalidateQueries({ queryKey: ratingsKey });
       await queryClient.invalidateQueries({ queryKey: ["habits"] });
+    },
+  });
+}
+
+/** Changes the new season's mode during its setup window (DESIGN.md §4.6). */
+export function useSetSeasonMode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mode: SeasonMode) =>
+      api<SeasonSetupDto>("/seasons/setup/mode", { method: "PUT", body: JSON.stringify({ mode }) }),
+    onSuccess: async (setup) => {
+      queryClient.setQueryData([...seasonsKey, "setup"], setup);
+      await queryClient.invalidateQueries({ queryKey: ratingsKey });
+      await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
     },
   });
 }

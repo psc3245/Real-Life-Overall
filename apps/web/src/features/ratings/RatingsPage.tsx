@@ -9,6 +9,7 @@ import { HistoryChart } from "../../components/charts/HistoryChart";
 import { ShapeRadar } from "../../components/charts/ShapeRadar";
 import { Button } from "../../components/Button";
 import { PlayerCard } from "../../components/PlayerCard";
+import { HiddenRating, useScore } from "../../components/score";
 import { StatBar } from "../../components/StatBar";
 import { SectionNav } from "../../components/SectionNav";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -35,6 +36,7 @@ export function RatingsPage() {
   const talk = useTalk();
   const ratings = useRatings();
   const me = useMe();
+  const { mode } = useScore();
 
   if (ratings.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
   if (ratings.isError) return <ErrorNote error={ratings.error} />;
@@ -72,10 +74,23 @@ export function RatingsPage() {
             </p>
           )}
           {data.summary && <p className="text-court-300">{data.summary}</p>}
+          {mode === "growth" && (
+            <div className="rounded-lg border border-neon/40 bg-neon/5 p-3 text-sm text-court-300">
+              <p>
+                <span className="font-display uppercase tracking-wider text-neon">
+                  {talk.growthMode}.
+                </span>{" "}
+                Every number this season is points gained since it started. Gains add up; decay and
+                off days never take them away. Your rating keeps running underneath, and only you
+                can see it.
+              </p>
+              {root && <HiddenRating rating={root.rating} className="mt-1" />}
+            </div>
+          )}
           {root && (
             <div className="rounded-lg border border-court-800 p-3">
               <p className="mb-1 text-xs uppercase tracking-wider text-court-300">
-                Overall potential
+                {mode === "growth" ? "Overall growth target" : "Overall potential"}
               </p>
               <GoalEditor node={root} />
             </div>
@@ -92,7 +107,9 @@ export function RatingsPage() {
             </span>
           </Link>
           <p className="text-sm text-court-500">
-            Tap any attribute to see why it's rated that way.
+            {mode === "growth"
+              ? "Tap any attribute to see where its gains came from."
+              : "Tap any attribute to see why it's rated that way."}
           </p>
         </div>
       </div>
@@ -126,6 +143,7 @@ export function RatingsPage() {
             </Link>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <GoalEditor node={c} />
+              <HiddenRating rating={c.rating} />
               <Link
                 to={`/ratings/node/${c.id}`}
                 className="text-xs uppercase tracking-wider text-court-300 hover:text-neon"
@@ -199,6 +217,7 @@ function Detail({ node }: { node: RatedNodeDto }) {
         History, changes and linked habits →
       </Link>
       <GoalEditor node={node} />
+      <HiddenRating rating={node.rating} />
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs uppercase tracking-wider text-court-500">
         {node.confidence && <span>{CONFIDENCE_LABEL[node.confidence]}</span>}
         {node.decay && (

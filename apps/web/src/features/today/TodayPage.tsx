@@ -18,7 +18,8 @@ import { useMe } from "../../api/hooks";
 import { usePreferences } from "../../api/preferences";
 import { useActivity, useRatings } from "../../api/ratings";
 import { DayPicker } from "../../components/DayPicker";
-import { Delta } from "../../components/Delta";
+import { ChangeDelta, Delta, OverallMove } from "../../components/Delta";
+import { formatScore, useScore } from "../../components/score";
 import { OvrBadge } from "../../components/OvrBadge";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import {
@@ -281,6 +282,8 @@ function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
 }
 
 function RatingCard({ nodes, movers: moverCount }: { nodes: RatedNodeDto[]; movers: number }) {
+  const talk = useTalk();
+  const { mode } = useScore();
   const root = nodes.find((n) => n.parentId === null);
   if (root?.value == null) return null;
   const parents = new Set(nodes.map((n) => n.parentId));
@@ -291,7 +294,7 @@ function RatingCard({ nodes, movers: moverCount }: { nodes: RatedNodeDto[]; move
 
   return (
     <Card
-      title="Your rating"
+      title={mode === "growth" ? `Your ${talk.growthMode} season` : "Your rating"}
       action={
         <Link to="/ratings" className={cardLink}>
           Full rating →
@@ -308,7 +311,7 @@ function RatingCard({ nodes, movers: moverCount }: { nodes: RatedNodeDto[]; move
           )}
           {root.projection != null && (
             <p className="text-sm text-court-500">
-              Projected {root.projection.toFixed(1)} at season end
+              Projected {formatScore(mode, root.projection)} at season end
             </p>
           )}
         </div>
@@ -448,17 +451,14 @@ function RecapCard({ title, recap, date }: { title: string; recap: RecapDto; dat
       }
     >
       {before !== null && after !== null && (
-        <p className="font-display text-lg tabular-nums text-court-300">
-          OVR {before.toFixed(1)} → <span className="text-court-100">{after.toFixed(1)}</span>{" "}
-          {Math.abs(after - before) >= 0.05 && <Delta value={after - before} />}
-        </p>
+        <OverallMove mode={recap.mode} before={before} after={after} />
       )}
       <p className="text-court-100">{recap.narrative}</p>
       {top.length > 0 && (
         <ul className="space-y-1 text-sm">
           {top.map((c) => (
             <li key={c.nodeId} className="grid grid-cols-[3.5rem_1fr] gap-2">
-              <Delta value={c.delta} />
+              <ChangeDelta delta={c.delta} growth={c.growth} />
               <Link to={`/ratings/node/${c.nodeId}`} className="hover:text-neon">
                 <span className="font-medium">{c.nodeName}</span>{" "}
                 <span className="text-court-300">{c.reason}</span>

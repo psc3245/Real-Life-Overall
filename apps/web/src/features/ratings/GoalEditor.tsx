@@ -3,9 +3,14 @@ import { useState, type FormEvent } from "react";
 import { useSetGoal } from "../../api/ratings";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { formatScore, useScore } from "../../components/score";
 
-/** Set or clear a node's goal rating; shows the season-end projection beside it. */
+/**
+ * Set or clear a node's goal (a rating, or in a growth season the points to gain); shows the
+ * season-end projection beside it.
+ */
 export function GoalEditor({ node }: { node: RatedNodeDto }) {
+  const { mode } = useScore();
   const setGoal = useSetGoal();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(node.goal?.toString() ?? "");
@@ -19,7 +24,9 @@ export function GoalEditor({ node }: { node: RatedNodeDto }) {
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs uppercase tracking-wider text-court-500">
-      {node.projection != null && <span>Projected {node.projection.toFixed(1)} by season end</span>}
+      {node.projection != null && (
+        <span>Projected {formatScore(mode, node.projection)} by season end</span>
+      )}
       {editing ? (
         <form onSubmit={save} className="flex items-center gap-1 normal-case tracking-normal">
           <input
@@ -28,7 +35,7 @@ export function GoalEditor({ node }: { node: RatedNodeDto }) {
             max={100}
             step={0.5}
             autoFocus
-            aria-label={`Goal for ${node.name}`}
+            aria-label={`${mode === "growth" ? "Points to gain" : "Goal"} for ${node.name}`}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             className="w-20 rounded-md border border-court-700 bg-court-950 px-2 py-1 text-sm text-court-100 outline-none focus:border-neon"
@@ -60,7 +67,11 @@ export function GoalEditor({ node }: { node: RatedNodeDto }) {
           onClick={() => setEditing(true)}
           className="uppercase tracking-wider hover:text-neon"
         >
-          {node.goal != null ? `Goal ${node.goal.toFixed(1)} · edit` : "+ Set goal"}
+          {node.goal != null
+            ? `Goal ${formatScore(mode, node.goal)} · edit`
+            : mode === "growth"
+              ? "+ Set growth target"
+              : "+ Set goal"}
         </button>
       )}
       <ErrorNote error={setGoal.error} />

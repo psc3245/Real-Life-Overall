@@ -1,12 +1,21 @@
-import { parsePreferences, type SportsTalk } from "@rlo/shared";
+import { parsePreferences, type SeasonMode, type SportsTalk } from "@rlo/shared";
 import { APICallError, generateText, Output, type ModelMessage } from "ai";
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import type { Database } from "../db/client";
 import { llmCalls, users } from "../db/schema";
+import * as seasonRepo from "../repos/season-repo";
 import { estimateCostUsd, type LlmPurpose } from "./models";
+import { GROWTH_MODE } from "./prompts/shared";
 import { VOICE, VOICED_PURPOSES } from "./prompts/voice";
 import type { ModelResolver } from "./providers";
+
+/** How the model should write for this player. */
+export interface Voice {
+  talk: SportsTalk;
+  mode: SeasonMode;
+}
+const DEFAULT_VOICE: Voice = { talk: "normal", mode: "rating" };
 
 export interface StructuredRequest<T extends z.ZodType> {
   purpose: LlmPurpose;
@@ -50,21 +59,28 @@ export class LlmClient {
   constructor(
     private readonly resolveModel: ModelResolver,
     private readonly recordCall: (record: LlmCallRecord) => Promise<void>,
-    /** The player's sports-talk setting; without one every call uses the normal voice. */
-    private readonly resolveVoice?: (userId: string) => Promise<SportsTalk>,
+    /**
+     * The player's sports-talk setting and season mode; without them every call uses the
+     * normal voice and rating mode.
+     */
+    private readonly resolveVoice?: (userId: string) => Promise<Voice>,
   ) {}
 
-  /** Appends the player's voice to calls that write text they read (DESIGN.md §7.10). */
+  /**
+   * Appends the player's voice (DESIGN.md §7.10), and the growth-mode note in a growth season
+   * (§4.6), to calls that write text they read.
+   */
   private async withVoice<T extends z.ZodType>(req: StructuredRequest<T>) {
     if (!VOICED_PURPOSES.has(req.purpose)) return req;
-    const talk: SportsTalk =
+    const { talk, mode }: Voice =
       req.userId && this.resolveVoice
-        ? await this.resolveVoice(req.userId).catch(() => "normal" as const)
-        : "normal";
+        ? await this.resolveVoice(req.userId).catch(() => DEFAULT_VOICE)
+        : DEFAULT_VOICE;
+    const growth = mode === "growth";
     return {
       ...req,
-      system: `${req.system}\n\n${VOICE[talk]}`,
-      promptVersion: `${req.promptVersion}+talk-${talk}`,
+      system: [req.system, ...(growth ? [GROWTH_MODE] : []), VOICE[talk]].join("\n\n"),
+      promptVersion: `${req.promptVersion}+talk-${talk}${growth ? "+growth" : ""}`,
     };
   }
 
@@ -150,13 +166,16 @@ export function dbCallRecorder(db: Database) {
   };
 }
 
-/** Reads the player's sports-talk preference (DESIGN.md §7.10). */
+/** Reads the player's sports-talk preference (DESIGN.md §7.10) and current season's mode. */
 export function dbVoiceResolver(db: Database) {
-  return async (userId: string): Promise<SportsTalk> => {
-    const rows = await db
-      .select({ preferences: users.preferences })
-      .from(users)
-      .where(eq(users.id, userId));
-    return parsePreferences(rows[0]?.preferences).sportsTalk;
+  return async (userId: string): Promise<Voice> => {
+    const [rows, season] = await Promise.all([
+      db.select({ preferences: users.preferences }).from(users).where(eq(users.id, userId)),
+      seasonRepo.findLatest(db, userId),
+    ]);
+    return {
+      talk: parsePreferences(rows[0]?.preferences).sportsTalk,
+      mode: season?.mode ?? "rating",
+    };
   };
 }

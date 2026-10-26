@@ -7,6 +7,9 @@ import {
   HABIT_TYPE_LABELS,
   isHabitDone,
   lastCompletedWeek,
+  growthDelta,
+  leafGrowthFromEvents,
+  leafScoresFromEvents,
   leafValuesFromEvents,
   localDateIn,
   MAX_DECAY_REVISIONS,
@@ -25,6 +28,7 @@ import {
   type HabitDto,
   type HabitProposalDto,
   type RatingNodeDto,
+  type SeasonMode,
   type TreeProposalDto,
   type WeightChangeDto,
   type WeeklyReviewDto,
@@ -36,6 +40,7 @@ import type { Database } from "../db/client";
 import { badRequest, conflict, isUniqueViolation, notFound } from "../errors";
 import type { LlmClient } from "../llm/client";
 import { refsFor, renderTree, toPromptNodes } from "../llm/prompts/tree";
+import { GROWTH_PROJECTIONS_NOTE } from "../llm/prompts/shared";
 import { weeklyReviewPrompt } from "../llm/prompts/weekly";
 import * as decayRepo from "../repos/decay-repo";
 import * as evolutionRepo from "../repos/evolution-repo";
@@ -79,6 +84,8 @@ interface WeeklyOutput {
   decayRevisions: Omit<DecayRevisionDto, "nodeName">[];
   /** Season-end projections for Overall and categories (absent on older reviews). */
   projections?: { nodeId: string; value: number }[];
+  /** The mode the projections are in (absent: ratings, from before growth mode). */
+  mode?: SeasonMode;
   archetypeChange?: WeeklyReviewDto["archetypeChange"];
 }
 
@@ -97,16 +104,17 @@ async function reviewableWeek(db: Database, userId: string, ctx: LeafContext) {
   return { user, week: localDateIn(user.timezone, onboarded) <= week.end ? week : null };
 }
 
-function overallOf(nodes: RatingNodeDto[], events: { nodeId: string; delta: number }[]) {
+function overallOf(nodes: RatingNodeDto[], events: DatedEvent[], mode: SeasonMode) {
   const root = nodes.find((n) => n.parentId === null);
   if (!root) return null;
-  return computeNodeValues(nodes, leafValuesFromEvents(events)).get(root.id) ?? null;
+  return computeNodeValues(nodes, leafScoresFromEvents(mode, events)).get(root.id) ?? null;
 }
 
 export function toWeeklyDto(
   recap: RecapRow,
   nodes: RatingNodeDto[],
   events: DatedEvent[],
+  mode: SeasonMode,
   badges: EarnedBadgeDto[] = [],
   evolution: Evolution = NO_EVOLUTION,
 ): WeeklyReviewDto {
@@ -114,20 +122,22 @@ export function toWeeklyDto(
   const names = new Map(nodes.map((n) => [n.id, n.name]));
   const asOf = (date: string, exclusive: boolean) =>
     events.filter((e) => e.date === null || (exclusive ? e.date < date : e.date <= date));
-  const after = leafValuesFromEvents(asOf(recap.periodEnd, false));
+  const after = leafScoresFromEvents(mode, asOf(recap.periodEnd, false));
   return {
     id: recap.id,
     weekStart: recap.periodStart,
     weekEnd: recap.periodEnd,
     narrative: recap.narrative,
-    overallStart: overallOf(nodes, asOf(recap.periodStart, true)),
-    overallEnd: overallOf(nodes, asOf(recap.periodEnd, false)),
+    mode,
+    overallStart: overallOf(nodes, asOf(recap.periodStart, true), mode),
+    overallEnd: overallOf(nodes, asOf(recap.periodEnd, false), mode),
     corrections: events
       .filter((e) => e.recapId === recap.id)
       .map((e) => ({
         nodeId: e.nodeId,
         nodeName: names.get(e.nodeId) ?? "Unknown",
         delta: e.delta,
+        growth: growthDelta(e),
         reason: e.reason,
         evidence: null,
         valueAfter: after.get(e.nodeId) ?? 0,
@@ -208,6 +218,7 @@ export async function getWeeklyState(db: Database, userId: string): Promise<Week
           current,
           ctx.nodes,
           datedEvents(rows),
+          ctx.season.mode,
           (await badgesByRecap(db, [current.id])).get(current.id),
           await evolutionOf(db, current.id, ctx.nodes, ctx.season.id),
         )
@@ -232,16 +243,18 @@ export async function getWeeklyReview(
 ): Promise<WeeklyReviewDto> {
   const recap = await recapRepo.findById(db, userId, id);
   if (!recap || recap.kind !== "weekly") throw notFound("Weekly review not found");
-  const [nodes, rows, badges, current] = await Promise.all([
+  const [nodes, rows, badges, current, season] = await Promise.all([
     nodeRepo.findActiveBySeason(db, recap.seasonId),
     eventRepo.findActiveWithDates(db, recap.seasonId),
     badgesByRecap(db, [recap.id]),
     seasonRepo.findLatestActive(db, userId),
+    seasonRepo.findById(db, recap.seasonId),
   ]);
   return toWeeklyDto(
     recap,
     nodes,
     datedEvents(rows),
+    season?.mode ?? "rating",
     badges.get(recap.id),
     await evolutionOf(db, recap.id, nodes, current?.id ?? null),
   );
@@ -493,6 +506,7 @@ export async function runWeeklyReview(
   const seasonStart = startWeights(ctx.nodes, weightHistory);
   const names = new Map(ctx.nodes.map((n) => [n.id, n.name]));
   const goalLines = goals.map((g) => `- ${names.get(g.nodeId)}: ${g.targetValue}`);
+  const growthMode = ctx.season.mode === "growth";
   // Older days related to this week, matched on both journals and recap narratives.
   const memories = await searchMemories(
     db,
@@ -510,9 +524,23 @@ export async function runWeeklyReview(
       `What you know about the user:\n${profile || "(nothing yet)"}`,
       "Current ratings (Overall is the implicit root):",
       renderTree(toPromptNodes(ctx.nodes, refById, nodeValues), true),
+      ...(growthMode
+        ? [
+            GROWTH_PROJECTIONS_NOTE,
+            "Points gained this season:",
+            renderTree(
+              toPromptNodes(
+                ctx.nodes,
+                refById,
+                computeNodeValues(ctx.nodes, leafGrowthFromEvents(events)),
+              ),
+              true,
+            ),
+          ]
+        : []),
       await renderWeek(db, userId, ctx, week, refById, events),
       `Last week's focus goals:\n${lastFocus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
-      `The user's goal ratings:\n${goalLines.join("\n") || "(none set)"}`,
+      `The user's ${growthMode ? "growth targets (points to gain by season end)" : "goal ratings"}:\n${goalLines.join("\n") || "(none set)"}`,
       `Season: ${ctx.season.label}, ends ${ctx.season.endsOn} (${daysBetween(week.end, ctx.season.endsOn)} days after this week).`,
       `Current archetype: ${archetype ? `${archetype.name}: ${archetype.description}` : "(none)"}`,
       `Related older days:\n${renderMemories(memories) || "(none)"}`,
@@ -558,6 +586,7 @@ export async function runWeeklyReview(
           habitProposals: normalized.habitProposals,
           decayRevisions: normalized.decayRevisions,
           projections: normalized.projections,
+          mode: ctx.season.mode,
           archetypeChange:
             normalized.archetype && normalized.archetype.name !== archetype?.name
               ? {
