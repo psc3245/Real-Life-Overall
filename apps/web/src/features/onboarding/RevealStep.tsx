@@ -7,9 +7,10 @@ import { Button } from "../../components/Button";
 import { OvrBadge } from "../../components/OvrBadge";
 import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "./ErrorNote";
+import { useTalk } from "../../lib/talk";
 
 const WORKING_LINES = [
-  "Reviewing your scouting report…",
+  "Reviewing your answers…",
   "Checking answers against the rating scale…",
   "Weighing strengths and gaps…",
   "Writing your rationales…",
@@ -22,6 +23,7 @@ export function RevealStep({ state }: { state: OnboardingStateDto }) {
 }
 
 function ReadyToRate() {
+  const talk = useTalk();
   const rate = useRateInitial();
   const [line, setLine] = useState(0);
 
@@ -33,10 +35,12 @@ function ReadyToRate() {
 
   return (
     <div className="rounded-xl border border-court-700 bg-court-900/70 p-8 text-center">
-      <p className="font-display text-3xl uppercase tracking-wider text-neon">Scouting complete</p>
+      <p className="font-display text-3xl uppercase tracking-wider text-neon">
+        {talk.scouting} complete
+      </p>
       <p className="mx-auto mt-3 max-w-md text-court-300">
-        The scouts have everything they need. Your starting ratings are set once and then move with
-        what you log.
+        That's everything needed. Your starting ratings are set once and then move with what you
+        log.
       </p>
       <Button
         variant="primary"
@@ -44,7 +48,7 @@ function ReadyToRate() {
         disabled={rate.isPending}
         onClick={() => rate.mutate()}
       >
-        {rate.isPending ? "Rating you…" : "Reveal my rating"}
+        {rate.isPending ? "Rating you…" : talk.revealButton}
       </Button>
       {rate.isPending && (
         <p aria-live="polite" className="mt-4 animate-pulse text-sm text-court-500">

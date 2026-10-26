@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useDiscovery, useDraftTemplate, useSkipDiscovery } from "../../api/onboarding";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "./ErrorNote";
+import { useTalk } from "../../lib/talk";
 
 const DRAFTING = [
   "Reading your conversation…",
@@ -12,6 +13,7 @@ const DRAFTING = [
 
 /** Step 1: get to know the player, then let the scout draft their rating tree. */
 export function DiscoveryChat({ state }: { state: OnboardingStateDto }) {
+  const talk = useTalk();
   const chat = useDiscovery();
   const draft = useDraftTemplate();
   const skip = useSkipDiscovery();
@@ -52,7 +54,7 @@ export function DiscoveryChat({ state }: { state: OnboardingStateDto }) {
   return (
     <div className="space-y-6">
       <p className="text-court-300">
-        First, a short conversation so the scout understands what matters in your life. Then it
+        First, a short conversation so {talk.scout} understands what matters in your life. Then it
         drafts your rating tree for you to edit.
       </p>
       <div className="space-y-3" aria-live="polite">

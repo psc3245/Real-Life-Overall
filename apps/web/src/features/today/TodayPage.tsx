@@ -33,6 +33,7 @@ import { preferencesLink } from "../settings/PreferencesModal";
 import { formatElapsed, formatVolume } from "../workouts/format";
 import { dayLabel, longDate } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
+import { useTalk } from "../../lib/talk";
 const PinnedCharts = lazy(() =>
   import("../charts/PinnedCharts").then((m) => ({ default: m.PinnedCharts })),
 );
@@ -45,6 +46,7 @@ const STATUS_LABEL: Record<DayDto["status"], string> = {
 
 /** Today at a glance: what's done, what's left, and how the ratings are moving. Logging is /log. */
 export function TodayPage() {
+  const talk = useTalk();
   const day = useDay(null);
   const ratings = useRatings();
   const me = useMe();
@@ -95,7 +97,10 @@ export function TodayPage() {
     <div className="space-y-6 pt-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-neon">{longDate(d.today)}</p>
+          <p className="text-sm uppercase tracking-[0.3em] text-neon">
+            {talk.todayEyebrow && `${talk.todayEyebrow} · `}
+            {longDate(d.today)}
+          </p>
           <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
             {t.greeting && me.data?.displayName ? greeting(me.data.displayName) : "Today"}
           </h1>

@@ -1,13 +1,17 @@
 import { createApp, type DepsFactory } from "./app";
 import { createNeonDb } from "./db/client";
 import { parseEnv } from "./env";
-import { dbCallRecorder, LlmClient } from "./llm/client";
+import { dbCallRecorder, dbVoiceResolver, LlmClient } from "./llm/client";
 import { createEnvModelResolver } from "./llm/providers";
 import { runHourly } from "./services/scheduler";
 
 const makeDeps: DepsFactory = (env) => {
   const { db, dispose } = createNeonDb(env.DATABASE_URL);
-  return { db, dispose, llm: new LlmClient(createEnvModelResolver(env), dbCallRecorder(db)) };
+  return {
+    db,
+    dispose,
+    llm: new LlmClient(createEnvModelResolver(env), dbCallRecorder(db), dbVoiceResolver(db)),
+  };
 };
 
 const app = createApp(makeDeps);

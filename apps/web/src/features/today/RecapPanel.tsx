@@ -9,6 +9,7 @@ import { useRecapDebug } from "../../api/admin";
 import { DebugFacts, DebugJson } from "../../components/debug/Debug";
 import { useDebug } from "../../components/debug/debugMode";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { useTalk } from "../../lib/talk";
 
 const WORKING = ["Reading your day…", "Weighing the evidence…", "Updating your ratings…"];
 
@@ -25,6 +26,7 @@ function hasContent(day: DayDto) {
 
 /** "End my day" before a recap; the recap itself after, with an update button if stale. */
 export function RecapPanel({ day }: { day: DayDto }) {
+  const talk = useTalk();
   const endDay = useEndDay(day.date);
   const [line, setLine] = useState(0);
   useEffect(() => {
@@ -54,10 +56,10 @@ export function RecapPanel({ day }: { day: DayDto }) {
       <section className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-5">
         <h2 className="font-display text-xl uppercase tracking-wider">Recap</h2>
         <p className="text-sm text-court-300">
-          When you're done for the day, the scout reviews what you logged and moves your ratings.
+          When you're done for the day, {talk.scout} reviews what you logged and moves your ratings.
         </p>
         {day.editable ? (
-          action("End my day")
+          action(talk.endDay)
         ) : (
           <p className="text-sm text-court-500">Not recapped.</p>
         )}

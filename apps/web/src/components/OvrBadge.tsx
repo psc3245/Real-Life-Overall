@@ -1,6 +1,7 @@
 import { ratingTier } from "@rlo/shared";
 import { tierColor } from "./tier";
 import { useCountUp } from "./useCountUp";
+import { useTalk } from "../lib/talk";
 
 export function OvrBadge({
   value,
@@ -12,6 +13,7 @@ export function OvrBadge({
   /** Count up from 0, for the reveal. */
   animate?: boolean;
 }) {
+  const talk = useTalk();
   const counted = useCountUp(value, 2200);
   const shown = animate ? counted : value;
   const color = tierColor(ratingTier(shown));
@@ -26,7 +28,7 @@ export function OvrBadge({
       style={{ borderColor: color, color, boxShadow: `0 0 24px -6px ${color}` }}
     >
       <span className="tabular-nums">{Math.round(shown)}</span>
-      <span className="mt-1 text-xs font-semibold tracking-[0.3em] text-court-300">OVR</span>
+      <span className="mt-1 text-xs font-semibold tracking-[0.3em] text-court-300">{talk.ovr}</span>
     </div>
   );
 }

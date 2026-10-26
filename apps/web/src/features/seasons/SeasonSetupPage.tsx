@@ -4,8 +4,10 @@ import { useSaveSeasonTree, useSeasonSetup } from "../../api/seasons";
 import { nodesToDraft } from "../onboarding/draft";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { TreeBuilder } from "../onboarding/TreeBuilder";
+import { useTalk } from "../../lib/talk";
 
 export function SeasonSetupPage() {
+  const talk = useTalk();
   const setup = useSeasonSetup();
   const ratings = useRatings();
   const save = useSaveSeasonTree();
@@ -35,7 +37,7 @@ export function SeasonSetupPage() {
         <p className="mt-2 max-w-2xl text-court-300">
           Your ratings carried over{setup.data.previous ? ` from ${setup.data.previous.label}` : ""}
           . Rename, add, move or remove categories and attributes until {setup.data.setupEndsOn}.
-          New attributes get starting ratings from the scout; removed ones keep their history.
+          New attributes get starting ratings from {talk.scout}; removed ones keep their history.
         </p>
       </header>
       <TreeBuilder

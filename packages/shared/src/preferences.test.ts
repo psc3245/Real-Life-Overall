@@ -11,6 +11,9 @@ describe("preferences", () => {
   it("fill every missing field with its default", () => {
     expect(parsePreferences(null)).toEqual(DEFAULT_PREFERENCES);
     expect(DEFAULT_PREFERENCES.theme).toBe("court");
+    expect(DEFAULT_PREFERENCES.sportsTalk).toBe("normal");
+    expect(parsePreferences({ sportsTalk: "loud" }).sportsTalk).toBe("normal");
+    expect(parsePreferences({ sportsTalk: "extra" }).sportsTalk).toBe("extra");
     expect(Object.values(DEFAULT_PREFERENCES.features).every(Boolean)).toBe(true);
     expect(DEFAULT_PREFERENCES.today.widgets.map((w) => w.id)).toEqual([...TODAY_WIDGETS]);
   });

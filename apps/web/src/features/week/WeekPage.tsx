@@ -31,10 +31,12 @@ import { WeekBreakdown } from "./WeekBreakdown";
 import { shortDate } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
 import { TreeProposalCard, WeightShiftList } from "../scouting/TreeEvolution";
+import { cap, useTalk } from "../../lib/talk";
 
 const WORKING = ["Reading your week…", "Checking habits and decay…", "Setting next week's focus…"];
 
 export function WeekPage() {
+  const talk = useTalk();
   const weekly = useWeekly();
   const ratings = useRatings();
   const run = useRunWeekly();
@@ -65,7 +67,7 @@ export function WeekPage() {
     <div className="space-y-8 pt-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-neon">Weekly review</p>
+          <p className="text-sm uppercase tracking-[0.3em] text-neon">{talk.weeklyReview}</p>
           <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
             {week ? `${shortDate(week.start)} – ${shortDate(week.end)}` : "Your week"}
           </h1>
@@ -83,8 +85,8 @@ export function WeekPage() {
       {ready && (
         <section className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-5">
           <p className="text-court-300">
-            This week is done. The scout reviews it as a whole: what worked, what slipped, your
-            focus for next week, and any habits worth adding.
+            This week is done. {cap(talk.scout)} reviews it as a whole: what worked, what slipped,
+            your focus for next week, and any habits worth adding.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button
@@ -93,7 +95,7 @@ export function WeekPage() {
               disabled={run.isPending}
               onClick={() => run.mutate()}
             >
-              {run.isPending ? WORKING[line] : "Run weekly review"}
+              {run.isPending ? WORKING[line] : talk.runWeekly}
             </Button>
             {run.isPending && <span className="text-sm text-court-500">Up to a minute.</span>}
           </div>

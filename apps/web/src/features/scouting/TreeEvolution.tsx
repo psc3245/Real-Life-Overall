@@ -4,6 +4,7 @@ import { useResolveTreeProposal, useUndoWeightChange } from "../../api/evolution
 import { Button } from "../../components/Button";
 import { shortDate } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { useTalk } from "../../lib/talk";
 
 /** Weight shifts made by weekly reviews, each undoable while its season is current. */
 export function WeightShiftList({
@@ -106,6 +107,7 @@ const STATUS_LABEL: Record<TreeProposalDto["status"], string> = {
 
 /** A proposed tree change: what it adds or removes, why, and accept/dismiss. */
 export function TreeProposalCard({ proposal: p }: { proposal: TreeProposalDto }) {
+  const talk = useTalk();
   const resolve = useResolveTreeProposal();
   const pending = p.status === "pending";
   return (
@@ -129,8 +131,8 @@ export function TreeProposalCard({ proposal: p }: { proposal: TreeProposalDto })
       {pending && (
         <>
           <p className="text-sm text-court-500">
-            New attributes get a starting rating from the scout. Removed ones leave your rating for
-            the rest of the season. You can always reshape the tree at the next season setup.
+            New attributes get a starting rating from {talk.scout}. Removed ones leave your rating
+            for the rest of the season. You can always reshape the tree at the next season setup.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button

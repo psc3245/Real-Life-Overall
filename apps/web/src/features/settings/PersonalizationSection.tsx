@@ -6,6 +6,8 @@ import {
   THEMES,
   type Preferences,
   type PreferencesPatch,
+  SPORTS_TALK_INFO,
+  SPORTS_TALK_LEVELS,
 } from "@rlo/shared";
 import { useEffect } from "react";
 import { usePreferences, useSetPreferences } from "../../api/preferences";
@@ -40,6 +42,7 @@ const APPEARANCE_KEYS = [
   "stickyNav",
   "showApiStatus",
   "startPage",
+  "sportsTalk",
 ] as const satisfies readonly (keyof Preferences)[];
 
 export function PersonalizationSection() {
@@ -197,6 +200,17 @@ export function PersonalizationSection() {
           ))}
         </div>
       </div>
+
+      <Segmented
+        label="Sports talk"
+        value={prefs.sportsTalk}
+        onChange={(sportsTalk) => set({ sportsTalk })}
+        options={SPORTS_TALK_LEVELS.map((level) => ({
+          value: level,
+          label: SPORTS_TALK_INFO[level].label,
+        }))}
+        hint={`${SPORTS_TALK_INFO[prefs.sportsTalk].detail} Changes the app's wording and how the AI writes your recaps, reviews and coach replies.`}
+      />
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Segmented

@@ -1,3 +1,4 @@
+import { useTalk } from "../../lib/talk";
 export const ONBOARDING_STEPS = [
   { key: "discover", label: "Discover" },
   { key: "tree", label: "Build" },
@@ -17,6 +18,7 @@ export function StepIndicator({
   reachable: StepKey[];
   onSelect: (step: StepKey) => void;
 }) {
+  const talk = useTalk();
   return (
     <ol className="flex flex-wrap gap-2" aria-label="Onboarding steps">
       {ONBOARDING_STEPS.map((step, i) => {
@@ -38,7 +40,11 @@ export function StepIndicator({
               }`}
             >
               <span className="tabular-nums">{i + 1}</span>
-              {step.label}
+              {step.key === "questionnaire"
+                ? talk.scouting
+                : step.key === "reveal"
+                  ? talk.reveal
+                  : step.label}
             </button>
           </li>
         );

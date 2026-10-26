@@ -1,4 +1,5 @@
 import type { AnswerValue, OnboardingStateDto, QuestionDto } from "@rlo/shared";
+import { useTalk } from "../../lib/talk";
 
 function formatAnswer(question: QuestionDto, value: AnswerValue | undefined): string {
   if (value === undefined || value === "") return "—";
@@ -9,6 +10,7 @@ function formatAnswer(question: QuestionDto, value: AnswerValue | undefined): st
 
 /** Read-only view of submitted answers and the follow-up chat. */
 export function ScoutingRecap({ state }: { state: OnboardingStateDto }) {
+  const talk = useTalk();
   return (
     <div className="space-y-8">
       <section className="space-y-3">
@@ -29,7 +31,7 @@ export function ScoutingRecap({ state }: { state: OnboardingStateDto }) {
             {state.chat.map((m, i) => (
               <p key={i} className={m.role === "user" ? "text-court-100" : "text-court-300"}>
                 <span className="mr-2 text-xs uppercase tracking-wider text-court-500">
-                  {m.role === "user" ? "You" : "Scout"}
+                  {m.role === "user" ? "You" : talk.Scout}
                 </span>
                 {m.content}
               </p>

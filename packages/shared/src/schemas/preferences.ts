@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SPORTS_TALK_LEVELS } from "../talk";
 
 /**
  * Per-player personalization and configuration (DESIGN.md §7.9), stored as one jsonb document on
@@ -172,6 +173,8 @@ export const preferencesSchema = z.object({
   stickyNav: z.boolean().catch(false),
   showApiStatus: z.boolean().catch(true),
   startPage: z.enum(START_PAGES).catch("home"),
+  /** How much sports framing the app and the model use (DESIGN.md §7.10). */
+  sportsTalk: z.enum(SPORTS_TALK_LEVELS).catch("normal"),
   features: featuresSchema,
   today: todaySchema,
 });
@@ -208,6 +211,7 @@ export const preferencesPatchSchema = z
     stickyNav: z.boolean(),
     showApiStatus: z.boolean(),
     startPage: z.enum(START_PAGES),
+    sportsTalk: z.enum(SPORTS_TALK_LEVELS),
     features: z.object(
       Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<Feature, z.ZodBoolean>,
     ),

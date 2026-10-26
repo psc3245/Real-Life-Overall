@@ -10,6 +10,7 @@ import { DevUserSwitcher } from "../components/DevUserSwitcher";
 import { TimezoneSync } from "../components/TimezoneSync";
 import { PreferencesModal } from "../features/settings/PreferencesModal";
 import type { Feature, Preferences } from "@rlo/shared";
+import { useTalk } from "../lib/talk";
 
 const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
   narrow: "max-w-3xl",
@@ -122,6 +123,7 @@ function MainNav({
   features: Record<Feature, boolean>;
   sticky: boolean;
 }) {
+  const talk = useTalk();
   const link = (feature: Feature, to: string, label: string) =>
     features[feature] && (
       <NavLink to={to} className={side}>
@@ -140,7 +142,7 @@ function MainNav({
             `whitespace-nowrap font-display text-base font-semibold uppercase tracking-wider ${isActive ? "text-neon" : "text-court-100 hover:text-neon"}`
           }
         >
-          Today
+          {talk.nav.today}
         </NavLink>
         <span className="contents lg:flex lg:gap-5">
           <NavLink to="/log" className={side}>
@@ -148,9 +150,9 @@ function MainNav({
           </NavLink>
           {link("habits", "/habits", "Habits")}
           {link("goals", "/goals", "Goals")}
-          {link("workouts", "/workouts", "Train")}
-          {link("week", "/week", "Week")}
-          {link("coach", "/coach", "Coach")}
+          {link("workouts", "/workouts", talk.nav.workouts)}
+          {link("week", "/week", talk.nav.week)}
+          {link("coach", "/coach", talk.coach)}
         </span>
       </div>
       <NavLink
@@ -175,7 +177,7 @@ function MainNav({
             )}
           </NavLink>
         )}
-        {link("leaderboards", "/leaderboards", "Leaders")}
+        {link("leaderboards", "/leaderboards", talk.nav.leaderboards)}
         {link("charts", "/charts", "Charts")}
         {link("reports", "/reports", "Reports")}
         {link("history", "/history", "History")}
