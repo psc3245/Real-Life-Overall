@@ -48,7 +48,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Potential | **Both**: user-set goal ratings plus an LLM-projected end-of-season rating. |
 | Badges | **Hybrid**: a core catalog with a deterministic rule engine, plus LLM-generated personal badges. |
 | Archetype | LLM-assigned build name (e.g. "Two-Way Scholar-Athlete"). |
-| Coaching | **Weekly focus goals and habit proposals** (the user accepts proposals). |
+| Coaching | **Weekly focus goals and habit proposals** (the user accepts proposals), plus an on-demand **coach chat** that suggests habits, goals and Scouting Report lines added with one tap (decided 2026-10-26, §5.9). |
 | LLM persona | **Neutral**, informative tone. |
 | Habit ↔ attribute links | **LLM suggests, user confirms.** |
 | Habit input types | All 8 from Habit Tracker: checkbox, checknote, counter, duration, slider, rating, shorttext, journal. |
@@ -240,7 +240,16 @@ A structured picture of what the player wants out of life, stored as `users.scou
 - **aspirations** (up to 6): what they want out of life, in their words;
 - **priorities** (up to 10): life areas with importance 1-5, each mapped to the rating node that measures it (by **lineage**, so it survives seasons) or to nothing ("Not in your tree", the main signal for adding a category);
 - **focuses** (up to 5) and **constraints** (up to 5: schedule, injuries, caregiving).
-The weekly review rewrites it each week alongside the profile summary. When the player edited it last (`updatedBy: "user"`), the review keeps their entries and only adds. It feeds weight shifts and tree proposals (§4.5) and, next, the coach chat.
+The weekly review rewrites it each week alongside the profile summary. When the player edited it last (`updatedBy: "user"`), the review keeps their entries and only adds. It feeds weight shifts and tree proposals (§4.5) and the coach chat (§5.9), which can add lines to it.
+
+
+### 5.9 The coach chat (added 2026-10-26)
+- One continuing conversation per player (`coach_messages`: role, content, `suggestions` jsonb), on `/coach` and through an "Ask the coach" card on Today (which opens the chat with `?ask=`). "Clear chat" deletes it all.
+- **Context** (rebuilt every turn, in the system prompt): today's date, the profile summary, the Scouting Report, the rating tree with values, habits with the last two weeks' adherence, running goals with pace, the weekly focus, and the last week's recap narratives. The last 20 messages go along as the conversation. Purpose `coach.chat`, fast tier.
+- **Suggestions** (0-3 per reply), shown as cards under the reply: a **habit** (type, days, target, linked attributes; never a duplicate name), a **goal** (target, unit, days to the deadline; starts the day it's added) or a **Scouting Report line** (aspiration, priority with importance and node, focus, constraint). Accepting creates the habit or goal or edits the report (as the player's edit); each card records accepted or dismissed. Kinds for switched-off features are not suggested.
+- **Limits:** 1,000 characters per message, 30 player messages per rolling 24 hours (429 after). Nothing is stored when the model call fails; the web puts the text back in the box.
+- **Boundaries** in the prompt: not a doctor, therapist, dietitian or financial advisor; never judges body weight; for crisis or risk of harm it responds with care, points to people they trust, emergency services or a crisis line, and makes no suggestions.
+- The `coach` configuration switch hides the page, nav link and Today card. iOS doesn't have the coach yet.
 
 ---
 
@@ -418,7 +427,7 @@ type LlmPurpose =
   | 'onboarding.questionnaire' | 'onboarding.followup' | 'onboarding.initialRatings'
   | 'onboarding.suggestAttributes' | 'onboarding.weights'
   | 'recap.daily' | 'recap.weekly' | 'prompts.guided'
-  | 'habits.suggestLinks' | 'season.newLeaves' | 'reports.analysis' | 'embed';
+  | 'habits.suggestLinks' | 'season.newLeaves' | 'reports.analysis' | 'coach.chat' | 'embed';
 
 generateStructured<T>(opts: {
   purpose: LlmPurpose;
@@ -484,6 +493,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `recaps` | `user_id`, `season_id`, `kind` (`daily`/`weekly`), `period_start`, `period_end`, `narrative`, `output` jsonb, `prompt_version`, `status` (`active`/`superseded`) | One active recap per period. Weekly `output` also holds focus goals, habit proposals, decay revisions, projections and archetype changes |
 | `goals` | `node_id`, `target_value` | User half of Potential |
 | `weight_changes` | `season_id`, `node_id`, `recap_id`, `from_weight`, `to_weight`, `from_share`, `to_share`, `reason`, `reverted_at` | Weekly weight shifts (§4.5) |
+| `coach_messages` | `user_id`, `role` (`user`/`assistant`), `content`, `suggestions` jsonb | Coach chat (§5.9) |
 | `tree_proposals` | `season_id`, `recap_id`, `reason`, `changes` jsonb, `status` (`pending`/`accepted`/`dismissed`/`expired`), `resolved_at` | Proposed tree changes (§4.5) |
 | `objectives` | `user_id`, `name`, `unit`, `target`, `starts_on`, `ends_on`, `source` (`manual`/`habit`/`workouts`), `habit_id`, `archived_at` | Goals with a deadline (§7.4) |
 | `workouts` | `user_id`, `name`, `notes`, `local_date`, `started_at`, `ended_at` (null while in progress), `template_id`, `exercises` jsonb | §7.5; one in progress per user |
@@ -618,7 +628,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Reports: chart collections run over any period, with summaries and AI write-ups and suggestions (§7.8)
 - [x] Personalization and configuration: themes, accents, fonts and layout options; switch parts of the app off; a customizable Today page (§7.9)
 - [x] Scouting Report and an evolving tree: automatic capped weight shifts with undo, rare tree change proposals the player accepts (§4.5, §5.8)
-- [ ] Coach chat: ask the scout for advice; it suggests habits and goals you add with one tap
+- [x] Coach chat: advice grounded in your data, with one-tap habit, goal and Scouting Report suggestions; a Today card (§5.9)
+- [ ] iOS: Scouting Report, evolving tree and coach
 - [ ] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 
 ---

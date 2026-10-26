@@ -30,3 +30,4 @@ export * from "./schemas/reports";
 export * from "./schemas/preferences";
 export * from "./schemas/scouting-report";
 export * from "./schemas/tree-evolution";
+export * from "./schemas/coach";

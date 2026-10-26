@@ -33,6 +33,10 @@ export const FEATURE_INFO: Record<Feature, { label: string; detail: string }> = 
   reports: { label: "Reports", detail: "Chart collections run over a period, with write-ups." },
   history: { label: "History", detail: "Past seasons and their archives." },
   focus: { label: "Focus card", detail: "The suggested focus areas on Today." },
+  coach: {
+    label: "Coach",
+    detail: "The coach chat, its Today card and one-tap habit, goal and report suggestions.",
+  },
   adaptiveRating: {
     label: "Adaptive rating",
     detail:
@@ -44,7 +48,7 @@ export const FEATURE_INFO: Record<Feature, { label: string; detail: string }> = 
 /** How the configuration section groups the switches. */
 export const FEATURE_GROUPS: { label: string; features: Feature[] }[] = [
   { label: "Daily logging", features: ["habits", "goals", "workouts", "journal", "guidedPrompts"] },
-  { label: "Insights", features: ["week", "charts", "reports", "history", "focus"] },
+  { label: "Insights", features: ["week", "coach", "charts", "reports", "history", "focus"] },
   { label: "Social", features: ["friends", "leaderboards"] },
   { label: "Rating", features: ["adaptiveRating"] },
 ];

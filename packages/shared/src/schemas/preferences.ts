@@ -68,6 +68,7 @@ export const FEATURES = [
   "history",
   "focus",
   "adaptiveRating",
+  "coach",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -81,6 +82,7 @@ export const TODAY_WIDGETS = [
   "training",
   "charts",
   "focus",
+  "coach",
   "recap",
 ] as const;
 export type TodayWidget = (typeof TODAY_WIDGETS)[number];
@@ -93,6 +95,7 @@ export const TODAY_WIDGET_FEATURE: Partial<Record<TodayWidget, Feature>> = {
   training: "workouts",
   charts: "charts",
   focus: "focus",
+  coach: "coach",
 };
 
 const DEFAULT_WIDGETS: TodayWidgetConfig[] = TODAY_WIDGETS.map((id) => ({
