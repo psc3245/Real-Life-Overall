@@ -1,7 +1,8 @@
 import { computeNodeValues, type RatingNodeLike } from "@rlo/shared";
-import { Link } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import { useAuthState } from "../api/auth";
 import { useMe } from "../api/hooks";
+import { usePreferences } from "../api/preferences";
 import { useRatings } from "../api/ratings";
 import { PlayerCard } from "../components/PlayerCard";
 import { OvrBadge } from "../components/OvrBadge";
@@ -32,8 +33,15 @@ export function HomePage() {
   const me = useMe(auth.signedIn);
   const ratings = useRatings(auth.signedIn);
   const rated = Boolean(ratings.data);
+  const location = useLocation();
+  const { startPage } = usePreferences();
   const values = computeNodeValues(sampleNodes, sampleLeaves);
   const categories = sampleNodes.filter((n) => n.depth === 1);
+
+  // "Open the app on": only when the app is first opened here, so the logo still leads home.
+  if (auth.signedIn && rated && startPage !== "home" && location.key === "default") {
+    return <Navigate to={`/${startPage}`} replace />;
+  }
 
   return (
     <div className="grid gap-10 pt-6 md:grid-cols-[1.1fr_1fr] md:items-center">

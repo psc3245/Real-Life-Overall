@@ -1,12 +1,22 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { useIsAdmin } from "../api/admin";
 import { useHealth } from "../api/hooks";
+import { useApplyPreferences, usePreferences } from "../api/preferences";
 import { DebugPanel } from "../components/debug/DebugPanel";
 import { useAuthState, useSignOut } from "../api/auth";
 import { useFriends } from "../api/social";
 import { Button } from "../components/Button";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
 import { TimezoneSync } from "../components/TimezoneSync";
+import { PreferencesModal } from "../features/settings/PreferencesModal";
+import type { Feature, Preferences } from "@rlo/shared";
+
+const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
+  narrow: "max-w-3xl",
+  normal: "max-w-5xl",
+  wide: "max-w-7xl",
+  full: "max-w-none",
+};
 
 export function RootLayout() {
   const health = useHealth();
@@ -14,12 +24,14 @@ export function RootLayout() {
   const signOut = useSignOut();
   const navigate = useNavigate();
   const apiUp = health.data?.ok === true;
-  const friends = useFriends(auth.signedIn);
-  const requests = friends.data?.incoming.length ?? 0;
   const admin = useIsAdmin();
+  useApplyPreferences();
+  const prefs = usePreferences();
+  const friends = useFriends(auth.signedIn && prefs.features.friends);
+  const requests = friends.data?.incoming.length ?? 0;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-5xl flex-col px-4">
+    <div className={`mx-auto flex min-h-dvh ${PAGE_WIDTH[prefs.pageWidth]} flex-col px-4`}>
       {auth.signedIn && <TimezoneSync />}
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 pt-5 pb-3">
         <Link to="/" className="font-display text-2xl font-bold tracking-wider">
@@ -29,13 +41,15 @@ export function RootLayout() {
           </span>
         </Link>
         <div className="flex items-center gap-4">
-          <span
-            className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-court-500"
-            title={apiUp ? "API reachable" : "API unreachable — is `npm run dev:api` running?"}
-          >
-            <span className={`h-2 w-2 rounded-full ${apiUp ? "bg-neon" : "bg-flare"}`} />
-            API
-          </span>
+          {(prefs.showApiStatus || !apiUp) && (
+            <span
+              className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-court-500"
+              title={apiUp ? "API reachable" : "API unreachable — is `npm run dev:api` running?"}
+            >
+              <span className={`h-2 w-2 rounded-full ${apiUp ? "bg-neon" : "bg-flare"}`} />
+              API
+            </span>
+          )}
           {admin && (
             <Link
               to="/admin"
@@ -80,10 +94,13 @@ export function RootLayout() {
             ))}
         </div>
       </header>
-      {auth.signedIn && <MainNav requests={requests} />}
+      {auth.signedIn && (
+        <MainNav requests={requests} features={prefs.features} sticky={prefs.stickyNav} />
+      )}
       <main className="flex-1 pb-16">
         <Outlet />
       </main>
+      {auth.signedIn && <PreferencesModal />}
       <DebugPanel />
     </div>
   );
@@ -96,11 +113,25 @@ const side = ({ isActive }: { isActive: boolean }) =>
  * Today anchors the left; Rating is the big centered button with smaller links either side.
  * Below lg it's one scrolling row in the same order.
  */
-function MainNav({ requests }: { requests: number }) {
+function MainNav({
+  requests,
+  features,
+  sticky,
+}: {
+  requests: number;
+  features: Record<Feature, boolean>;
+  sticky: boolean;
+}) {
+  const link = (feature: Feature, to: string, label: string) =>
+    features[feature] && (
+      <NavLink to={to} className={side}>
+        {label}
+      </NavLink>
+    );
   return (
     <nav
       aria-label="Main"
-      className="-mx-4 mb-4 flex items-center gap-5 overflow-x-auto border-y border-court-800/70 px-4 py-2.5 lg:mx-0 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:overflow-visible lg:rounded-full lg:border lg:px-5"
+      className={`-mx-4 mb-4 flex items-center gap-5 overflow-x-auto border-y border-court-800/70 px-4 py-2.5 lg:mx-0 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:overflow-visible lg:rounded-full lg:border lg:px-5 ${sticky ? "sticky top-0 z-30 bg-court-950/90 backdrop-blur" : ""}`}
     >
       <div className="contents lg:flex lg:items-center lg:justify-between lg:gap-5">
         <NavLink
@@ -115,18 +146,10 @@ function MainNav({ requests }: { requests: number }) {
           <NavLink to="/log" className={side}>
             Log
           </NavLink>
-          <NavLink to="/habits" className={side}>
-            Habits
-          </NavLink>
-          <NavLink to="/goals" className={side}>
-            Goals
-          </NavLink>
-          <NavLink to="/workouts" className={side}>
-            Train
-          </NavLink>
-          <NavLink to="/week" className={side}>
-            Week
-          </NavLink>
+          {link("habits", "/habits", "Habits")}
+          {link("goals", "/goals", "Goals")}
+          {link("workouts", "/workouts", "Train")}
+          {link("week", "/week", "Week")}
         </span>
       </div>
       <NavLink
@@ -138,29 +161,23 @@ function MainNav({ requests }: { requests: number }) {
         Rating
       </NavLink>
       <div className="contents lg:flex lg:items-center lg:gap-5">
-        <NavLink to="/friends" className={side}>
-          Friends
-          {requests > 0 && (
-            <span
-              className="ml-1.5 rounded-full bg-neon px-1.5 text-[10px] text-court-950"
-              aria-label={`${requests} friend request${requests === 1 ? "" : "s"}`}
-            >
-              {requests}
-            </span>
-          )}
-        </NavLink>
-        <NavLink to="/leaderboards" className={side}>
-          Leaders
-        </NavLink>
-        <NavLink to="/charts" className={side}>
-          Charts
-        </NavLink>
-        <NavLink to="/reports" className={side}>
-          Reports
-        </NavLink>
-        <NavLink to="/history" className={side}>
-          History
-        </NavLink>
+        {features.friends && (
+          <NavLink to="/friends" className={side}>
+            Friends
+            {requests > 0 && (
+              <span
+                className="ml-1.5 rounded-full bg-neon px-1.5 text-[10px] text-court-950"
+                aria-label={`${requests} friend request${requests === 1 ? "" : "s"}`}
+              >
+                {requests}
+              </span>
+            )}
+          </NavLink>
+        )}
+        {link("leaderboards", "/leaderboards", "Leaders")}
+        {link("charts", "/charts", "Charts")}
+        {link("reports", "/reports", "Reports")}
+        {link("history", "/history", "History")}
       </div>
     </nav>
   );

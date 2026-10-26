@@ -9,6 +9,7 @@ import { CopyLink } from "./CopyLink";
 import { FriendButtons } from "./FriendButtons";
 import { instantMonthYear } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
+import { preferencesLink } from "../settings/PreferencesModal";
 
 export const VISIBILITY_LABEL = {
   private: "Private: only you",
@@ -52,6 +53,12 @@ export function ProfilePage() {
             {p.visibility !== "private" && <CopyLink username={p.username} />}
             <Link to="/settings" className="text-neon hover:underline">
               Sharing settings
+            </Link>
+            <Link
+              to={preferencesLink()}
+              className="rounded-lg border border-neon/60 px-3 py-1 text-neon hover:bg-neon/10"
+            >
+              Personalize
             </Link>
           </span>
         </div>

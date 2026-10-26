@@ -6,13 +6,13 @@ import { dayLabel } from "../../lib/format";
 
 const CELL = 13;
 const GAP = 3;
-/** One-hue sequential ramp on the dark surface: more rating gained, brighter. */
+/** One-hue sequential ramp in the accent color: more rating gained, stronger. */
 const LEVELS = [
   "var(--color-court-800)", // nothing logged
-  "rgb(60 242 200 / 0.25)", // logged
-  "rgb(60 242 200 / 0.5)",
-  "rgb(60 242 200 / 0.75)",
-  "rgb(60 242 200 / 1)",
+  "color-mix(in srgb, var(--color-neon) 25%, transparent)", // logged
+  "color-mix(in srgb, var(--color-neon) 50%, transparent)",
+  "color-mix(in srgb, var(--color-neon) 75%, transparent)",
+  "var(--color-neon)",
 ];
 
 function level(day: ActivityDayDto): number {

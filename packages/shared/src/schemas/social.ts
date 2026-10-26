@@ -3,6 +3,7 @@ import { CATEGORY_TEMPLATES } from "../templates";
 import type { UnitSystem } from "../units";
 import type { UserRole } from "./admin";
 import type { BadgeTier } from "./badges";
+import type { Preferences } from "./preferences";
 
 /**
  * Who can see a player's card (DESIGN.md §7.3). Private is the default. Journals, recaps,
@@ -52,6 +53,7 @@ export interface MeDto {
   trackWeight: boolean;
   trackHeight: boolean;
   role: UserRole;
+  preferences: Preferences;
   createdAt: string;
 }
 

@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
 import { AdminPage } from "./features/admin/AdminPage";
+import { FeatureGate } from "./components/FeatureGate";
 import { GoalsPage } from "./features/goals/GoalsPage";
 import { ReportEditorPage } from "./features/reports/ReportEditorPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
@@ -92,7 +93,9 @@ export const router = createBrowserRouter([
         path: "history",
         element: (
           <RequireAuth>
-            <HistoryPage />
+            <FeatureGate feature="history">
+              <HistoryPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -100,9 +103,11 @@ export const router = createBrowserRouter([
         path: "history/:id",
         element: (
           <RequireAuth>
-            <Suspense fallback={loading}>
-              <SeasonPage />
-            </Suspense>
+            <FeatureGate feature="history">
+              <Suspense fallback={loading}>
+                <SeasonPage />
+              </Suspense>
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -146,7 +151,9 @@ export const router = createBrowserRouter([
         path: "habits",
         element: (
           <RequireAuth>
-            <HabitsGlancePage />
+            <FeatureGate feature="habits">
+              <HabitsGlancePage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -154,7 +161,9 @@ export const router = createBrowserRouter([
         path: "habits/manage",
         element: (
           <RequireAuth>
-            <ManageHabitsPage />
+            <FeatureGate feature="habits">
+              <ManageHabitsPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -162,7 +171,9 @@ export const router = createBrowserRouter([
         path: "goals",
         element: (
           <RequireAuth>
-            <GoalsPage />
+            <FeatureGate feature="goals">
+              <GoalsPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -170,7 +181,9 @@ export const router = createBrowserRouter([
         path: "workouts",
         element: (
           <RequireAuth>
-            <StartWorkoutPage />
+            <FeatureGate feature="workouts">
+              <StartWorkoutPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -178,7 +191,9 @@ export const router = createBrowserRouter([
         path: "workouts/active",
         element: (
           <RequireAuth>
-            <ActiveWorkoutPage />
+            <FeatureGate feature="workouts">
+              <ActiveWorkoutPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -186,7 +201,9 @@ export const router = createBrowserRouter([
         path: "workouts/history",
         element: (
           <RequireAuth>
-            <WorkoutHistoryPage />
+            <FeatureGate feature="workouts">
+              <WorkoutHistoryPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -194,7 +211,9 @@ export const router = createBrowserRouter([
         path: "workouts/templates/:id",
         element: (
           <RequireAuth>
-            <TemplatePage />
+            <FeatureGate feature="workouts">
+              <TemplatePage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -202,7 +221,9 @@ export const router = createBrowserRouter([
         path: "workouts/exercises",
         element: (
           <RequireAuth>
-            <ExercisesPage />
+            <FeatureGate feature="workouts">
+              <ExercisesPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -210,9 +231,11 @@ export const router = createBrowserRouter([
         path: "workouts/exercises/:id",
         element: (
           <RequireAuth>
-            <Suspense fallback={loading}>
-              <ExercisePage />
-            </Suspense>
+            <FeatureGate feature="workouts">
+              <Suspense fallback={loading}>
+                <ExercisePage />
+              </Suspense>
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -220,7 +243,9 @@ export const router = createBrowserRouter([
         path: "workouts/:id",
         element: (
           <RequireAuth>
-            <WorkoutPage />
+            <FeatureGate feature="workouts">
+              <WorkoutPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -238,7 +263,9 @@ export const router = createBrowserRouter([
         path: "week",
         element: (
           <RequireAuth>
-            <WeekPage />
+            <FeatureGate feature="week">
+              <WeekPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -247,7 +274,9 @@ export const router = createBrowserRouter([
         path: "friends",
         element: (
           <RequireAuth>
-            <FriendsPage />
+            <FeatureGate feature="friends">
+              <FriendsPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -255,7 +284,9 @@ export const router = createBrowserRouter([
         path: "leaderboards",
         element: (
           <RequireAuth>
-            <LeaderboardsPage />
+            <FeatureGate feature="leaderboards">
+              <LeaderboardsPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -263,7 +294,9 @@ export const router = createBrowserRouter([
         path: "compare/:username",
         element: (
           <RequireAuth>
-            <ComparePage />
+            <FeatureGate feature="friends">
+              <ComparePage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -279,9 +312,11 @@ export const router = createBrowserRouter([
         path: "charts",
         element: (
           <RequireAuth>
-            <Suspense fallback={loading}>
-              <ChartsPage />
-            </Suspense>
+            <FeatureGate feature="charts">
+              <Suspense fallback={loading}>
+                <ChartsPage />
+              </Suspense>
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -289,7 +324,9 @@ export const router = createBrowserRouter([
         path: "reports",
         element: (
           <RequireAuth>
-            <ReportsPage />
+            <FeatureGate feature="reports">
+              <ReportsPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -297,7 +334,9 @@ export const router = createBrowserRouter([
         path: "reports/new",
         element: (
           <RequireAuth>
-            <ReportEditorPage />
+            <FeatureGate feature="reports">
+              <ReportEditorPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -305,7 +344,9 @@ export const router = createBrowserRouter([
         path: "reports/:id/edit",
         element: (
           <RequireAuth>
-            <ReportEditorPage />
+            <FeatureGate feature="reports">
+              <ReportEditorPage />
+            </FeatureGate>
           </RequireAuth>
         ),
       },
@@ -313,9 +354,11 @@ export const router = createBrowserRouter([
         path: "reports/:id",
         element: (
           <RequireAuth>
-            <Suspense fallback={loading}>
-              <ReportPage />
-            </Suspense>
+            <FeatureGate feature="reports">
+              <Suspense fallback={loading}>
+                <ReportPage />
+              </Suspense>
+            </FeatureGate>
           </RequireAuth>
         ),
       },

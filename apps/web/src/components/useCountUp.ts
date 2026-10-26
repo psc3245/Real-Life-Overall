@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-
-const prefersReducedMotion = () =>
-  typeof window !== "undefined" &&
-  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+import { reducedMotion as prefersReducedMotion } from "../lib/appearance";
 
 /** Animates from 0 to `target` with an ease-out curve; jumps straight there for reduced motion. */
 export function useCountUp(target: number, durationMs = 1600, delayMs = 0): number {

@@ -320,6 +320,13 @@ Later (Phase 4, when leaderboards exist): evidence-backed inputs (photos, integr
 - **Checkboxes** (per report, overridable per run): *Summaries* (one plain sentence per series from its stats, no AI), *Write-up* (an AI narrative of the period) and *Suggestions* (up to 5 AI next steps). Write-up and suggestions share one `reports.analysis` call (smart tier) that sees each chart's stats and summaries plus the profile summary; it never judges body measurements. Runs that use AI are capped at 10 per user per rolling day. If the AI call fails, the run is still saved with its charts and summaries and an `aiError`.
 - Tables: `reports` (definition) and `report_runs` (`from`, `to`, `used_ai`, `result` jsonb). Routes under `/reports` (`/reports/:id/run`, `/reports/:id/runs`, `/reports/runs/:runId`).
 
+### 7.9 Personalization and configuration (added 2026-10-25)
+- **One document per player:** `users.preferences` (jsonb, default `{}`), read through `parsePreferences` in `packages/shared`, which fills every missing or invalid field with its default, so removed options never break old documents and new ones arrive with defaults. `PATCH /me` takes `preferences` with any top-level keys; each replaces the stored key whole (a shallow `||` merge), so `features` and `today` are always sent complete. Stored server-side so the look follows the player to every device; the web caches the last copy in localStorage to style the page before `/me` loads.
+- **Personalization (look):** theme (Court, Midnight, Carbon, OLED black, Turf, and light Daylight and Paper), accent (9 presets with a bright dark-mode and a deeper light-mode value, or any custom color), headline font (7) and body font (6), text size, density, corner roundness, background (glow, grid, plain), animations (full, match system, off), all-caps type, color-blind-safe rating colors, page width, a pinned menu bar, the API status dot, and the page the app opens on. The web applies these as CSS variables on `<html>` (`lib/appearance.ts`): every Tailwind color, font, radius and spacing token resolves through a variable, so components don't change.
+- **Configuration (parts of the app):** habits, goals, workouts, journal, guided questions, week, friends, leaderboards, charts, reports, history and the focus card can each be switched off. Off hides the menu link, Today widget and day-log section, and the page shows a "switched off" note with a button to turn it back on. Nothing is deleted and recaps are unchanged. Ratings, Today and the day log are always on.
+- **Today page:** widgets (missed recaps, habits, rating, goals, journal, training, pinned charts, focus, recap) can be shown or hidden, reordered, and set half or full width; one- or two-column layout, a greeting by name, the Log button, hiding finished habits, and how many goals and rating movers show.
+- Screens: a **Personalize** modal (tabs: Look, Today page, Configuration) opened from your own profile page and from `/settings`. Any page can open it with `?prefs=look|today|configuration` (Today's Customize link, the switched-off pages). The iOS app doesn't read preferences yet.
+
 ---
 
 ## 8. Architecture
@@ -490,7 +497,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - **Refinements (before mobile):** Today is an at-a-glance overview and logging lives at `/log`; `/habits` is the habit stats glance (week / month / season; management at `/habits/manage`); the Week page adds day-by-day detail and opens earlier reviews; `/ratings/activity` holds the full change feed; every attribute and category has a page (`/ratings/node/:id`: history, changes, children, linked habits) and is linked wherever it appears; long pages get sticky section nav; heatmap days show a hover card and open their log.
   - **iOS app:** five tabs (Today, Habits, Week, Ratings, You). Today, Habits, Week and Ratings match their web pages; You gathers the web header's links (profile, friends, leaderboards, history) with Settings. Detail screens (a day's log, attribute pages, activity, seasons, profiles, onboarding) push over the tabs. Same dark 2K look, with SF Symbols and native sheets, prompts and share sheets.
 - Responsive from the start (web first, mobile later). Consider making it an installable **PWA** before going native.
-- Light mode is optional. The 2K look is dark-first.
+- The 2K look is dark-first and the default; light themes and other styles are opt-in personalization (§7.9).
 
 ---
 
@@ -589,7 +596,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] User roles, an admin page and admin-only debug info across the web app (§8.7)
 - [x] Charts for everything: metric catalog, chart explorer with trend modeling, saved and pinned charts (§7.7)
 - [x] Reports: chart collections run over any period, with summaries and AI write-ups and suggestions (§7.8)
-- [ ] iOS app parity for goals, workouts, body tracking and avoid habits
+- [x] Personalization and configuration: themes, accents, fonts and layout options; switch parts of the app off; a customizable Today page (§7.9)
+- [ ] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 
 ---
 

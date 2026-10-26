@@ -1,5 +1,6 @@
 import type { ChartConfig } from "@rlo/shared";
 import { Link } from "react-router";
+import { useFeature } from "../../api/preferences";
 import { chartHref } from "./model";
 
 /** Opens the chart explorer with these metrics. */
@@ -14,6 +15,7 @@ export function ChartLink({
   label?: string;
   className?: string;
 }) {
+  if (!useFeature("charts")) return null;
   return (
     <Link to={chartHref(ids, config)} className={className}>
       {label}

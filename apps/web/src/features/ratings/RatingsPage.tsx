@@ -244,7 +244,9 @@ function ExportableCard({
     try {
       const url = await toPng(card.current, {
         pixelRatio: 2,
-        backgroundColor: "#07090d",
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue(
+          "--color-court-950",
+        ),
         cacheBust: true,
       });
       const link = document.createElement("a");
