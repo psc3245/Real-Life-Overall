@@ -738,3 +738,45 @@ export const chartViews = pgTable(
   },
   (t) => [index().on(t.userId)],
 );
+
+/** Report definitions: charts (ReportChartDto[]) plus options (DESIGN.md §7.8). */
+export const reports = pgTable(
+  "reports",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    description: text().notNull().default(""),
+    charts: jsonb().notNull(),
+    /** ReportOptions */
+    options: jsonb().notNull(),
+    defaultRange: text().notNull().default("30d"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+/** One run of a report over a period: a snapshot of the data and any AI write-up. */
+export const reportRuns = pgTable(
+  "report_runs",
+  {
+    id: id(),
+    reportId: uuid()
+      .notNull()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    from: date().notNull(),
+    to: date().notNull(),
+    /** Whether the run called the model (write-up or suggestions), for the daily cap. */
+    usedAi: boolean().notNull().default(false),
+    /** ReportRunDto minus ids and timestamps. */
+    result: jsonb().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.reportId, t.createdAt), index().on(t.userId, t.createdAt)],
+);

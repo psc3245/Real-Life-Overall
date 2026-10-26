@@ -21,6 +21,7 @@ import { objectiveRoutes } from "./routes/objectives";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
 import { profileRoutes } from "./routes/profiles";
+import { reportRoutes } from "./routes/reports";
 import { seasonRoutes } from "./routes/seasons";
 import { ratingsRoutes } from "./routes/ratings";
 import { weeklyRoutes } from "./routes/weekly";
@@ -115,6 +116,8 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/exercises/*", requireUser)
     .use("/metrics", requireUser)
     .use("/metrics/*", requireUser)
+    .use("/reports", requireUser)
+    .use("/reports/*", requireUser)
     .use("/chart-views", requireUser)
     .use("/chart-views/*", requireUser)
     .use("/body", requireUser)
@@ -145,6 +148,7 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/body", bodyRoutes)
     .route("/metrics", metricRoutes)
     .route("/chart-views", chartViewRoutes)
+    .route("/reports", reportRoutes)
     .route("/pauses", pauseRoutes)
     .route("/dev", devRoutes)
     .route("/weekly", weeklyRoutes)

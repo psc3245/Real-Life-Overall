@@ -3,17 +3,18 @@ import {
   correlation,
   linearTrend,
   movingAverage,
+  seriesStats,
   type ChartBucket,
   type ChartConfig,
   type MetricDto,
   type MetricPointDto,
   type MetricSeriesDto,
+  type SeriesStatsDto,
 } from "@rlo/shared";
 import { CATEGORY_COLORS } from "../../components/charts/palette";
 
 /** Days a trend line is projected past the last point, by bucket. */
 const PROJECT_DAYS: Record<ChartBucket, number> = { day: 14, week: 28, month: 60 };
-const DAYS_PER: Record<ChartBucket, number> = { day: 1, week: 7, month: 30 };
 
 export interface ChartLine {
   /** Row key for the series' values (avg and trend use `${key}~avg`, `${key}~trend`). */
@@ -24,21 +25,9 @@ export interface ChartLine {
   axis: string;
 }
 
-export interface SeriesStats {
+export interface SeriesStats extends SeriesStatsDto {
   metric: MetricDto;
   color: string;
-  points: number;
-  latest: number | null;
-  min: number | null;
-  max: number | null;
-  mean: number | null;
-  /** Sum over the range (amount metrics). */
-  total: number | null;
-  /** Last minus first point (levels and sessions). */
-  change: number | null;
-  /** Fitted change per bucket, and how well the line fits. */
-  slope: number | null;
-  r2: number | null;
 }
 
 export interface ChartModel {
@@ -49,8 +38,6 @@ export interface ChartModel {
   /** Between the first two series, over the buckets both have. */
   correlation: { r: number; n: number; a: MetricDto; b: MetricDto } | null;
 }
-
-const round = (n: number) => Math.round(n * 100) / 100;
 
 export function buildChart(
   series: MetricSeriesDto[],
@@ -79,25 +66,12 @@ export function buildChart(
     if (config.average && points.length > 1) {
       for (const p of movingAverage(points, 7)) row(p.date)[`${key}~avg`] = p.value;
     }
-    const trend = linearTrend(points, config.trend ? PROJECT_DAYS[config.bucket] : 0);
-    if (config.trend && trend) {
-      for (const p of trend.line) row(p.date)[`${key}~trend`] = p.value;
+    if (config.trend) {
+      for (const p of linearTrend(points, PROJECT_DAYS[config.bucket])?.line ?? []) {
+        row(p.date)[`${key}~trend`] = p.value;
+      }
     }
-    const values = points.map((p) => p.value);
-    stats.push({
-      metric: s.metric,
-      color,
-      points: points.length,
-      latest: values.at(-1) ?? null,
-      min: values.length ? Math.min(...values) : null,
-      max: values.length ? Math.max(...values) : null,
-      mean: values.length ? round(values.reduce((a, b) => a + b, 0) / values.length) : null,
-      total: s.metric.kind === "amount" ? round(values.reduce((a, b) => a + b, 0)) : null,
-      change:
-        s.metric.kind !== "amount" && values.length > 1 ? round(values.at(-1)! - values[0]!) : null,
-      slope: trend ? round(trend.slope * DAYS_PER[config.bucket]) : null,
-      r2: trend ? round(trend.r2) : null,
-    });
+    stats.push({ metric: s.metric, color, ...seriesStats(points, s.metric.kind, config.bucket) });
   });
 
   const c = series.length >= 2 ? correlation(aggregated[0]!, aggregated[1]!) : null;

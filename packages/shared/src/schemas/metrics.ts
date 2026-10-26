@@ -264,3 +264,93 @@ export function describeCorrelation(r: number): string {
   if (strength === "no clear") return "no clear relationship";
   return `${strength} ${r > 0 ? "positive" : "negative"}`;
 }
+
+export interface SeriesStatsDto {
+  points: number;
+  latest: number | null;
+  min: number | null;
+  max: number | null;
+  mean: number | null;
+  /** Sum over the range (amount metrics). */
+  total: number | null;
+  /** Last minus first point (levels and sessions). */
+  change: number | null;
+  /** Fitted change per bucket, and how well a straight line fits (0-1). */
+  slope: number | null;
+  r2: number | null;
+}
+
+const DAYS_PER_BUCKET: Record<ChartBucket, number> = { day: 1, week: 7, month: 30 };
+
+/** Headline numbers for already-aggregated points. */
+export function seriesStats(
+  points: MetricPointDto[],
+  kind: MetricKind,
+  bucket: ChartBucket,
+): SeriesStatsDto {
+  const values = points.map((p) => p.value);
+  const trend = linearTrend(points);
+  return {
+    points: values.length,
+    latest: values.at(-1) ?? null,
+    min: values.length ? Math.min(...values) : null,
+    max: values.length ? Math.max(...values) : null,
+    mean: values.length ? round(values.reduce((a, b) => a + b, 0) / values.length) : null,
+    total: kind === "amount" ? round(values.reduce((a, b) => a + b, 0)) : null,
+    change: kind !== "amount" && values.length > 1 ? round(values.at(-1)! - values[0]!) : null,
+    slope: trend ? round(trend.slope * DAYS_PER_BUCKET[bucket]) : null,
+    r2: trend ? round(trend.r2) : null,
+  };
+}
+
+const num = (n: number) =>
+  Math.abs(n) >= 1000 ? Math.round(n).toLocaleString("en-US") : String(round(n));
+// Ratings read as plain numbers ("57.4"), not "57.4 rating".
+const withUnit = (n: number, unit: string) =>
+  unit && unit !== "rating" ? `${num(n)} ${unit}` : num(n);
+
+/** One plain sentence about a metric over a period, from its stats. */
+export function summarizeSeries(
+  metric: Pick<MetricDto, "label" | "unit" | "kind" | "target">,
+  stats: SeriesStatsDto,
+  bucket: ChartBucket,
+): string {
+  if (stats.points === 0 || stats.latest === null) return `${metric.label}: nothing logged.`;
+  const parts: string[] = [];
+  if (metric.kind === "amount") {
+    const active = stats.total ?? 0;
+    parts.push(
+      `${metric.label} totaled ${withUnit(active, metric.unit)}, about ${withUnit(stats.mean ?? 0, metric.unit)} per ${bucket}`,
+    );
+    if (stats.max !== null && stats.max > 0)
+      parts.push(`peaking at ${withUnit(stats.max, metric.unit)}`);
+  } else {
+    const change = stats.change ?? 0;
+    const dir = Math.abs(change) < 1e-9 ? "held at" : change > 0 ? "rose to" : "fell to";
+    parts.push(
+      `${metric.label} ${dir} ${withUnit(stats.latest, metric.unit)}` +
+        (Math.abs(change) >= 1e-9 ? ` (${change > 0 ? "+" : ""}${num(change)})` : ""),
+    );
+    if (stats.min !== null && stats.max !== null && stats.min !== stats.max) {
+      parts.push(`ranging ${num(stats.min)}–${num(stats.max)}`);
+    }
+  }
+  if (
+    stats.slope !== null &&
+    stats.r2 !== null &&
+    stats.r2 >= 0.3 &&
+    Math.abs(stats.slope) > 1e-9
+  ) {
+    parts.push(
+      `trending ${stats.slope > 0 ? "up" : "down"} about ${num(Math.abs(stats.slope))} per ${bucket}`,
+    );
+  }
+  if (metric.target !== null && metric.kind !== "amount") {
+    parts.push(
+      stats.latest >= metric.target
+        ? `at or above the ${num(metric.target)} target`
+        : `${num(metric.target - stats.latest)} short of the ${num(metric.target)} target`,
+    );
+  }
+  return `${parts.join(", ")}.`;
+}

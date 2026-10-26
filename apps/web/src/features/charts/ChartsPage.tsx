@@ -5,8 +5,6 @@ import {
   CHART_STYLES,
   describeCorrelation,
   MAX_CHART_METRICS,
-  METRIC_GROUP_LABELS,
-  METRIC_GROUPS,
   rangeStart,
   seasonForDate,
   type ChartBucket,
@@ -14,10 +12,9 @@ import {
   type ChartRange,
   type ChartStyle,
   type ChartViewDto,
-  type MetricDto,
 } from "@rlo/shared";
 import { useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useDay } from "../../api/days";
 import { useMe } from "../../api/hooks";
 import {
@@ -33,6 +30,7 @@ import { DebugJson } from "../../components/debug/Debug";
 import { compactFieldClass } from "../../components/form";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { MetricChart } from "./MetricChart";
+import { MetricPicker } from "./MetricPicker";
 import { buildChart, chartHref, type SeriesStats } from "./model";
 
 const pick = <T extends string>(value: string | null, options: readonly T[], fallback: T): T =>
@@ -88,9 +86,14 @@ export function ChartsPage() {
 
   return (
     <div className="space-y-6 pt-4">
-      <header>
-        <p className="text-sm uppercase tracking-[0.3em] text-neon">Everything you track</p>
-        <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Charts</h1>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm uppercase tracking-[0.3em] text-neon">Everything you track</p>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Charts</h1>
+        </div>
+        <Link to="/reports" className="text-sm text-court-300 hover:text-neon">
+          Reports: run sets of charts with write-ups →
+        </Link>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
@@ -209,87 +212,6 @@ function Controls({
         >
           Trend + projection
         </button>
-      </div>
-    </div>
-  );
-}
-
-function MetricPicker({
-  metrics,
-  selected,
-  onToggle,
-  loading,
-}: {
-  metrics: MetricDto[];
-  selected: string[];
-  onToggle: (id: string) => void;
-  loading: boolean;
-}) {
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const shown = metrics.filter(
-    (m) => !q || m.label.toLowerCase().includes(q) || (m.detail ?? "").toLowerCase().includes(q),
-  );
-  const full = selected.length >= MAX_CHART_METRICS;
-  return (
-    <div className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-sm uppercase tracking-wider">
-          Metrics{" "}
-          <span className="text-court-500">
-            {selected.length}/{MAX_CHART_METRICS}
-          </span>
-        </h2>
-      </div>
-      <input
-        aria-label="Search metrics"
-        value={query}
-        placeholder="Search"
-        onChange={(e) => setQuery(e.target.value)}
-        className={`${compactFieldClass} w-full`}
-      />
-      {loading && <p className="text-sm text-court-500">Loading…</p>}
-      <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
-        {METRIC_GROUPS.map((g) => {
-          const items = shown.filter((m) => m.group === g);
-          if (!items.length) return null;
-          return (
-            <div key={g}>
-              <p className="mb-1 text-[11px] uppercase tracking-wider text-court-500">
-                {METRIC_GROUP_LABELS[g]}
-              </p>
-              <ul className="space-y-0.5">
-                {items.map((m) => {
-                  const on = selected.includes(m.id);
-                  return (
-                    <li key={m.id}>
-                      <button
-                        type="button"
-                        aria-pressed={on}
-                        disabled={!on && full}
-                        onClick={() => onToggle(m.id)}
-                        className={`flex w-full items-start gap-2 rounded px-2 py-1 text-left text-sm disabled:opacity-40 ${on ? "bg-neon/10 text-neon" : "hover:bg-court-800"}`}
-                      >
-                        <span
-                          aria-hidden
-                          className={`mt-1 h-3 w-3 shrink-0 rounded-sm border ${on ? "border-neon bg-neon" : "border-court-500"}`}
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate">{m.label}</span>
-                          {m.detail && (
-                            <span className="block truncate text-[11px] text-court-500">
-                              {m.detail}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
