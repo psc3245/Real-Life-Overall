@@ -4,6 +4,8 @@ import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
 import { AdminPage } from "./features/admin/AdminPage";
 import { GoalsPage } from "./features/goals/GoalsPage";
+import { ReportEditorPage } from "./features/reports/ReportEditorPage";
+import { ReportsPage } from "./features/reports/ReportsPage";
 import { ActiveWorkoutPage } from "./features/workouts/ActiveWorkoutPage";
 import { ExercisesPage } from "./features/workouts/ExercisesPage";
 import { StartWorkoutPage } from "./features/workouts/StartWorkoutPage";
@@ -44,6 +46,12 @@ const ExercisePage = lazy(() =>
 );
 const BodyPage = lazy(() =>
   import("./features/body/BodyPage").then((m) => ({ default: m.BodyPage })),
+);
+const ChartsPage = lazy(() =>
+  import("./features/charts/ChartsPage").then((m) => ({ default: m.ChartsPage })),
+);
+const ReportPage = lazy(() =>
+  import("./features/reports/ReportPage").then((m) => ({ default: m.ReportPage })),
 );
 const loading = <p className="pt-10 text-court-500">Loading…</p>;
 
@@ -264,6 +272,50 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <SettingsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "charts",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <ChartsPage />
+            </Suspense>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "reports",
+        element: (
+          <RequireAuth>
+            <ReportsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "reports/new",
+        element: (
+          <RequireAuth>
+            <ReportEditorPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "reports/:id/edit",
+        element: (
+          <RequireAuth>
+            <ReportEditorPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "reports/:id",
+        element: (
+          <RequireAuth>
+            <Suspense fallback={loading}>
+              <ReportPage />
+            </Suspense>
           </RequireAuth>
         ),
       },

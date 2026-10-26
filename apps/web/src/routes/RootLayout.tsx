@@ -152,6 +152,12 @@ function MainNav({ requests }: { requests: number }) {
         <NavLink to="/leaderboards" className={side}>
           Leaders
         </NavLink>
+        <NavLink to="/charts" className={side}>
+          Charts
+        </NavLink>
+        <NavLink to="/reports" className={side}>
+          Reports
+        </NavLink>
         <NavLink to="/history" className={side}>
           History
         </NavLink>

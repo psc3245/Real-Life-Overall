@@ -358,6 +358,15 @@ export const templateBodySchema = z.object({
   exercises: exercisesSchema.default([]),
 });
 
+/** Updates without defaults, so a missing field keeps its saved value. */
+export const updateTemplateBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    notes: z.string().max(MAX_WORKOUT_NOTES),
+    exercises: exercisesSchema,
+  })
+  .partial();
+
 export const createTemplateBodySchema = z.union([
   z.object({ fromWorkoutId: z.uuid(), name: z.string().trim().min(1).max(80).optional() }),
   templateBodySchema,
@@ -368,3 +377,28 @@ export const exerciseBodySchema = z.object({
   category: z.enum(EXERCISE_CATEGORIES),
   tracking: z.enum(EXERCISE_TRACKING),
 });
+
+/** A record in display units, as a plain number for charts (time in minutes). */
+export function recordChartValue(
+  key: keyof ExerciseRecordsDto,
+  value: number,
+  system: UnitSystem,
+): number {
+  if (key === "heaviestKg" || key === "best1RmKg" || key === "bestSetVolumeKg") {
+    return toDisplayWeight(value, system);
+  }
+  if (key === "longestM") return toDisplayDistance(value, system);
+  if (key === "longestS") return Math.round(value / 6) / 10;
+  return Math.round(value * 10) / 10;
+}
+
+/** The unit recordChartValue returns. */
+export function recordChartUnit(key: keyof ExerciseRecordsDto, system: UnitSystem): string {
+  if (key === "heaviestKg" || key === "best1RmKg" || key === "bestSetVolumeKg") {
+    return weightUnit(system);
+  }
+  if (key === "longestM") return distanceUnit(system);
+  if (key === "longestS") return "min";
+  if (key === "bestPct") return "%";
+  return "reps";
+}

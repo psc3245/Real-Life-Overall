@@ -11,6 +11,7 @@ export const LLM_PURPOSES = [
   "recap.daily",
   "recap.weekly",
   "season.newLeaves",
+  "reports.analysis",
 ] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
@@ -28,6 +29,7 @@ export const PURPOSE_TIERS: Record<LlmPurpose, ModelTier> = {
   "recap.daily": "fast",
   "recap.weekly": "smart",
   "season.newLeaves": "smart",
+  "reports.analysis": "smart",
 };
 
 /** "provider:modelId". Override per tier with LLM_FAST_MODEL / LLM_SMART_MODEL. */

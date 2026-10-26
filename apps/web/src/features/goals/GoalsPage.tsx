@@ -17,6 +17,7 @@ import {
   statusTone,
 } from "./ObjectiveProgress";
 import { DebugId, DebugJson } from "../../components/debug/Debug";
+import { ChartLink } from "../charts/ChartLink";
 
 const TERM_DETAIL: Record<ObjectiveTerm, string> = {
   short: "A month or less",
@@ -178,7 +179,10 @@ function GoalCard({
       </div>
       <div className="flex flex-wrap items-center justify-end gap-1 border-t border-court-800 pt-2">
         {p.status === "active" && (
-          <Link to={`/log#goal-${o.id}`} className="mr-auto text-sm text-neon hover:underline">
+          <Link
+            to={o.source === "workouts" ? "/workouts" : `/log#goal-${o.id}`}
+            className="mr-auto text-sm text-neon hover:underline"
+          >
             {o.source === "manual"
               ? "Log today →"
               : o.source === "workouts"
@@ -186,6 +190,11 @@ function GoalCard({
                 : `Log ${o.habitName ?? "the habit"} →`}
           </Link>
         )}
+        <ChartLink
+          ids={[`goal:${o.id}`]}
+          config={{ range: "all" }}
+          className="px-2 text-sm text-court-300 hover:text-neon"
+        />
         {confirming ? (
           <span className="flex items-center gap-1 text-sm text-court-300">
             Delete this goal?

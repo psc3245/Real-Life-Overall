@@ -4,6 +4,8 @@ import {
   formatSet,
   HEADLINE_RECORD,
   RECORD_LABELS,
+  recordChartUnit,
+  recordChartValue,
   SET_KIND_TAGS,
   toDisplayDistance,
   toDisplayWeight,
@@ -23,6 +25,7 @@ import { dayLabel } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
 import { DebugId, DebugJson } from "../../components/debug/Debug";
+import { ChartLink } from "../charts/ChartLink";
 
 /** A record's value in the user's units. */
 function formatRecord(key: keyof ExerciseRecordsDto, value: number, units: UnitSystem) {
@@ -40,16 +43,6 @@ function formatRecord(key: keyof ExerciseRecordsDto, value: number, units: UnitS
     default:
       return String(value);
   }
-}
-
-/** Charts plot plain numbers in display units. */
-function chartValue(key: keyof ExerciseRecordsDto, value: number, units: UnitSystem) {
-  if (key === "heaviestKg" || key === "best1RmKg" || key === "bestSetVolumeKg") {
-    return toDisplayWeight(value, units);
-  }
-  if (key === "longestM") return toDisplayDistance(value, units);
-  if (key === "longestS") return Math.round(value / 6) / 10; // minutes
-  return Math.round(value * 10) / 10;
 }
 
 export function ExercisePage() {
@@ -70,17 +63,9 @@ export function ExercisePage() {
   const points = [...history]
     .reverse()
     .filter((h) => h.best !== null)
-    .map((h) => ({ date: h.localDate, value: chartValue(headline, h.best!, units) }));
-  const chartUnit =
-    headline === "longestS"
-      ? " min"
-      : headline === "longestM"
-        ? ` ${distanceUnit(units)}`
-        : headline === "bestPct"
-          ? "%"
-          : headline === "mostReps"
-            ? ""
-            : ` ${weightUnit(units)}`;
+    .map((h) => ({ date: h.localDate, value: recordChartValue(headline, h.best!, units) }));
+  const unit = recordChartUnit(headline, units);
+  const chartUnit = unit === "%" ? "%" : unit === "reps" ? "" : ` ${unit}`;
 
   return (
     <div className="space-y-6 pt-4">
@@ -96,7 +81,12 @@ export function ExercisePage() {
           </h1>
           <p className="text-sm text-court-500">
             {CATEGORY_LABELS[e.category]} · {TRACKING_LABELS[e.tracking]}
-            {e.custom && " · custom"} · done {e.timesDone}×
+            {e.custom && " · custom"} · done {e.timesDone}× ·{" "}
+            <ChartLink
+              ids={[`exercise:${e.id}`]}
+              config={{ range: "all", trend: true }}
+              className="text-neon hover:underline"
+            />
           </p>
         </div>
       </header>

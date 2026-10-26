@@ -141,6 +141,20 @@
       "when": 1792978300709,
       "tag": "0019_user_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792979115881,
+      "tag": "0020_chart_views",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792980407026,
+      "tag": "0021_reports",
+      "breakpoints": true
     }
   ]
 }

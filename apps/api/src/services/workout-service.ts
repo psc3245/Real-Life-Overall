@@ -46,7 +46,7 @@ interface ExerciseInfo {
   custom: boolean;
   archived: boolean;
 }
-type Lookup = Map<string, ExerciseInfo>;
+export type Lookup = Map<string, ExerciseInfo>;
 
 async function userOf(db: Database, userId: string) {
   const user = await userRepo.findById(db, userId);
@@ -72,7 +72,7 @@ function lookupFrom(custom: ExerciseRow[]): Lookup {
   return lookup;
 }
 
-async function loadLookup(db: Database, userId: string): Promise<Lookup> {
+export async function loadLookup(db: Database, userId: string): Promise<Lookup> {
   return lookupFrom(await workoutRepo.findExercises(db, userId));
 }
 

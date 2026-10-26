@@ -3,7 +3,7 @@ import {
   exerciseBodySchema,
   finishWorkoutBodySchema,
   startWorkoutBodySchema,
-  templateBodySchema,
+  updateTemplateBodySchema,
   updateWorkoutBodySchema,
 } from "@rlo/shared";
 import { Hono } from "hono";
@@ -57,7 +57,7 @@ export const templateRoutes = new Hono<AppEnv>()
     return c.json(await workouts.createTemplate(c.get("db"), c.get("userId"), body), 201);
   })
   .patch("/:id", async (c) => {
-    const body = await parseJson(c, templateBodySchema.partial());
+    const body = await parseJson(c, updateTemplateBodySchema);
     return c.json(
       await workouts.updateTemplate(
         c.get("db"),

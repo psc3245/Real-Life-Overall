@@ -13,6 +13,7 @@ import { GoalEditor } from "./GoalEditor";
 import { CONFIDENCE_LABEL } from "./labels";
 import { DebugJson } from "../../components/debug/Debug";
 import { DebugId } from "../../components/debug/Debug";
+import { ChartLink } from "../charts/ChartLink";
 
 /** Everything about one attribute or category: value, history, why it moved, what feeds it. */
 export function NodePage() {
@@ -81,6 +82,11 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
               {node.name}
               <DebugId id={node.id} />
             </h1>
+            <ChartLink
+              ids={[`rating:${node.id}`]}
+              config={{ range: "season", trend: true }}
+              label="Chart and model →"
+            />
             {node.description && <p className="text-court-300">{node.description}</p>}
           </div>
           <div className="text-right">

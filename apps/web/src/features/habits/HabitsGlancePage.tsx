@@ -15,6 +15,7 @@ import { scheduleLabel } from "./ManageHabitsPage";
 import { StatTile } from "../../components/StatTile";
 import { shortDate } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
+import { ChartLink } from "../charts/ChartLink";
 
 const RANGE_LABEL: Record<HabitStatRange, string> = {
   week: "Week",
@@ -188,6 +189,11 @@ function HabitCard({
         />
         {s.bonus > 0 && <Fact label="Bonus days" value={String(s.bonus)} />}
         {habit.config.direction === "avoid" && <Fact label="Slips" value={String(s.slips)} />}
+        {habit.type !== "group" && (
+          <span className="ml-auto">
+            <ChartLink ids={[`habit:${habit.id}`]} config={{ trend: true }} />
+          </span>
+        )}
       </dl>
 
       <DayStrip days={s.days} range={range} today={today} />

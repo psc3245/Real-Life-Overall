@@ -9,7 +9,7 @@ import {
   type RatedNodeDto,
   type RecapDto,
 } from "@rlo/shared";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useDay } from "../../api/days";
 import { useActivity, useRatings } from "../../api/ratings";
@@ -26,6 +26,9 @@ import {
 import { FocusCard } from "./FocusCard";
 import { dayLabel, longDate } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
+const PinnedCharts = lazy(() =>
+  import("../charts/PinnedCharts").then((m) => ({ default: m.PinnedCharts })),
+);
 
 const STATUS_LABEL: Record<DayDto["status"], string> = {
   open: "Not recapped yet",
@@ -86,6 +89,10 @@ export function TodayPage() {
           <JournalCard day={d} />
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <PinnedCharts today={d.today} />
+      </Suspense>
 
       <FocusCard />
 

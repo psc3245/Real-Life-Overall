@@ -13,6 +13,7 @@ import { WorkoutsNav } from "../workouts/WorkoutsNav";
 import { HeightInput, WeightInput } from "./BodyInputs";
 import { TrackingSettings } from "./TrackingSettings";
 import { DebugJson } from "../../components/debug/Debug";
+import { ChartLink } from "../charts/ChartLink";
 
 /** Height and weight over time, if the user tracks them. */
 export function BodyPage() {
@@ -28,6 +29,11 @@ export function BodyPage() {
           <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Body</h1>
         </div>
         <WorkoutsNav />
+        <ChartLink
+          ids={["body:weight"]}
+          config={{ range: "all", average: true, trend: true }}
+          label="Chart and model weight →"
+        />
       </header>
       {(body.isPending || me.isPending || !today) && <p className="text-court-500">Loading…</p>}
       <ErrorNote error={body.error ?? me.error} />
