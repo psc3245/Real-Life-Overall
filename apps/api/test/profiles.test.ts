@@ -1,4 +1,4 @@
-import type { DayDto, ProfileDto } from "@rlo/shared";
+import { DEFAULT_PREFERENCES, type DayDto, type MeDto, type ProfileDto } from "@rlo/shared";
 import { describe, expect, it } from "vitest";
 import { createRatedApp, json } from "./flows";
 import { jsonResult, testBindings } from "./helpers";
@@ -83,6 +83,29 @@ describe("usernames", () => {
     for (const bad of ["admin", "ab", "has space", "-dash"]) {
       const res = await t.request("/me", { user, method: "PATCH", ...json({ username: bad }) });
       expect(res.status, bad).toBe(400);
+    }
+  });
+
+  it("store personalization, merging each top-level preference", async () => {
+    const t = await createRatedApp();
+    const fresh = await body<MeDto>(await t.request("/me"));
+    expect(fresh.preferences).toEqual(DEFAULT_PREFERENCES);
+
+    await t.request("/me", { method: "PATCH", ...json({ preferences: { theme: "oled" } }) });
+    const features = { ...DEFAULT_PREFERENCES.features, goals: false };
+    const res = await t.request("/me", {
+      method: "PATCH",
+      ...json({ preferences: { accent: "gold", features } }),
+    });
+    expect(res.status).toBe(200);
+    const me = await body<MeDto>(res);
+    expect(me.preferences).toMatchObject({ theme: "oled", accent: "gold" });
+    expect(me.preferences.features.goals).toBe(false);
+    expect(me.preferences.features.habits).toBe(true);
+
+    for (const bad of [{ theme: "neon" }, { colour: "red" }, { features: { goals: false } }]) {
+      const rejected = await t.request("/me", { method: "PATCH", ...json({ preferences: bad }) });
+      expect(rejected.status, JSON.stringify(bad)).toBe(400);
     }
   });
 });

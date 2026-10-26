@@ -1,4 +1,5 @@
-import { eq } from "drizzle-orm";
+import { parsePreferences, type Preferences, type PreferencesPatch } from "@rlo/shared";
+import { eq, sql } from "drizzle-orm";
 import type { Database, Executor } from "../db/client";
 import { users } from "../db/schema";
 
@@ -15,21 +16,28 @@ export const publicUserColumns = {
   trackWeight: users.trackWeight,
   trackHeight: users.trackHeight,
   role: users.role,
+  preferences: users.preferences,
   createdAt: users.createdAt,
 };
 
-export type PublicUser = {
+type UserRow = {
   [K in keyof typeof publicUserColumns]: (typeof publicUserColumns)[K]["_"]["data"];
 };
+export type PublicUser = Omit<UserRow, "preferences"> & { preferences: Preferences };
+
+const toPublic = (row: UserRow): PublicUser => ({
+  ...row,
+  preferences: parsePreferences(row.preferences),
+});
 
 export async function findById(db: Database, id: string): Promise<PublicUser | null> {
   const rows = await db.select(publicUserColumns).from(users).where(eq(users.id, id));
-  return rows[0] ?? null;
+  return rows[0] ? toPublic(rows[0]) : null;
 }
 
 export async function findByUsername(db: Database, username: string): Promise<PublicUser | null> {
   const rows = await db.select(publicUserColumns).from(users).where(eq(users.username, username));
-  return rows[0] ?? null;
+  return rows[0] ? toPublic(rows[0]) : null;
 }
 
 export async function findOrCreateDevUser(db: Database, username: string): Promise<PublicUser> {
@@ -37,13 +45,13 @@ export async function findOrCreateDevUser(db: Database, username: string): Promi
     .select(publicUserColumns)
     .from(users)
     .where(eq(users.username, username));
-  if (existing) return existing;
+  if (existing) return toPublic(existing);
   await db
     .insert(users)
     .values({ username, email: `${username}@dev.local`, displayName: username })
     .onConflictDoNothing({ target: users.username });
   const rows = await db.select(publicUserColumns).from(users).where(eq(users.username, username));
-  return rows[0]!;
+  return toPublic(rows[0]!);
 }
 
 export async function update(
@@ -63,14 +71,21 @@ export async function update(
       | "trackHeight"
       | "role"
     >
-  >,
+  > & { preferences?: PreferencesPatch },
 ): Promise<PublicUser | null> {
+  const { preferences, ...rest } = changes;
   const rows = await db
     .update(users)
-    .set(changes)
+    .set({
+      ...rest,
+      // Shallow merge: each top-level key in the patch replaces the stored one.
+      ...(preferences && {
+        preferences: sql`${users.preferences} || ${JSON.stringify(preferences)}::jsonb`,
+      }),
+    })
     .where(eq(users.id, id))
     .returning(publicUserColumns);
-  return rows[0] ?? null;
+  return rows[0] ? toPublic(rows[0]) : null;
 }
 
 export async function findProfileSummary(db: Database, id: string): Promise<string | null> {
@@ -87,7 +102,7 @@ export async function setProfileSummary(db: Executor, id: string, profileSummary
 
 export async function findByAuthSubject(db: Database, subject: string): Promise<PublicUser | null> {
   const rows = await db.select(publicUserColumns).from(users).where(eq(users.authSubject, subject));
-  return rows[0] ?? null;
+  return rows[0] ? toPublic(rows[0]) : null;
 }
 
 /** Creates the app user for a signed-in identity, deriving a unique username from the email. */
@@ -113,7 +128,7 @@ export async function createForAuth(
       })
       .onConflictDoNothing()
       .returning(publicUserColumns);
-    if (rows[0]) return rows[0];
+    if (rows[0]) return toPublic(rows[0]);
     const existing = await findByAuthSubject(db, identity.id); // a concurrent request won
     if (existing) return existing;
   }

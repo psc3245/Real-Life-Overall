@@ -69,6 +69,8 @@ export const users = pgTable("users", {
   trackHeight: boolean().notNull().default(false),
   /** "admin" unlocks /admin and debug panels (DESIGN.md §8.7). Set with `npm run set-role`. */
   role: userRole().notNull().default("user"),
+  /** Personalization and configuration (DESIGN.md §7.9); read through `parsePreferences`. */
+  preferences: jsonb().notNull().default({}),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

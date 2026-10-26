@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useDay, useSaveEntry, useSaveJournal } from "../../api/days";
+import { usePreferences } from "../../api/preferences";
 import { useRatings } from "../../api/ratings";
 import { DayPicker } from "../../components/DayPicker";
 import { SectionNav } from "../../components/SectionNav";
@@ -40,6 +41,7 @@ export function LogPage() {
   const date = params.get("date");
   const day = useDay(date);
   const ratings = useRatings();
+  const on = usePreferences().features;
   useHashScroll(day.isSuccess);
 
   if (ratings.data === null) {
@@ -100,30 +102,40 @@ export function LogPage() {
 
       <SectionNav
         sections={[
-          ...(d.prompts.length ? [{ id: "questions", label: "Questions" }] : []),
-          { id: "journal-section", label: "Journal" },
-          { id: "habits", label: "Habits" },
-          { id: "workouts", label: "Workouts" },
-          { id: "goals", label: "Goals" },
+          ...(on.guidedPrompts && d.prompts.length
+            ? [{ id: "questions", label: "Questions" }]
+            : []),
+          ...(on.journal ? [{ id: "journal-section", label: "Journal" }] : []),
+          ...(on.habits ? [{ id: "habits", label: "Habits" }] : []),
+          ...(on.workouts ? [{ id: "workouts", label: "Workouts" }] : []),
+          ...(on.goals ? [{ id: "goals", label: "Goals" }] : []),
           { id: "recap", label: "Recap" },
         ]}
       />
-      <div id="questions" className="scroll-mt-16">
-        <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
-      </div>
-      <div id="journal-section" className="scroll-mt-16">
-        <Journal key={d.date} day={d} />
-      </div>
-      <div id="habits" className="scroll-mt-16">
-        <Habits day={d} leaves={ratings.data?.nodes ?? []} />
-      </div>
+      {on.guidedPrompts && (
+        <div id="questions" className="scroll-mt-16">
+          <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
+        </div>
+      )}
+      {on.journal && (
+        <div id="journal-section" className="scroll-mt-16">
+          <Journal key={d.date} day={d} />
+        </div>
+      )}
+      {on.habits && (
+        <div id="habits" className="scroll-mt-16">
+          <Habits day={d} leaves={ratings.data?.nodes ?? []} />
+        </div>
+      )}
       <div id="workouts" className="scroll-mt-16 space-y-8">
-        <DayWorkouts day={d} />
+        {on.workouts && <DayWorkouts day={d} />}
         <DayBody day={d} />
       </div>
-      <div id="goals" className="scroll-mt-16">
-        <DayGoals day={d} />
-      </div>
+      {on.goals && (
+        <div id="goals" className="scroll-mt-16">
+          <DayGoals day={d} />
+        </div>
+      )}
       <div id="recap" className="scroll-mt-16">
         <RecapPanel day={d} />
       </div>

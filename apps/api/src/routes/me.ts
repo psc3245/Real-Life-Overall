@@ -1,4 +1,10 @@
-import { isValidTimeZone, PROFILE_VISIBILITIES, UNIT_SYSTEMS, usernameSchema } from "@rlo/shared";
+import {
+  isValidTimeZone,
+  preferencesPatchSchema,
+  PROFILE_VISIBILITIES,
+  UNIT_SYSTEMS,
+  usernameSchema,
+} from "@rlo/shared";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -18,6 +24,7 @@ const updateMeSchema = z
     unitSystem: z.enum(UNIT_SYSTEMS),
     trackWeight: z.boolean(),
     trackHeight: z.boolean(),
+    preferences: preferencesPatchSchema,
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Provide at least one field");
