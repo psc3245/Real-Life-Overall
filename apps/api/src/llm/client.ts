@@ -1,8 +1,11 @@
+import { parsePreferences, type SportsTalk } from "@rlo/shared";
 import { APICallError, generateText, Output, type ModelMessage } from "ai";
+import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import type { Database } from "../db/client";
-import { llmCalls } from "../db/schema";
+import { llmCalls, users } from "../db/schema";
 import { estimateCostUsd, type LlmPurpose } from "./models";
+import { VOICE, VOICED_PURPOSES } from "./prompts/voice";
 import type { ModelResolver } from "./providers";
 
 export interface StructuredRequest<T extends z.ZodType> {
@@ -47,9 +50,28 @@ export class LlmClient {
   constructor(
     private readonly resolveModel: ModelResolver,
     private readonly recordCall: (record: LlmCallRecord) => Promise<void>,
+    /** The player's sports-talk setting; without one every call uses the normal voice. */
+    private readonly resolveVoice?: (userId: string) => Promise<SportsTalk>,
   ) {}
 
-  async generateStructured<T extends z.ZodType>(req: StructuredRequest<T>): Promise<z.infer<T>> {
+  /** Appends the player's voice to calls that write text they read (DESIGN.md §7.10). */
+  private async withVoice<T extends z.ZodType>(req: StructuredRequest<T>) {
+    if (!VOICED_PURPOSES.has(req.purpose)) return req;
+    const talk: SportsTalk =
+      req.userId && this.resolveVoice
+        ? await this.resolveVoice(req.userId).catch(() => "normal" as const)
+        : "normal";
+    return {
+      ...req,
+      system: `${req.system}\n\n${VOICE[talk]}`,
+      promptVersion: `${req.promptVersion}+talk-${talk}`,
+    };
+  }
+
+  async generateStructured<T extends z.ZodType>(
+    request: StructuredRequest<T>,
+  ): Promise<z.infer<T>> {
+    const req = await this.withVoice(request);
     let resolved: ReturnType<ModelResolver>;
     try {
       resolved = this.resolveModel(req.purpose);
@@ -125,5 +147,16 @@ export function dbCallRecorder(db: Database) {
       // Cost logging must never break the user-facing request.
       console.error("Failed to record LLM call", error);
     }
+  };
+}
+
+/** Reads the player's sports-talk preference (DESIGN.md §7.10). */
+export function dbVoiceResolver(db: Database) {
+  return async (userId: string): Promise<SportsTalk> => {
+    const rows = await db
+      .select({ preferences: users.preferences })
+      .from(users)
+      .where(eq(users.id, userId));
+    return parsePreferences(rows[0]?.preferences).sportsTalk;
   };
 }

@@ -26,8 +26,10 @@ import { SectionNav } from "../../components/SectionNav";
 import { shortDate } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { TreeProposalCard, WeightShiftList } from "./TreeEvolution";
+import { cap, useTalk } from "../../lib/talk";
 
 export function ScoutingReportPage() {
+  const talk = useTalk();
   const report = useScoutingReport();
   const weights = useWeights();
   const proposals = useTreeProposals();
@@ -40,17 +42,19 @@ export function ScoutingReportPage() {
   return (
     <div className="space-y-10 pt-4">
       <header className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.3em] text-neon">What you're playing for</p>
-        <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Scouting Report</h1>
+        <p className="text-sm uppercase tracking-[0.3em] text-neon">{talk.scoutingReportTagline}</p>
+        <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+          {talk.scoutingReport}
+        </h1>
         <p className="max-w-2xl text-court-300">
-          The scout's picture of what you want out of life. Each weekly review updates it, and your
-          rating is tuned to match it: weights drift toward what matters to you, and now and then
-          the scout suggests adding or removing part of your tree.
+          {cap(talk.scout)}'s picture of what you want out of life. Each weekly review updates it,
+          and your rating is tuned to match it: weights drift toward what matters to you, and now
+          and then {talk.scout} suggests adding or removing part of your tree.
         </p>
         {r.updatedAt && (
           <p className="text-sm text-court-500">
             Updated {shortDate(r.updatedAt.slice(0, 10))} by{" "}
-            {r.updatedBy === "user" ? "you" : "the scout"}
+            {r.updatedBy === "user" ? "you" : talk.scout}
           </p>
         )}
       </header>
@@ -87,7 +91,7 @@ export function ScoutingReportPage() {
         <ErrorNote error={proposals.error} />
         {proposals.data?.length === 0 && (
           <p className="rounded-xl border border-dashed border-court-700 p-6 text-center text-court-500">
-            No suggestions yet. Your tree fits what the scout knows so far.
+            No suggestions yet. Your tree fits what {talk.scout} knows so far.
           </p>
         )}
         <div className="space-y-3">
@@ -116,6 +120,7 @@ function Importance({ value }: { value: number }) {
 }
 
 function ReportView({ report: r, onEdit }: { report: ScoutingReportDto; onEdit: () => void }) {
+  const talk = useTalk();
   const empty =
     !r.aspirations.length && !r.priorities.length && !r.focuses.length && !r.constraints.length;
   const list = (title: string, items: string[]) =>
@@ -137,8 +142,8 @@ function ReportView({ report: r, onEdit }: { report: ScoutingReportDto; onEdit: 
       </div>
       {empty && (
         <p className="text-court-300">
-          Empty for now. The scout writes it after your next weekly review, or you can fill it in
-          yourself.
+          Empty for now. {cap(talk.scout)} writes it after your next weekly review, or you can fill
+          it in yourself.
         </p>
       )}
       {list("Aspirations", r.aspirations)}

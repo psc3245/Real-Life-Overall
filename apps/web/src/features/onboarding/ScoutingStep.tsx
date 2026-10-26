@@ -6,6 +6,7 @@ import { ErrorNote } from "./ErrorNote";
 import { FollowupChat } from "./FollowupChat";
 import { QuestionnaireForm } from "./QuestionnaireForm";
 import { ScoutingRecap } from "./ScoutingRecap";
+import { useTalk } from "../../lib/talk";
 
 export function ScoutingStep({
   state,
@@ -28,12 +29,13 @@ function ScoutingIntro({
   state: OnboardingStateDto;
   onEditBuild: () => void;
 }) {
+  const talk = useTalk();
   const generate = useGenerateQuestionnaire();
   const attributes = leafIds(state.nodes).length;
 
   return (
     <div className="rounded-xl border border-court-700 bg-court-900/70 p-8 text-center">
-      <p className="font-display text-3xl uppercase tracking-wider text-neon">Scouting report</p>
+      <p className="font-display text-3xl uppercase tracking-wider text-neon">{talk.scouting}</p>
       <p className="mx-auto mt-3 max-w-lg text-court-300">
         You'll get questions written for your {attributes} attributes, about what you've actually
         been doing lately. Your answers set your starting ratings. It takes about 5–10 minutes, and
@@ -47,7 +49,7 @@ function ScoutingIntro({
           ← Adjust build or weights
         </Button>
         <Button variant="primary" disabled={generate.isPending} onClick={() => generate.mutate()}>
-          {generate.isPending ? "Writing your questions…" : "Start scouting"}
+          {generate.isPending ? "Writing your questions…" : talk.startScouting}
         </Button>
       </div>
       {generate.isPending && (

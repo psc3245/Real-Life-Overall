@@ -354,6 +354,13 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 - **Today page:** widgets (missed recaps, habits, rating, goals, journal, training, pinned charts, focus, recap) can be shown or hidden, reordered, and set half or full width; one- or two-column layout, a greeting by name, the Log button, hiding finished habits, and how many goals and rating movers show.
 - Screens: a **Personalize** modal (tabs: Look, Today page, Configuration) opened from your own profile page and from `/settings`. Any page can open it with `?prefs=look|today|configuration` (Today's Customize link, the switched-off pages). The iOS app doesn't read preferences yet.
 
+
+### 7.10 Sports talk (added 2026-10-26)
+- One setting, `preferences.sportsTalk`: **none**, **normal** (default, the app as designed) or **extra**. It sits on the Personalize modal's Look tab.
+- **The app's words:** `TALK` in `packages/shared/src/talk.ts` holds the terms that change (the scout, Scouting Report, Coach, OVR, player card, archetype, nav labels, weekly review, End my day, onboarding's scouting step and reveal); the web reads them with `useTalk()`. None turns them plain (the AI, Life priorities, Assistant, Overall, Workouts, Rankings, Questions); extra turns them up (Game day, Film room, Practice, Standings, Film session, Final whistle, Combine, Draft night, Undrafted). Routes, ids and data never change.
+- **The model's words:** the LLM client appends a voice section (`llm/prompts/voice.ts`) to every call that writes text the player reads (onboarding chat, questions and rationales, daily recaps, weekly reviews, new-attribute ratings, report write-ups, the coach), read from the player's preference per call; the logged prompt version gets `+talk-<level>`. Calls that only produce names, weights or links (attribute suggestions, weights, habit links) aren't voiced, so attribute names never pick up slang. Every level keeps numbers exact, never renames the player's nodes, and drops the playful framing for health, grief, mental health, money or distress. None also makes archetypes plain profile labels; extra makes them bold 2K builds.
+- Past text (recaps, archetype names) keeps the voice it was written in. iOS doesn't read the setting yet.
+
 ---
 
 ## 8. Architecture
@@ -629,7 +636,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Personalization and configuration: themes, accents, fonts and layout options; switch parts of the app off; a customizable Today page (§7.9)
 - [x] Scouting Report and an evolving tree: automatic capped weight shifts with undo, rare tree change proposals the player accepts (§4.5, §5.8)
 - [x] Coach chat: advice grounded in your data, with one-tap habit, goal and Scouting Report suggestions; a Today card (§5.9)
-- [ ] iOS: Scouting Report, evolving tree and coach
+- [x] Sports talk: none / normal / extra for the app's wording and every AI-written text (§7.10)
+- [ ] iOS: Scouting Report, evolving tree, coach and sports talk
 - [ ] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 
 ---

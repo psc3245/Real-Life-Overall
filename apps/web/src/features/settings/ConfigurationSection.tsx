@@ -2,9 +2,11 @@ import { DEFAULT_PREFERENCES, FEATURES } from "@rlo/shared";
 import { usePreferences, useSetPreferences } from "../../api/preferences";
 import { PrefsHeading, Toggle } from "./controls";
 import { FEATURE_GROUPS, FEATURE_INFO } from "./featureInfo";
+import { useTalk } from "../../lib/talk";
 
 /** Switch whole parts of the app on and off. Data is kept while a part is off. */
 export function ConfigurationSection() {
+  const talk = useTalk();
   const prefs = usePreferences();
   const setPreferences = useSetPreferences();
   const allOn = FEATURES.every((f) => prefs.features[f]);
@@ -38,7 +40,7 @@ export function ConfigurationSection() {
               key={f}
               checked={prefs.features[f]}
               onChange={(on) => setPreferences({ features: { ...prefs.features, [f]: on } })}
-              label={FEATURE_INFO[f].label}
+              label={f === "coach" ? talk.coach : FEATURE_INFO[f].label}
               detail={FEATURE_INFO[f].detail}
             />
           ))}

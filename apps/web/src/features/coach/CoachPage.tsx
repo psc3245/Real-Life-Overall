@@ -19,8 +19,10 @@ import { useRatings } from "../../api/ratings";
 import { Button } from "../../components/Button";
 import { DebugJson } from "../../components/debug/Debug";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { useTalk } from "../../lib/talk";
 
 export function CoachPage() {
+  const talk = useTalk();
   const coach = useCoach();
   const send = useSendCoachMessage();
   const clear = useClearCoach();
@@ -59,13 +61,14 @@ export function CoachPage() {
     <div className="mx-auto max-w-3xl space-y-6 pt-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-neon">Your scout, on call</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Coach</h1>
+          <p className="text-sm uppercase tracking-[0.3em] text-neon">{talk.coachTagline}</p>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">{talk.coach}</h1>
           <p className="mt-1 max-w-xl text-court-300">
-            Ask about your ratings, what to work on, or how to fit it into your week. The coach
+            Ask about your ratings, what to work on, or how to fit it into your week. The{" "}
+            {talk.coach.toLowerCase()}
             knows your habits, goals, recent days and{" "}
             <Link to="/scouting-report" className="text-neon hover:underline">
-              Scouting Report
+              {talk.scoutingReport}
             </Link>
             , and can suggest habits and goals you add with one tap.
           </p>
@@ -262,6 +265,7 @@ function Suggestion({
   messageId: string;
   suggestion: CoachSuggestionDto;
 }) {
+  const talk = useTalk();
   const resolve = useResolveCoachSuggestion();
   const ratings = useRatings();
   const names = new Map((ratings.data?.nodes ?? []).map((n) => [n.id, n.name]));
@@ -269,7 +273,9 @@ function Suggestion({
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-court-700 bg-court-900/60 p-3">
       <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider text-neon">{KIND_LABEL[s.kind]}</p>
+        <p className="text-[11px] uppercase tracking-wider text-neon">
+          {s.kind === "report" ? talk.scoutingReport : KIND_LABEL[s.kind]}
+        </p>
         <p className="font-medium">{title}</p>
         <p className="text-sm text-court-500">{describe(s, names)}</p>
         {s.reason && <p className="text-sm text-court-300">{s.reason}</p>}

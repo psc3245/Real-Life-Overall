@@ -19,6 +19,7 @@ import { NewSeasonBanner, PastSeasons } from "./SeasonSections";
 import { GoalEditor } from "./GoalEditor";
 import { CONFIDENCE_LABEL } from "./labels";
 import { DebugJson } from "../../components/debug/Debug";
+import { useTalk } from "../../lib/talk";
 
 const RATINGS_SECTIONS = [
   { id: "card", label: "Card" },
@@ -31,6 +32,7 @@ const RATINGS_SECTIONS = [
 ];
 
 export function RatingsPage() {
+  const talk = useTalk();
   const ratings = useRatings();
   const me = useMe();
 
@@ -62,7 +64,7 @@ export function RatingsPage() {
           username={me.data?.username}
         />
         <div className="space-y-3">
-          <h1 className="font-display text-4xl font-bold uppercase">Player profile</h1>
+          <h1 className="font-display text-4xl font-bold uppercase">{talk.profileHeading}</h1>
           {data.archetype && (
             <p className="text-court-300">
               <span className="font-semibold text-neon">{data.archetype.name}.</span>{" "}
@@ -83,10 +85,10 @@ export function RatingsPage() {
             className="block rounded-lg border border-court-700 p-3 hover:border-neon"
           >
             <span className="font-display uppercase tracking-wider text-neon">
-              Scouting Report →
+              {talk.scoutingReport} →
             </span>
             <span className="block text-sm text-court-300">
-              What you're playing for, and how your rating is adapting to it.
+              {talk.scoutingReportTagline}, and how your rating is adapting to it.
             </span>
           </Link>
           <p className="text-sm text-court-500">

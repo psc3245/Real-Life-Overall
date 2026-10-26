@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 import { resolve } from "node:path";
 import { createApp } from "../src/app";
 import { DB_CASING, schema, type Database } from "../src/db/client";
-import { dbCallRecorder, LlmClient } from "../src/llm/client";
+import { dbCallRecorder, dbVoiceResolver, LlmClient } from "../src/llm/client";
 import type { ModelResolver } from "../src/llm/providers";
 
 const migrationsFolder = resolve(import.meta.dirname, "../drizzle");
@@ -57,7 +57,7 @@ export const testBindings = {
 export async function createTestApp(options: { doGenerate?: MockGenerate } = {}) {
   const db = await createTestDb();
   const { resolver, model } = mockResolver(options.doGenerate ?? []);
-  const llm = new LlmClient(resolver, dbCallRecorder(db));
+  const llm = new LlmClient(resolver, dbCallRecorder(db), dbVoiceResolver(db));
   const app = createApp(() => ({ db, llm }));
   const request = (path: string, init: RequestInit & { user?: string } = {}) => {
     const headers = new Headers(init.headers);

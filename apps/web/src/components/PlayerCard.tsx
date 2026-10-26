@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { OvrBadge } from "./OvrBadge";
 import { StatBar } from "./StatBar";
+import { useTalk } from "../lib/talk";
 
 interface CardCategory {
   key: string;
@@ -29,9 +30,10 @@ export function CardView({
   note?: ReactNode;
   categories: CardCategory[];
 }) {
+  const talk = useTalk();
   return (
     <section
-      aria-label="Player card"
+      aria-label={talk.playerCard}
       className="rounded-2xl border border-court-700 bg-court-900/80 p-6 shadow-2xl backdrop-blur"
     >
       <div className="flex items-center gap-5">
@@ -59,6 +61,7 @@ export function CardView({
 
 /** OVR, archetype and category bars. Used on the home page, the reveal and the ratings page. */
 export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: string }) {
+  const talk = useTalk();
   const root = ratings.nodes.find((n) => n.parentId === null);
   const categories = ratings.nodes.filter((n) => n.parentId === root?.id);
 
@@ -66,7 +69,7 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
     <CardView
       name={name}
       overall={root?.value ?? 0}
-      subtitle={`${ratings.archetype?.name ?? "Unranked"} · ${ratings.season.label}`}
+      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}`}
       note={
         root?.projection != null && (
           <>
@@ -90,11 +93,12 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
 
 /** Another player's shared card: Overall, archetype and categories only. */
 export function PublicCard({ card, name }: { card: PublicCardDto; name: string }) {
+  const talk = useTalk();
   return (
     <CardView
       name={name}
       overall={card.overall}
-      subtitle={`${card.archetype ?? "Unranked"} · ${card.seasonLabel}`}
+      subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}`}
       note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
       categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
     />
