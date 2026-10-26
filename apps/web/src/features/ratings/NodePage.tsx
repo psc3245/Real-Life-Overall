@@ -1,4 +1,4 @@
-import { ratingTier, type RatedNodeDto } from "@rlo/shared";
+import type { RatedNodeDto } from "@rlo/shared";
 import { Link, useParams } from "react-router";
 import { useHabitStats } from "../../api/days";
 import { useChangeFeed, useHistory, useRatings } from "../../api/ratings";
@@ -6,7 +6,7 @@ import { Button } from "../../components/Button";
 import { HistoryChart } from "../../components/charts/HistoryChart";
 import { Delta } from "../../components/Delta";
 import { StatBar } from "../../components/StatBar";
-import { tierColor } from "../../components/tier";
+import { formatScore, HiddenRating, scoreColor, useScore } from "../../components/score";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { ChangeList } from "./ActivityPage";
 import { GoalEditor } from "./GoalEditor";
@@ -55,7 +55,8 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
     for (const n of nodes) if (n.parentId && below.has(n.parentId)) below.add(n.id);
   }
   const linked = (habits.data?.habits ?? []).filter((h) => h.habit.links.some((l) => below.has(l)));
-  const color = tierColor(ratingTier(node.value ?? 0));
+  const { mode } = useScore();
+  const color = scoreColor(mode, node.value ?? 0);
   const changes = feed.data?.pages.flat() ?? [];
 
   return (
@@ -91,13 +92,17 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
           </div>
           <div className="text-right">
             <p className="font-display text-6xl font-bold tabular-nums" style={{ color }}>
-              {node.value?.toFixed(1) ?? "—"}
+              {node.value == null ? "—" : formatScore(mode, node.value)}
             </p>
+            {mode === "growth" && (
+              <p className="text-xs uppercase tracking-wider text-court-500">gained this season</p>
+            )}
             {node.trend != null && (
               <p className="text-sm text-court-300">
                 <Delta value={node.trend} /> in 7 days
               </p>
             )}
+            <HiddenRating rating={node.rating} />
           </div>
         </div>
         <GoalEditor node={node} />

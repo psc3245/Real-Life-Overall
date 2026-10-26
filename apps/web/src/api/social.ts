@@ -5,6 +5,7 @@ import type {
   LeaderboardScope,
   ProfileDto,
   ProfileVisibility,
+  SeasonMode,
   UnitSystem,
 } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -77,9 +78,13 @@ export function useFriendAction() {
   });
 }
 
-export function useLeaderboard(scope: LeaderboardScope, board: string) {
+/** Without a mode, the server picks your own season's mode. */
+export function useLeaderboard(scope: LeaderboardScope, board: string, mode?: SeasonMode) {
   return useQuery({
-    queryKey: ["leaderboard", scope, board],
-    queryFn: () => api<LeaderboardDto>(`/leaderboards?scope=${scope}&board=${board}`),
+    queryKey: ["leaderboard", scope, board, mode ?? "mine"],
+    queryFn: () =>
+      api<LeaderboardDto>(
+        `/leaderboards?scope=${scope}&board=${board}${mode ? `&mode=${mode}` : ""}`,
+      ),
   });
 }

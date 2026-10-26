@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { AXIS_TEXT, CATEGORY_COLORS, GRID_COLOR, OVERALL_COLOR } from "./palette";
 import { shortDate } from "../../lib/format";
+import { useScore } from "../score";
 
 /**
  * Overall over time by default; "Categories" shows each category in its fixed color. With `only`,
@@ -50,8 +51,12 @@ export function HistoryChart({
   const valueAt = (row: Row, id: string) => (row[id] as number | null | undefined) ?? null;
   const all = rows.flatMap((r) => series.map((s) => valueAt(r, s.id)));
   const finite = all.filter((v): v is number => v !== null);
-  const lo = Math.max(0, Math.floor(Math.min(...finite, 100) - 3));
-  const hi = Math.min(100, Math.ceil(Math.max(...finite, 0) + 3));
+  // Growth starts at 0 and has no ceiling; ratings zoom in on their part of 0-100.
+  const growth = useScore().mode === "growth";
+  const lo = growth ? 0 : Math.max(0, Math.floor(Math.min(...finite, 100) - 3));
+  const hi = growth
+    ? Math.ceil(Math.max(...finite, 0) + 1)
+    : Math.min(100, Math.ceil(Math.max(...finite, 0) + 3));
 
   if (history.dates.length < 2) {
     return <p className="text-sm text-court-500">History appears after your first full day.</p>;

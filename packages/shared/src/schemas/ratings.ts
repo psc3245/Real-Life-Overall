@@ -18,17 +18,22 @@ export interface DecayRuleDto {
 }
 
 export interface RatedNodeDto extends RatingNodeDto {
-  /** Leaves: the ledger sum. Parents: weighted roll-up. Null if nothing below is rated. */
+  /**
+   * The season's score (DESIGN.md §4.6): the rating, or in growth mode the points gained.
+   * Leaves: from the ledger. Parents: weighted roll-up. Null if nothing below is rated.
+   */
   value: number | null;
+  /** The rating itself, in either mode. Growth mode keeps it hidden until the owner asks. */
+  rating: number | null;
   /** Leaves only: why the current rating is what it is. */
   rationale: string | null;
   confidence: Confidence | null;
   decay: DecayRuleDto | null;
-  /** Change over the last 7 days (null without history). */
+  /** Change in `value` over the last 7 days (null without history). */
   trend: number | null;
-  /** The user's target rating (Potential, DESIGN.md §7.1). */
+  /** The user's target for `value` (Potential, DESIGN.md §7.1). */
   goal: number | null;
-  /** The latest weekly review's projection for season end (categories and Overall). */
+  /** The latest weekly review's season-end projection of `value` (categories and Overall). */
   projection: number | null;
 }
 

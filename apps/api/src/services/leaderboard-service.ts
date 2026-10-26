@@ -7,7 +7,7 @@ import {
   type LeaderboardDto,
   type LeaderboardEntryDto,
   type LeaderboardScope,
-  type PublicCategoryDto,
+  type SeasonMode,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
 import { notFound } from "../errors";
@@ -17,11 +17,14 @@ import * as userRepo from "../repos/user-repo";
 
 type BoardRow = Awaited<ReturnType<typeof cardRepo.findGlobal>>[number];
 
-/** The row's value on a board: Overall, or a template category's value (absent: not ranked). */
-function boardValue(row: BoardRow, board: string): number | null {
-  if (board === "overall") return row.overall;
-  const category = (row.categories as PublicCategoryDto[]).find((c) => c.templateKey === board);
-  return category?.value ?? null;
+/**
+ * The row's value on a board: Overall, or a template category's value (absent: not ranked),
+ * as a rating or as growth.
+ */
+function boardValue(row: BoardRow, board: string, mode: SeasonMode): number | null {
+  const scores = cardRepo.cardScores(row, mode);
+  if (board === "overall") return scores.overall;
+  return scores.categories.find((c) => c.templateKey === board)?.value ?? null;
 }
 
 /** Highest first; ties share a rank (1, 2, 2, 4). */
@@ -48,18 +51,23 @@ export function rank(
 /**
  * Friends boards: you plus friends who share their card with friends (provisional players
  * included and marked). Global boards: public, opted-in players whose ratings are backed by
- * enough recaps and aren't frequently flagged (DESIGN.md §7.3).
+ * enough recaps and aren't frequently flagged (DESIGN.md §7.3). Rating and growth boards are
+ * separate: each ranks only the players in that mode this season (§4.6). Without a mode, you
+ * see your own mode's board.
  */
 export async function getLeaderboard(
   db: Database,
   userId: string,
   scope: LeaderboardScope,
   board: string,
+  requestedMode?: SeasonMode,
 ): Promise<LeaderboardDto> {
   const me = await userRepo.findById(db, userId);
   if (!me) throw notFound("User not found");
   const seasonLabel = seasonForDate(localDateIn(me.timezone)).label;
   const myCard = await cardRepo.findByUser(db, userId);
+  const myMode = myCard?.seasonLabel === seasonLabel ? myCard.mode : null;
+  const mode = requestedMode ?? myMode ?? "rating";
 
   let rows: BoardRow[];
   if (scope === "friends") {
@@ -74,7 +82,8 @@ export async function getLeaderboard(
   }
 
   const scored = rows.flatMap((r) => {
-    const value = boardValue(r, board);
+    if (r.mode !== mode) return [];
+    const value = boardValue(r, board, mode);
     return value == null ? [] : [{ row: r, value }];
   });
   const ranked = rank(
@@ -100,6 +109,8 @@ export async function getLeaderboard(
 
   return {
     scope,
+    mode,
+    myMode,
     board,
     seasonLabel,
     entries: entries.slice(0, LEADERBOARD_SIZE),

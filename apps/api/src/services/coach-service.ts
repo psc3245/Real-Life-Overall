@@ -7,6 +7,7 @@ import {
   dayOfWeek,
   HABIT_TYPE_LABELS,
   isHabitDone,
+  leafGrowthFromEvents,
   leafValuesFromEvents,
   localDateIn,
   MAX_ASPIRATIONS,
@@ -153,6 +154,10 @@ async function buildContext(db: Database, userId: string) {
     ctx ? eventRepo.findActiveBySeason(db, ctx.season.id) : [],
   ]);
   const values = ctx ? computeNodeValues(ctx.nodes, leafValuesFromEvents(events)) : new Map();
+  const growth =
+    ctx?.season.mode === "growth"
+      ? computeNodeValues(ctx.nodes, leafGrowthFromEvents(events))
+      : null;
   const off = [!features.habits && "habits", !features.goals && "goals"].filter(Boolean);
 
   const context = [
@@ -164,6 +169,10 @@ async function buildContext(db: Database, userId: string) {
     ctx &&
       `Ratings this season (${ctx.season.label}, ends ${ctx.season.endsOn}):\n` +
         renderTree(toPromptNodes(ctx.nodes, refs.refById, values), true),
+    ctx &&
+      growth &&
+      `Points gained this season (what the user sees in Growth mode):\n` +
+        renderTree(toPromptNodes(ctx.nodes, refs.refById, growth), true),
     features.habits && `Habits:\n${habits || "(none)"}`,
     features.goals && `Goals:\n${renderGoals(goals as ObjectiveDto[]) || "(none running)"}`,
     `This week's focus from the weekly review:\n${focus.map((f) => `- ${f.title}: ${f.detail}`).join("\n") || "(none)"}`,

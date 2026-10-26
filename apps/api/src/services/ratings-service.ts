@@ -1,11 +1,13 @@
 import {
   computeNodeValues,
+  leafGrowthFromEvents,
   leafIds,
   leafValuesFromEvents,
   localDateIn,
   type ChangeFeedItemDto,
   type Confidence,
   type RatingsDto,
+  type SeasonMode,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
 import { notFound } from "../errors";
@@ -24,7 +26,11 @@ import { trends } from "./history-service";
 import { ensureCurrentSeason } from "./season-service";
 import type { OnboardingResult } from "./onboarding-service";
 
-/** The user's current ratings: leaf values from the ledger, parents rolled up by weight. */
+/**
+ * The user's current ratings: leaf values from the ledger, parents rolled up by weight. In a
+ * growth season `value` (and trends, goals, projections) is points gained, and `rating` keeps
+ * the rating underneath (DESIGN.md §4.6).
+ */
 export async function getRatings(db: Database, userId: string): Promise<RatingsDto> {
   const season = await ensureCurrentSeason(db, userId);
   if (!season) throw notFound("No ratings yet. Finish onboarding first.");
@@ -38,9 +44,11 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
     eventRepo.findActiveWithDates(db, season.id).then(datedEvents),
     userRepo.findById(db, userId),
   ]);
-  const trend = trends(nodes, dated, localDateIn(user?.timezone ?? "UTC"));
+  const trend = trends(nodes, dated, localDateIn(user?.timezone ?? "UTC"), season.mode);
   const leaves = new Set(leafIds(nodes));
-  const values = computeNodeValues(nodes, leafValuesFromEvents(events));
+  const ratings = computeNodeValues(nodes, leafValuesFromEvents(events));
+  const growth = computeNodeValues(nodes, leafGrowthFromEvents(events));
+  const values = season.mode === "growth" ? growth : ratings;
   const rules = new Map(
     (await decayRuleRepo.findActiveByNodes(db, [...leaves])).map((r) => [r.nodeId, r]),
   );
@@ -56,8 +64,13 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
   ]);
   const goalByNode = new Map(goals.map((g) => [g.nodeId, g.targetValue]));
   const weeklyOutput = latestWeekly[0]?.output as
-    { projections?: { nodeId: string; value: number }[] } | undefined;
-  const projections = new Map((weeklyOutput?.projections ?? []).map((p) => [p.nodeId, p.value]));
+    { projections?: { nodeId: string; value: number }[]; mode?: SeasonMode } | undefined;
+  // Projections are in the mode they were made for (reviews before growth mode: ratings).
+  const projections = new Map(
+    (weeklyOutput?.mode ?? "rating") === season.mode
+      ? (weeklyOutput?.projections ?? []).map((p) => [p.nodeId, p.value])
+      : [],
+  );
 
   const dto: RatingsDto = {
     season,
@@ -76,6 +89,7 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
       return {
         ...n,
         value: values.get(n.id) ?? null,
+        rating: ratings.get(n.id) ?? null,
         rationale: event?.reason ?? null,
         confidence: evidence?.confidence ?? null,
         decay: rule
@@ -87,7 +101,7 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
       };
     }),
   };
-  await syncCard(db, userId, dto);
+  await syncCard(db, userId, dto, growth);
   return dto;
 }
 

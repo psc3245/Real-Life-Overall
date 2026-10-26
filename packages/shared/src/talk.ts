@@ -32,6 +32,11 @@ export interface TalkTerms {
   coachTagline: string;
   /** The OVR number's short label. */
   ovr: string;
+  /** Growth mode's name (DESIGN.md §4.6), and its number's short label. */
+  growthMode: string;
+  growthLabel: string;
+  /** Rating mode's name. */
+  ratingMode: string;
   playerCard: string;
   profileHeading: string;
   archetype: string;
@@ -58,6 +63,9 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     coach: "Assistant",
     coachTagline: "Ask anything about your data",
     ovr: "Overall",
+    growthMode: "Growth",
+    growthLabel: "Gained",
+    ratingMode: "Rating",
     playerCard: "Summary card",
     profileHeading: "Profile",
     archetype: "Profile type",
@@ -80,6 +88,9 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     coach: "Coach",
     coachTagline: "Your scout, on call",
     ovr: "OVR",
+    growthMode: "Most Improved",
+    growthLabel: "Growth",
+    ratingMode: "OVR",
     playerCard: "Player card",
     profileHeading: "Player profile",
     archetype: "Archetype",
@@ -102,6 +113,9 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     coach: "Coach",
     coachTagline: "Coach is in the building",
     ovr: "OVR",
+    growthMode: "MIP race",
+    growthLabel: "MIP",
+    ratingMode: "OVR race",
     playerCard: "Player card",
     profileHeading: "Player profile",
     archetype: "Build",

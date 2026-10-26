@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SeasonMode } from "../rating/growth";
 import { addDays, dayOfWeek } from "../dates";
 import { HABIT_TYPES, type HabitType } from "./habits";
 import type { EarnedBadgeDto } from "./badges";
@@ -64,6 +65,8 @@ export interface WeeklyReviewDto {
   weekStart: string;
   weekEnd: string;
   narrative: string;
+  /** The season's mode: overallStart/End are growth in a growth season. */
+  mode: SeasonMode;
   overallStart: number | null;
   overallEnd: number | null;
   corrections: RecapChangeDto[];

@@ -1,11 +1,13 @@
 import {
   addDays,
   computeNodeValues,
-  leafValuesFromEvents,
+  growthDelta,
+  leafScoresFromEvents,
   localDateIn,
   MAX_HISTORY_DAYS,
   type ActivityDayDto,
   type HistoryDto,
+  type SeasonMode,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
 import * as dayRepo from "../repos/day-repo";
@@ -43,20 +45,23 @@ export async function getHistory(db: Database, userId: string, days: number): Pr
   const range = await rangeFor(db, userId, days);
   if (!range) return { dates: [], series: [] };
   const { ctx, today, from } = range;
-  return historyBetween(db, ctx.season.id, ctx.nodes, from, today);
+  return historyBetween(db, ctx.season.id, ctx.nodes, from, today, ctx.season.mode);
 }
 
-/** Every node's end-of-day value over [from, to], from one season's ledger. */
+/** Every node's end-of-day score (rating or growth) over [from, to], from one season's ledger. */
 export async function historyBetween(
   db: Database,
   seasonId: string,
   nodes: Parameters<typeof computeNodeValues>[0],
   from: string,
   to: string,
+  mode: SeasonMode,
 ): Promise<HistoryDto> {
   const events = datedEvents(await eventRepo.findActiveWithDates(db, seasonId));
   const dates = datesBetween(from, to);
-  const daily = dates.map((d) => computeNodeValues(nodes, leafValuesFromEvents(asOf(events, d))));
+  const daily = dates.map((d) =>
+    computeNodeValues(nodes, leafScoresFromEvents(mode, asOf(events, d))),
+  );
   return {
     dates,
     series: nodes.map((n) => ({
@@ -85,16 +90,20 @@ export async function getActivity(
   const range = await rangeFor(db, userId, days);
   if (!range) return [];
   const { ctx, today, from } = range;
-  return activityBetween(db, userId, ctx.season.id, from, today);
+  return activityBetween(db, userId, ctx.season.id, from, today, ctx.season.mode);
 }
 
-/** Per-day logging, recaps and rating movement over [from, to] within one season. */
+/**
+ * Per-day logging, recaps and rating movement over [from, to] within one season. Growth
+ * seasons count only what moves growth (DESIGN.md §4.6).
+ */
 export async function activityBetween(
   db: Database,
   userId: string,
   seasonId: string,
   from: string,
   today: string,
+  mode: SeasonMode,
 ): Promise<ActivityDayDto[]> {
   const [events, logs, recaps, habits] = await Promise.all([
     eventRepo.findActiveWithDates(db, seasonId).then(datedEvents),
@@ -122,7 +131,9 @@ export async function activityBetween(
   const summaries = new Map(recaps.map((r) => [r.periodStart, firstSentence(r.narrative)]));
   const round = (n: number) => Math.round(n * 100) / 100;
   return datesBetween(from, today).map((date) => {
-    const day = events.filter((e) => e.date === date);
+    const day = events
+      .filter((e) => e.date === date)
+      .map((e) => (mode === "growth" ? { delta: growthDelta(e) } : e));
     return {
       date,
       logged: logged.has(date),
@@ -134,14 +145,18 @@ export async function activityBetween(
   });
 }
 
-/** Each node's change over the last 7 days. */
+/** Each node's change in score over the last 7 days. */
 export function trends(
   nodes: Parameters<typeof computeNodeValues>[0],
   events: ReturnType<typeof datedEvents>,
   today: string,
+  mode: SeasonMode,
 ): Map<string, number> {
-  const now = computeNodeValues(nodes, leafValuesFromEvents(events));
-  const before = computeNodeValues(nodes, leafValuesFromEvents(asOf(events, addDays(today, -7))));
+  const now = computeNodeValues(nodes, leafScoresFromEvents(mode, events));
+  const before = computeNodeValues(
+    nodes,
+    leafScoresFromEvents(mode, asOf(events, addDays(today, -7))),
+  );
   const out = new Map<string, number>();
   for (const [id, value] of now) {
     const prior = before.get(id);

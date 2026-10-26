@@ -15,6 +15,7 @@ const mockedApi = vi.mocked(api);
 const recap: RecapDto = {
   id: "r",
   date: "2026-10-20",
+  mode: "rating",
   narrative: "A solid day.",
   flags: ["The 40 km claim seems high."],
   changes: [
@@ -22,6 +23,7 @@ const recap: RecapDto = {
       nodeId: "c",
       nodeName: "Cardio",
       delta: 0.6,
+      growth: 0.6,
       reason: "You ran.",
       evidence: null,
       valueAfter: 70.6,
@@ -30,6 +32,7 @@ const recap: RecapDto = {
       nodeId: "s",
       nodeName: "Strength",
       delta: -0.2,
+      growth: 0.0,
       reason: "Skipped lifting.",
       evidence: null,
       valueAfter: 49.8,

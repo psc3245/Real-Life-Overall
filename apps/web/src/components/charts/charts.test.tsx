@@ -15,6 +15,7 @@ const node = (id: string, parentId: string | null, name: string): RatedNodeDto =
   sortOrder: 0,
   templateKey: null,
   value: 60,
+  rating: null,
   rationale: null,
   confidence: null,
   decay: null,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SEASON_MODES, type SeasonMode } from "../rating/growth";
 import type { EarnedBadgeDto } from "./badges";
 import type { HistoryDto } from "./history";
 import { CONFIDENCE_LEVELS } from "./ratings";
@@ -13,6 +14,8 @@ export interface SeasonSnapshotNode {
   name: string;
   depth: number;
   value: number | null;
+  /** Points gained that season (absent on seasons archived before growth mode). */
+  growth?: number | null;
 }
 
 /** A finished season, frozen at rollover (the "season card"). */
@@ -21,7 +24,10 @@ export interface SeasonCardDto {
   label: string;
   startsOn: string;
   endsOn: string;
+  mode: SeasonMode;
+  /** The final rating. Growth seasons show `growth` instead. */
   overall: number | null;
+  growth: number | null;
   archetype: string | null;
   nodes: SeasonSnapshotNode[];
 }
@@ -31,7 +37,10 @@ export interface SeasonDetailNode {
   parentId: string | null;
   name: string;
   depth: number;
-  /** Value on the season's first rated day, and on its last (today while it's running). */
+  /**
+   * The season's score on its first rated day, and on its last (today while it's running):
+   * ratings, or growth (from 0) in a growth season.
+   */
   start: number | null;
   end: number | null;
 }
@@ -43,6 +52,7 @@ export interface SeasonDetailDto {
   startsOn: string;
   endsOn: string;
   current: boolean;
+  mode: SeasonMode;
   /** Last day covered: today while the season runs, its end once archived. */
   through: string;
   archetype: string | null;
@@ -61,12 +71,17 @@ export interface SeasonDetailDto {
 
 export interface SeasonSetupDto {
   label: string;
+  mode: SeasonMode;
+  /** The mode can change only during setup (DESIGN.md §4.6). */
+  modeEditable: boolean;
   /** Last day the tree can be edited; null when this season can't be set up (first season). */
   setupEndsOn: string | null;
   editable: boolean;
   /** Last season's card, for comparison while editing. */
   previous: SeasonCardDto | null;
 }
+
+export const setSeasonModeBodySchema = z.object({ mode: z.enum(SEASON_MODES) });
 
 // LLM output: starting ratings for attributes new this season (or that became leaves).
 

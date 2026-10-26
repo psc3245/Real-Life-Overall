@@ -1,9 +1,10 @@
 import { Link, useNavigate } from "react-router";
 import { useRatings } from "../../api/ratings";
-import { useSaveSeasonTree, useSeasonSetup } from "../../api/seasons";
+import { useSaveSeasonTree, useSeasonSetup, useSetSeasonMode } from "../../api/seasons";
 import { nodesToDraft } from "../onboarding/draft";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { TreeBuilder } from "../onboarding/TreeBuilder";
+import { ModePicker } from "./ModePicker";
 import { useTalk } from "../../lib/talk";
 
 export function SeasonSetupPage() {
@@ -11,6 +12,7 @@ export function SeasonSetupPage() {
   const setup = useSeasonSetup();
   const ratings = useRatings();
   const save = useSaveSeasonTree();
+  const setMode = useSetSeasonMode();
   const navigate = useNavigate();
 
   if (setup.isPending || ratings.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
@@ -40,6 +42,23 @@ export function SeasonSetupPage() {
           New attributes get starting ratings from {talk.scout}; removed ones keep their history.
         </p>
       </header>
+      {setup.data.modeEditable && (
+        <section className="space-y-3">
+          <h2 className="font-display text-2xl uppercase tracking-wider">
+            How this season is scored
+          </h2>
+          <ModePicker
+            value={setup.data.mode}
+            disabled={setMode.isPending}
+            onChange={(mode) => setMode.mutate(mode)}
+          />
+          <p className="text-sm text-court-500">
+            Locks when setup closes on {setup.data.setupEndsOn}. Switching clears goals set for the
+            other mode.
+          </p>
+          <ErrorNote error={setMode.error} />
+        </section>
+      )}
       <TreeBuilder
         initial={nodesToDraft(ratings.data.nodes)}
         saving={save.isPending}

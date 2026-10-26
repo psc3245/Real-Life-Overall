@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SeasonMode } from "../rating/growth";
 import type { EarnedBadgeDto } from "./badges";
 
 /** Largest move one attribute can make in one daily recap (DESIGN.md §5.6). */
@@ -16,16 +17,21 @@ export interface GuidedPromptDto {
 export interface RecapChangeDto {
   nodeId: string;
   nodeName: string;
+  /** The rating change. */
   delta: number;
+  /** How much of it counts as growth (DESIGN.md §4.6). */
+  growth: number;
   reason: string;
   evidence: string | null;
-  /** The attribute's value right after this recap. */
+  /** The attribute's score (rating, or growth in a growth season) right after this recap. */
   valueAfter: number;
 }
 
 export interface RecapDto {
   id: string;
   date: string;
+  /** The season's mode: overallBefore/After and valueAfter are growth in a growth season. */
+  mode: SeasonMode;
   narrative: string;
   flags: string[];
   changes: RecapChangeDto[];

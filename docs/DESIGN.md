@@ -45,6 +45,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Editing a past day after its recap | **Re-run that day's recap.** |
 | Onboarding | **Structured form, then a chat follow-up** with the LLM, then initial ratings. |
 | Recalibration | **Season reset** each **calendar quarter**. |
+| Season mode | **Rating or Growth, picked at the start of each season** (decided 2026-10-26, §4.6). Growth ("Most Improved") scores points gained this season: gains only, weekly corrections take back over-credit, decay never subtracts, rolled up by weight. The rating keeps running underneath, revealable only by its owner. Separate boards per mode; the mode locks after setup. |
 | Potential | **Both**: user-set goal ratings plus an LLM-projected end-of-season rating. |
 | Badges | **Hybrid**: a core catalog with a deterministic rule engine, plus LLM-generated personal badges. |
 | Archetype | LLM-assigned build name (e.g. "Two-Way Scholar-Athlete"). |
@@ -92,7 +93,9 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | **Season** | A calendar quarter. It sets the structure lock, the recalibration point and the archive boundary. |
 | **Pause** | A user-declared period (vacation or injury) during which decay doesn't apply. |
 | **Archetype** | The LLM-assigned build label for the user's attribute profile. |
-| **Potential** | The user's goal rating plus the LLM's projected end-of-season rating. |
+| **Potential** | The user's goal rating plus the LLM's projected end-of-season rating (in a growth season: a growth target and projected season growth). |
+| **Season mode** | How a season is scored: **rating** (the 0-100 OVR) or **growth** ("Most Improved": points gained this season, §4.6). |
+| **Growth** | The points a leaf gained this season (recap gains plus weekly corrections, never below 0), rolled up by weight like ratings. |
 | **Scouting Report** | The structured picture of what the player wants out of life (aspirations, priorities, focuses, constraints) that the tree is tuned against (§5.8). Not to be confused with the onboarding "scouting" questionnaire. |
 
 ---
@@ -143,6 +146,16 @@ The tree should measure what the player actually cares about, weighted the way t
 - Changing weights mid-season changes how history rolls up: charts replay the ledger with current weights, so a category's past Overall contribution is re-weighted too. Accepted as a trade-off.
 - The `adaptiveRating` configuration switch (on by default) turns both off; the review is then told not to shift weights or propose changes.
 - Screens: `/scouting-report` (the report, "Rating shape": share now vs season start per node, weight shifts with undo, tree proposals), plus weight shifts and the proposal on the weekly review card. Routes: `/scouting-report` (GET, PUT), `/weights` (GET, `POST /weights/changes/:id/undo`), `/tree-proposals` (GET, `POST /tree-proposals/:id/accept|dismiss`).
+
+### 4.6 Season modes: Rating and Growth (added 2026-10-26)
+- Each season has a **mode** (`seasons.mode`): **rating** (default, everything above) or **growth**, named "Most Improved" (sports talk: Growth / Most Improved / MIP race). Picked before the reveal in onboarding (`PUT /onboarding/mode`, until onboarding completes) and in season setup (`PUT /seasons/setup/mode`, during the 14-day setup window). Rollover carries the mode into the next season. Switching clears goals, since they're in the other mode's units.
+- **Growth is derived from the same ledger** (`packages/shared/src/rating/growth.ts`), so nothing extra is stored and either mode can be computed for any season. Per event: daily recap gains count, daily setbacks count 0, weekly-review corrections count both ways (so over-credited recaps are taken back), decay, onboarding and recalibration count 0. A leaf's growth is the sum, floored at 0; every rated leaf starts at 0, and parents roll up by the same weighted mean as ratings (bigger trees don't score higher).
+- **What switches in a growth season:** `RatedNodeDto.value`, trends, goals and projections are growth; `rating` carries the rating underneath. History, charts (`rating:<id>` metrics, unit "gained"), the heatmap, recap and weekly before/after, season detail and archived season cards (`finalSnapshot` keeps both) all use growth. Change feeds show the counted part of each change ("±0" for decay and setbacks).
+- **The rating is private to its owner.** The owner can show it with a "Show rating" toggle (remembered per browser) on the ratings and attribute pages, and peek at it on the reveal. Other players never receive it: `player_cards` stores both numbers (`overall`, `growth`, per-category `value` and `growth`) and the card DTO picks by mode, and growth players' rating-level catalog badges (Well-Rounded, Elite) are left off their public profile.
+- **Leaderboards** (`?mode=rating|growth`, default your own mode) rank only the players in that mode this season; the page has a Rating / Growth switch and says which board you're on. Compare shows ratings when both players are in rating mode, otherwise growth for both (every card carries growth).
+- **The model:** voiced calls for a growth player get a growth note (`GROWTH_MODE`, prompt version `+growth`): talk about gains, don't quote ratings, keep deltas honest. Weekly reviews also see the growth tree and project season growth; projections store their mode so old rating projections don't show as growth.
+- Rating-only parts stay as they are: decay rules, archetypes, the rails (§5.6), badges' rule engine and the Scouting Report.
+- iOS doesn't know about modes yet: in a growth season it shows growth numbers as if they were ratings.
 
 ---
 
@@ -292,7 +305,7 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 ### 7.3 Social (Phase 4)
 - Public profile and card link (requires real URLs, hence React Router)
 - Friends: **mutual requests** (send by exact username or from a profile; befriending someone who already asked accepts). Limits: 20 pending sent requests, 200 friends. Side-by-side **compare** lines up template categories by template key (even when renamed) and custom ones by name. Usernames are discoverable by exact match through requests; cards are not.
-- **Leaderboards** (`/leaderboards`), per season, by Overall or by **template category** (custom categories don't compare; a renamed template category still counts under its template):
+- **Leaderboards** (`/leaderboards`), per season and per mode (rating and growth boards are separate, §4.6), by Overall or by **template category** (custom categories don't compare; a renamed template category still counts under its template):
   - **Friends**: you plus friends whose visibility is `friends` or `public`. Provisional players are included and marked.
   - **Global**: players who are `public` **and** opted in (`users.leaderboard_opt_in`), and whose card passes the evidence rules below. Top 50 shown, plus your own row.
 - **Anti-gaming hardening** (ratings are self-reported, so boards lean on evidence, not trust):
@@ -487,7 +500,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | Table | Key columns | Notes |
 |---|---|---|
 | `users` | `email`, `username`, `display_name`, `timezone` (IANA), `week_start`, `auth_subject` (links the Better Auth identity), `profile_summary` | **Never return the full row from the API** (see §11) |
-| `seasons` | `user_id`, `label` (e.g. `2026-Q4`), `starts_on`, `ends_on`, `status` (`setup`/`active`/`archived`), `archetype`, `final_snapshot` jsonb, `setup_ends_on` | Archived seasons keep their tree and ledger (the History page replays them) |
+| `seasons` | `user_id`, `label` (e.g. `2026-Q4`), `starts_on`, `ends_on`, `status` (`setup`/`active`/`archived`), `mode` (`rating`/`growth`, §4.6), `archetype`, `final_snapshot` jsonb, `setup_ends_on` | Archived seasons keep their tree and ledger (the History page replays them) |
 | `rating_nodes` | `season_id`, `user_id`, `parent_id` (null for Overall), `name`, `description`, `depth` (0–3), `weight`, `sort_order`, `template_key` (nullable), `lineage_id` | `lineage_id` links "the same" node across seasons for long-term charts |
 | `rating_events` | `node_id` (leaf), `season_id`, `delta` numeric(6,2), `source` (`onboarding`/`daily_recap`/`weekly_review`/`decay`/`recalibration`), `recap_id` (nullable), `reason`, `evidence` (jsonb), `voided_at` (nullable) | Append-only ledger; re-runs set `voided_at` |
 | `decay_rules` | `node_id`, `grace_days`, `per_day`, `floor`, `notes`, `version`, `active`, `authored_by` (`llm`/`user`) | |
@@ -518,7 +531,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
 | `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
 | `friendships` | `requester_id`, `addressee_id`, `status` (`pending`/`accepted`), `responded_at` | One row per pair (unique on least/greatest), Phase 4 |
-| `player_cards` | `user_id` pk, `season_id`, `season_label`, `overall`, `archetype`, `categories` jsonb, `recapped_days`, `flagged_days` | Shareable card cache, Phase 4 |
+| `player_cards` | `user_id` pk, `season_id`, `season_label`, `mode`, `overall`, `growth`, `archetype`, `categories` jsonb (rating `value` and `growth` each), `recapped_days`, `flagged_days` | Shareable card cache, Phase 4 |
 | `users.leaderboard_opt_in` | boolean | Global boards (needs a public profile) |
 
 ---
@@ -637,6 +650,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Scouting Report and an evolving tree: automatic capped weight shifts with undo, rare tree change proposals the player accepts (§4.5, §5.8)
 - [x] Coach chat: advice grounded in your data, with one-tap habit, goal and Scouting Report suggestions; a Today card (§5.9)
 - [x] Sports talk: none / normal / extra for the app's wording and every AI-written text (§7.10)
+- [x] Season modes: Rating or Growth ("Most Improved") picked each season, growth boards, the rating hidden but revealable by its owner (§4.6)
+- [ ] iOS: season modes (picker, growth display, growth boards)
 - [ ] iOS: Scouting Report, evolving tree, coach and sports talk
 - [ ] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 

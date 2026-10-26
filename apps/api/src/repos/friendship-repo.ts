@@ -79,7 +79,9 @@ export async function findAllFor(db: Executor, userId: string) {
         username: users.username,
         displayName: users.displayName,
         visibility: users.profileVisibility,
+        mode: playerCards.mode,
         overall: playerCards.overall,
+        growth: playerCards.growth,
         archetype: playerCards.archetype,
       })
       .from(friendships)

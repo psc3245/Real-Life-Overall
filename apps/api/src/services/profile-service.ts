@@ -19,11 +19,26 @@ export async function canView(
   return (await friendshipState(db, viewerId, owner.id)) === "friends";
 }
 
-/** Highest catalog tier per badge. Personal badges are LLM-written from journals: never shared. */
-async function publicBadges(db: Database, userId: string): Promise<PublicBadgeDto[]> {
+/** Catalog badges whose tiers are rating levels, so they'd hint at a growth player's rating. */
+const RATING_LEVEL_BADGES = new Set(
+  BADGE_CATALOG.filter((b) => b.metric === "lowestCategory" || b.metric === "bestAttribute").map(
+    (b) => b.key,
+  ),
+);
+
+/**
+ * Highest catalog tier per badge. Personal badges are LLM-written from journals: never shared.
+ * Growth players' rating-level badges are left out too (DESIGN.md §4.6).
+ */
+async function publicBadges(
+  db: Database,
+  userId: string,
+  hideRatingLevels: boolean,
+): Promise<PublicBadgeDto[]> {
   const best = new Map<string, PublicBadgeDto>();
   for (const row of await badgeRepo.findByUser(db, userId)) {
     if (row.kind !== "catalog" || !row.tier) continue;
+    if (hideRatingLevels && RATING_LEVEL_BADGES.has(row.badgeKey)) continue;
     const seen = best.get(row.badgeKey);
     if (!seen || BADGE_TIERS.indexOf(row.tier) > BADGE_TIERS.indexOf(seen.tier)) {
       best.set(row.badgeKey, {
@@ -57,7 +72,7 @@ export async function getProfile(
     await getRatings(db, owner.id).catch(() => null); // no rating yet: stays without a card
     card = await cardRepo.findByUser(db, owner.id);
   }
-  const badges = await publicBadges(db, owner.id);
+  const badges = await publicBadges(db, owner.id, !isSelf && card?.mode === "growth");
   return {
     username: owner.username,
     displayName: owner.displayName,

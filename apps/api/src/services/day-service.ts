@@ -64,6 +64,7 @@ export async function getDay(db: Database, userId: string, date?: string): Promi
           recap,
           ctx.nodes,
           await eventRepo.findActiveBySeason(db, ctx.season.id),
+          ctx.season.mode,
           (await badgesByRecap(db, [recap.id])).get(recap.id),
         )
       : null;

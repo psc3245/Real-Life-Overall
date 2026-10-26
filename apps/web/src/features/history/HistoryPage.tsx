@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { useRatings } from "../../api/ratings";
 import { useSeasonCards } from "../../api/seasons";
 import { OvrBadge } from "../../components/OvrBadge";
+import { formatScore, seasonCardScores } from "../../components/score";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { seasonDates } from "../../lib/format";
 
@@ -22,6 +23,7 @@ export function HistoryPage() {
             id: live.season.id,
             label: live.season.label,
             dates: seasonDates(live.season.startsOn, live.season.endsOn),
+            mode: live.season.mode,
             overall: root?.value ?? null,
             archetype: live.archetype?.name ?? null,
             categories: live.nodes
@@ -35,11 +37,8 @@ export function HistoryPage() {
       id: c.id,
       label: c.label,
       dates: seasonDates(c.startsOn, c.endsOn),
-      overall: c.overall,
+      ...seasonCardScores(c),
       archetype: c.archetype,
-      categories: c.nodes
-        .filter((n) => n.depth === 1)
-        .map((n) => ({ name: n.name, value: n.value })),
       current: false,
     })),
   ];
@@ -66,7 +65,7 @@ export function HistoryPage() {
               className="flex items-center gap-4 rounded-xl border border-court-700 bg-court-900/70 p-4 transition hover:border-neon/60"
             >
               {r.overall !== null ? (
-                <OvrBadge value={r.overall} size="md" />
+                <OvrBadge value={r.overall} size="md" mode={r.mode} />
               ) : (
                 <span className="h-16 w-16 rounded-2xl border-2 border-court-700" />
               )}
@@ -85,7 +84,10 @@ export function HistoryPage() {
                 </p>
                 <p className="mt-1 truncate text-sm text-court-300">
                   {r.categories
-                    .map((c) => `${c.name} ${c.value === null ? "–" : c.value.toFixed(0)}`)
+                    .map(
+                      (c) =>
+                        `${c.name} ${c.value === null ? "–" : formatScore(r.mode, c.value, 0)}`,
+                    )
                     .join(" · ")}
                 </p>
               </div>

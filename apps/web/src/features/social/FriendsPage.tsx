@@ -124,7 +124,7 @@ function Row({ friend, children }: { friend: FriendDto; children?: React.ReactNo
   return (
     <li className="flex flex-wrap items-center gap-4 rounded-xl border border-court-700 bg-court-900/70 p-3">
       {friend.card ? (
-        <OvrBadge value={friend.card.overall} size="md" />
+        <OvrBadge value={friend.card.overall} size="md" mode={friend.card.mode} />
       ) : (
         <span className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-court-700 font-display text-xl text-court-500">
           –

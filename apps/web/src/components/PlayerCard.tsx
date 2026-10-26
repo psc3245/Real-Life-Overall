@@ -2,6 +2,7 @@ import { LEADERBOARD_MIN_RECAPPED_DAYS, type PublicCardDto, type RatingsDto } fr
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { OvrBadge } from "./OvrBadge";
+import { formatScore, ScoreProvider, useScore } from "./score";
 import { StatBar } from "./StatBar";
 import { useTalk } from "../lib/talk";
 
@@ -62,6 +63,7 @@ export function CardView({
 /** OVR, archetype and category bars. Used on the home page, the reveal and the ratings page. */
 export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: string }) {
   const talk = useTalk();
+  const { mode } = useScore();
   const root = ratings.nodes.find((n) => n.parentId === null);
   const categories = ratings.nodes.filter((n) => n.parentId === root?.id);
 
@@ -69,12 +71,12 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
     <CardView
       name={name}
       overall={root?.value ?? 0}
-      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}`}
+      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}${mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
       note={
         root?.projection != null && (
           <>
-            Projected {Math.round(root.projection)} by season end
-            {root.goal != null && ` · goal ${Math.round(root.goal)}`}
+            Projected {formatScore(mode, root.projection, 0)} by season end
+            {root.goal != null && ` · goal ${formatScore(mode, root.goal, 0)}`}
           </>
         )
       }
@@ -91,16 +93,21 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
   );
 }
 
-/** Another player's shared card: Overall, archetype and categories only. */
+/**
+ * Another player's shared card: Overall, archetype and categories only, in their own mode (a
+ * growth card shows points gained, never ratings).
+ */
 export function PublicCard({ card, name }: { card: PublicCardDto; name: string }) {
   const talk = useTalk();
   return (
-    <CardView
-      name={name}
-      overall={card.overall}
-      subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}`}
-      note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
-      categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
-    />
+    <ScoreProvider mode={card.mode} values={[card.overall, ...card.categories.map((c) => c.value)]}>
+      <CardView
+        name={name}
+        overall={card.overall}
+        subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}${card.mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
+        note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
+        categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
+      />
+    </ScoreProvider>
   );
 }
