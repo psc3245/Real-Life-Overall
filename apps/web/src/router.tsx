@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import { AuthPage, RequireAuth } from "./features/auth/AuthPage";
 import { OnboardingPage } from "./features/onboarding/OnboardingPage";
+import { AdminPage } from "./features/admin/AdminPage";
 import { GoalsPage } from "./features/goals/GoalsPage";
 import { ActiveWorkoutPage } from "./features/workouts/ActiveWorkoutPage";
 import { ExercisesPage } from "./features/workouts/ExercisesPage";
@@ -263,6 +264,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <SettingsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "admin",
+        element: (
+          <RequireAuth>
+            <AdminPage />
           </RequireAuth>
         ),
       },

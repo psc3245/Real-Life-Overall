@@ -11,6 +11,8 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { ChangeList } from "./ActivityPage";
 import { GoalEditor } from "./GoalEditor";
 import { CONFIDENCE_LABEL } from "./labels";
+import { DebugJson } from "../../components/debug/Debug";
+import { DebugId } from "../../components/debug/Debug";
 
 /** Everything about one attribute or category: value, history, why it moved, what feeds it. */
 export function NodePage() {
@@ -75,7 +77,10 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
         </nav>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">{node.name}</h1>
+            <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+              {node.name}
+              <DebugId id={node.id} />
+            </h1>
             {node.description && <p className="text-court-300">{node.description}</p>}
           </div>
           <div className="text-right">
@@ -195,6 +200,7 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
           </Button>
         )}
       </section>
+      <DebugJson label="node" data={{ node, history: history.data, feed: feed.data }} />
     </div>
   );
 }

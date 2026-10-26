@@ -14,6 +14,7 @@ import { TrackingSettings } from "../body/TrackingSettings";
 import { CopyLink } from "../social/CopyLink";
 import { VISIBILITY_LABEL } from "../social/ProfilePage";
 import { fieldClass } from "../../components/form";
+import { DebugJson } from "../../components/debug/Debug";
 
 const VISIBILITY_DETAIL: Record<ProfileVisibility, string> = {
   private: "Nobody else can open your profile.",
@@ -31,6 +32,7 @@ export function SettingsPage() {
       <ProfileForm me={me.data} />
       <TrackingSettings me={me.data} />
       <SharingSection me={me.data} />
+      <DebugJson label="me" data={me.data} />
     </div>
   );
 }

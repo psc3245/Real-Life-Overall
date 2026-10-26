@@ -134,6 +134,13 @@
       "when": 1792970439913,
       "tag": "0018_workouts_and_body",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792978300709,
+      "tag": "0019_user_roles",
+      "breakpoints": true
     }
   ]
 }

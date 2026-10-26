@@ -5,6 +5,7 @@ import {
   OBJECTIVE_SOURCES,
   RATING_EVENT_SOURCES,
   UNIT_SYSTEMS,
+  USER_ROLES,
 } from "@rlo/shared";
 import { sql, type SQL } from "drizzle-orm";
 import {
@@ -43,6 +44,7 @@ const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 export const profileVisibility = pgEnum("profile_visibility", ["private", "friends", "public"]);
 export const unitSystem = pgEnum("unit_system", UNIT_SYSTEMS);
+export const userRole = pgEnum("user_role", USER_ROLES);
 
 export const users = pgTable("users", {
   id: id(),
@@ -65,6 +67,8 @@ export const users = pgTable("users", {
   /** Opt-in body tracking (DESIGN.md §7.5). */
   trackWeight: boolean().notNull().default(false),
   trackHeight: boolean().notNull().default(false),
+  /** "admin" unlocks /admin and debug panels (DESIGN.md §8.7). Set with `npm run set-role`. */
+  role: userRole().notNull().default("user"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

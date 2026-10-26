@@ -16,6 +16,7 @@ import {
   objectiveStatusText,
   statusTone,
 } from "./ObjectiveProgress";
+import { DebugId, DebugJson } from "../../components/debug/Debug";
 
 const TERM_DETAIL: Record<ObjectiveTerm, string> = {
   short: "A month or less",
@@ -153,6 +154,7 @@ function GoalCard({
           <h3 className="font-medium">
             {done && <span className="mr-1.5 text-neon">✓</span>}
             {o.name}
+            <DebugId id={o.id} />
           </h3>
           <p className="text-xs text-court-500">
             {shortDate(o.startsOn)} – {shortDate(o.endsOn)}
@@ -210,6 +212,7 @@ function GoalCard({
         )}
       </div>
       <ErrorNote error={remove.error} />
+      <DebugJson label="goal" data={o} />
     </article>
   );
 }

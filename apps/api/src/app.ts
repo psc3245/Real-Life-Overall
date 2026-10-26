@@ -5,7 +5,8 @@ import { ZodError } from "zod";
 import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
 import { LlmError } from "./llm/client";
-import { authFor, optionalUser, requireUser } from "./middleware/auth";
+import { authFor, optionalUser, requireAdmin, requireUser } from "./middleware/auth";
+import { adminRoutes } from "./routes/admin";
 import { badgeRoutes } from "./routes/badges";
 import { bodyRoutes } from "./routes/body";
 import { dayRoutes } from "./routes/days";
@@ -126,6 +127,7 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/friends/*", requireUser)
     .use("/leaderboards", requireUser)
     .use("/profiles/*", optionalUser)
+    .use("/admin/*", requireUser, requireAdmin)
     .route("/me", meRoutes)
     .route("/onboarding", onboardingRoutes)
     .route("/ratings", ratingsRoutes)
@@ -144,7 +146,8 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/seasons", seasonRoutes)
     .route("/profiles", profileRoutes)
     .route("/friends", friendRoutes)
-    .route("/leaderboards", leaderboardRoutes);
+    .route("/leaderboards", leaderboardRoutes)
+    .route("/admin", adminRoutes);
 
   return routes;
 }

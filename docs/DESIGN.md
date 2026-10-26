@@ -419,6 +419,12 @@ There is no snapshot job: charts replay the ledger (`node_snapshots` stays a pos
 
 Jobs must be **idempotent**: unique constraints on `(user_id, local_date, kind)` for recaps, plus status columns.
 
+### 8.7 Roles, admin and debug tools (added 2026-10-25)
+- `users.role` is `user` (default) or `admin`. There's no self-serve path: grant it with `npm run set-role -w @rlo/api -- <email or username> admin` (uses `apps/api/.env`), or from `/admin` once you're an admin. Admins can't remove their own role, and `PATCH /me` ignores `role`.
+- `requireUser` puts the role on the request; `requireAdmin` guards `/api/admin/*` and answers 404 to everyone else.
+- **Admin API:** `/admin/overview` (users, active users, LLM calls/errors/cost for 24h/7d/30d, by purpose, by model and by day, recent errors), `/admin/llm-calls` (filter by user, purpose, errors), `/admin/users` (role, last logged day, LLM spend) with `PATCH /admin/users/:id`, and `/admin/recaps/:id` (stored model output, prompt version, re-runs, and the LLM calls within five minutes before it: `llm_calls` has no recap id).
+- **Web:** `/admin` ("Control room") plus debug info for admins all over the app: a floating DBG panel (recent API calls with status, timing and size; the TanStack Query cache; route and viewport; session and env; run the 4am job in dev), orange dashed raw-JSON blocks at the bottom of the main pages, id chips next to habits, goals, workouts, exercises and attributes, and model details under each recap. Ctrl+Shift+D (or the panel's checkbox) hides the inline blocks; the choice is remembered per browser.
+
 ---
 
 ## 9. Data Model
@@ -446,6 +452,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `exercises` | `user_id`, `name`, `category`, `tracking`, `archived_at` | Custom exercises; the library is in `packages/shared` |
 | `body_measurements` | `user_id`, `local_date`, `kind` (`weight`/`height`), `value` (kg/cm) | Unique per user, day and kind |
 | `users.unit_system`, `users.track_weight`, `users.track_height` | | Units and opt-in body tracking |
+| `users.role` | `user` / `admin` | §8.7 |
 | `objective_links` / `objective_entries` | `objective_id` + `node_lineage_id`; `objective_id`, `local_date`, `value` | Links by lineage; one manual entry per goal per day |
 | `decay_runs` | `user_id`, `season_id`, `local_date`, `paused`, `voided_at` | One active run per day; backfills void later runs |
 | (memory) | `day_logs.journal_search`, `recaps.narrative_search` (generated `tsvector`, GIN) | Full-text search; no embeddings table (§5.5) |
@@ -565,6 +572,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Workout logging with unlimited templates, records and a generic set model for lifting and sport (§7.5)
 - [x] Optional height and weight tracking, units setting (§7.5)
 - [x] Avoid habits: a build/avoid direction for every habit type (§7.6)
+- [x] User roles, an admin page and admin-only debug info across the web app (§8.7)
 - [ ] iOS app parity for goals, workouts, body tracking and avoid habits
 
 ---

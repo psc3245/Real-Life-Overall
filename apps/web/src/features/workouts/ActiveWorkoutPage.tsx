@@ -15,6 +15,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { RestTimerBar, useRestTimer } from "./RestTimer";
 import { WorkoutEditor } from "./WorkoutEditor";
 import { useUnits } from "./WorkoutsNav";
+import { DebugJson } from "../../components/debug/Debug";
 
 const AUTOSAVE_MS = 700;
 
@@ -176,6 +177,7 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
         <ErrorNote error={cancel.error} />
       </div>
 
+      <DebugJson label="live draft + server copy" data={{ draft, server: save.data ?? workout }} />
       <RestTimerBar timer={timer} />
 
       <Modal open={finishing} onClose={() => setFinishing(false)} label="Finish workout">

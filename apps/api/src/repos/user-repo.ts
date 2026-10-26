@@ -14,6 +14,7 @@ export const publicUserColumns = {
   unitSystem: users.unitSystem,
   trackWeight: users.trackWeight,
   trackHeight: users.trackHeight,
+  role: users.role,
   createdAt: users.createdAt,
 };
 
@@ -60,6 +61,7 @@ export async function update(
       | "unitSystem"
       | "trackWeight"
       | "trackHeight"
+      | "role"
     >
   >,
 ): Promise<PublicUser | null> {

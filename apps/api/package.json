@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "seed:demo": "tsx --env-file=.env scripts/seed-demo.ts"
+    "seed:demo": "tsx --env-file=.env scripts/seed-demo.ts",
+    "set-role": "tsx --env-file=.env scripts/set-role.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.84",

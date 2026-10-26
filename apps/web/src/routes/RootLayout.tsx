@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
+import { useIsAdmin } from "../api/admin";
 import { useHealth } from "../api/hooks";
+import { DebugPanel } from "../components/debug/DebugPanel";
 import { useAuthState, useSignOut } from "../api/auth";
 import { useFriends } from "../api/social";
 import { Button } from "../components/Button";
@@ -14,6 +16,7 @@ export function RootLayout() {
   const apiUp = health.data?.ok === true;
   const friends = useFriends(auth.signedIn);
   const requests = friends.data?.incoming.length ?? 0;
+  const admin = useIsAdmin();
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col px-4">
@@ -33,6 +36,14 @@ export function RootLayout() {
             <span className={`h-2 w-2 rounded-full ${apiUp ? "bg-neon" : "bg-flare"}`} />
             API
           </span>
+          {admin && (
+            <Link
+              to="/admin"
+              className="rounded border border-dashed border-tier-orange/60 px-2 py-0.5 font-mono text-xs text-tier-orange hover:bg-tier-orange/10"
+            >
+              admin
+            </Link>
+          )}
           {auth.mode === "dev" && (
             <>
               <DevUserSwitcher />
@@ -73,6 +84,7 @@ export function RootLayout() {
       <main className="flex-1 pb-16">
         <Outlet />
       </main>
+      <DebugPanel />
     </div>
   );
 }

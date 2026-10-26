@@ -10,6 +10,7 @@ import { Link, useSearchParams } from "react-router";
 import { useLeaderboard } from "../../api/social";
 import { tierColor } from "../../components/tier";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { DebugJson } from "../../components/debug/Debug";
 
 const chip = (active: boolean) =>
   `whitespace-nowrap rounded-full border px-3 py-1 text-sm ${active ? "border-neon bg-neon/10 text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`;
@@ -74,6 +75,7 @@ export function LeaderboardsPage() {
           <Board data={leaderboard.data} />
         </>
       )}
+      <DebugJson label="leaderboard" data={leaderboard.data} />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { WeekBreakdown } from "./WeekBreakdown";
 import { shortDate } from "../../lib/format";
+import { DebugJson } from "../../components/debug/Debug";
 
 const WORKING = ["Reading your week…", "Checking habits and decay…", "Setting next week's focus…"];
 
@@ -127,6 +128,7 @@ export function WeekPage() {
           </ul>
         </section>
       )}
+      <DebugJson label="weekly" data={weekly.data} />
     </div>
   );
 }

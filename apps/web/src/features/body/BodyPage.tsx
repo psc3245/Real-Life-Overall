@@ -12,6 +12,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { WorkoutsNav } from "../workouts/WorkoutsNav";
 import { HeightInput, WeightInput } from "./BodyInputs";
 import { TrackingSettings } from "./TrackingSettings";
+import { DebugJson } from "../../components/debug/Debug";
 
 /** Height and weight over time, if the user tracks them. */
 export function BodyPage() {
@@ -40,6 +41,7 @@ export function BodyPage() {
               day's log.
             </p>
           )}
+          <DebugJson label="body" data={body.data} />
           <div className="rounded-xl border border-court-700 bg-court-900/40 p-5">
             <TrackingSettings me={me.data} />
           </div>

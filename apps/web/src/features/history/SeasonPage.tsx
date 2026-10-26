@@ -13,6 +13,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { EarlierWeek } from "../week/WeekPage";
 import { seasonDates } from "../../lib/format";
 import { StatTile } from "../../components/StatTile";
+import { DebugJson } from "../../components/debug/Debug";
 
 /** HistoryChart reads rated nodes; a season's nodes carry only what the chart needs. */
 const asRated = (nodes: SeasonDetailNode[]): RatedNodeDto[] =>
@@ -212,6 +213,7 @@ function Season({ s }: { s: SeasonDetailDto }) {
           </ul>
         </section>
       )}
+      <DebugJson label="season" data={s} />
     </div>
   );
 }

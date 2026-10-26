@@ -8,6 +8,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { CopyLink } from "./CopyLink";
 import { FriendButtons } from "./FriendButtons";
 import { instantMonthYear } from "../../lib/format";
+import { DebugJson } from "../../components/debug/Debug";
 
 export const VISIBILITY_LABEL = {
   private: "Private: only you",
@@ -106,6 +107,7 @@ export function ProfilePage() {
           </section>
         </div>
       </div>
+      <DebugJson label="profile" data={profile.data} />
     </div>
   );
 }

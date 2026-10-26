@@ -14,6 +14,7 @@ import { DayStrip } from "./DayStrip";
 import { scheduleLabel } from "./ManageHabitsPage";
 import { StatTile } from "../../components/StatTile";
 import { shortDate } from "../../lib/format";
+import { DebugJson } from "../../components/debug/Debug";
 
 const RANGE_LABEL: Record<HabitStatRange, string> = {
   week: "Week",
@@ -119,6 +120,7 @@ export function HabitsGlancePage() {
           />
         ))}
       </ul>
+      <DebugJson label="habit stats" data={stats.data} />
     </div>
   );
 }

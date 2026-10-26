@@ -24,3 +24,4 @@ export * from "./units";
 export * from "./exercises";
 export * from "./schemas/workouts";
 export * from "./schemas/body";
+export * from "./schemas/admin";

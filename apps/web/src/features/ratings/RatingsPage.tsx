@@ -18,6 +18,7 @@ import { DecayCard } from "./DecayCard";
 import { NewSeasonBanner, PastSeasons } from "./SeasonSections";
 import { GoalEditor } from "./GoalEditor";
 import { CONFIDENCE_LABEL } from "./labels";
+import { DebugJson } from "../../components/debug/Debug";
 
 const RATINGS_SECTIONS = [
   { id: "card", label: "Card" },
@@ -133,6 +134,7 @@ export function RatingsPage() {
       <div id="decay" className="scroll-mt-16">
         <DecayCard />
       </div>
+      <DebugJson label="ratings" data={ratings.data} />
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { StatTile } from "../../components/StatTile";
 import { dayLabel } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
+import { DebugId, DebugJson } from "../../components/debug/Debug";
 
 /** A record's value in the user's units. */
 function formatRecord(key: keyof ExerciseRecordsDto, value: number, units: UnitSystem) {
@@ -89,7 +90,10 @@ export function ExercisePage() {
           <Link to="/workouts/exercises" className="text-sm text-court-300 hover:text-neon">
             ← Exercises
           </Link>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">{e.name}</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+            {e.name}
+            <DebugId id={e.id} />
+          </h1>
           <p className="text-sm text-court-500">
             {CATEGORY_LABELS[e.category]} · {TRACKING_LABELS[e.tracking]}
             {e.custom && " · custom"} · done {e.timesDone}×
@@ -160,6 +164,7 @@ export function ExercisePage() {
         </section>
       )}
 
+      <DebugJson label="exercise detail" data={detail.data} />
       {e.custom && (
         <div className="border-t border-court-800 pt-4">
           {confirming ? (
