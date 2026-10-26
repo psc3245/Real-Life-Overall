@@ -19,6 +19,7 @@ const WIDGET_INFO: Record<TodayWidget, { label: string; detail: string }> = {
   training: { label: "Training", detail: "Today's workouts and a shortcut to start one." },
   charts: { label: "Pinned charts", detail: "Charts you've pinned in the chart explorer." },
   focus: { label: "Focus", detail: "Suggested areas to work on." },
+  coach: { label: "Coach", detail: "Ask the coach a question, or start from a suggestion." },
   recap: { label: "Recap", detail: "Today's recap, or yesterday's until you end the day." },
 };
 

@@ -169,6 +169,13 @@
       "when": 1793044893186,
       "tag": "0023_adaptive_rating",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793045563220,
+      "tag": "0024_coach_chat",
+      "breakpoints": true
     }
   ]
 }

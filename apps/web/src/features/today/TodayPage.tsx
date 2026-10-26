@@ -27,6 +27,7 @@ import {
   objectiveStatusText,
   statusTone,
 } from "../goals/ObjectiveProgress";
+import { CoachCard } from "../coach/CoachCard";
 import { FocusCard } from "./FocusCard";
 import { preferencesLink } from "../settings/PreferencesModal";
 import { formatElapsed, formatVolume } from "../workouts/format";
@@ -78,6 +79,7 @@ export function TodayPage() {
       </Suspense>
     ),
     focus: <FocusCard />,
+    coach: <CoachCard />,
     recap: d.recap ? (
       <RecapCard title="Today's recap" recap={d.recap} date={d.date} />
     ) : (

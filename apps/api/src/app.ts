@@ -9,6 +9,7 @@ import { authFor, optionalUser, requireAdmin, requireUser } from "./middleware/a
 import { adminRoutes } from "./routes/admin";
 import { badgeRoutes } from "./routes/badges";
 import { bodyRoutes } from "./routes/body";
+import { coachRoutes } from "./routes/coach";
 import { dayRoutes } from "./routes/days";
 import { devRoutes } from "./routes/dev";
 import { friendRoutes } from "./routes/friends";
@@ -136,6 +137,8 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/friends/*", requireUser)
     .use("/leaderboards", requireUser)
     .use("/scouting-report", requireUser)
+    .use("/coach", requireUser)
+    .use("/coach/*", requireUser)
     .use("/weights", requireUser)
     .use("/weights/*", requireUser)
     .use("/tree-proposals", requireUser)
@@ -165,6 +168,7 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/friends", friendRoutes)
     .route("/leaderboards", leaderboardRoutes)
     .route("/scouting-report", scoutingReportRoutes)
+    .route("/coach", coachRoutes)
     .route("/weights", weightRoutes)
     .route("/tree-proposals", treeProposalRoutes)
     .route("/admin", adminRoutes);

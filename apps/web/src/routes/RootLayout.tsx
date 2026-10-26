@@ -150,6 +150,7 @@ function MainNav({
           {link("goals", "/goals", "Goals")}
           {link("workouts", "/workouts", "Train")}
           {link("week", "/week", "Week")}
+          {link("coach", "/coach", "Coach")}
         </span>
       </div>
       <NavLink

@@ -839,3 +839,21 @@ export const treeProposals = pgTable(
   },
   (t) => [index().on(t.userId, t.createdAt), index().on(t.recapId)],
 );
+
+export const coachRole = pgEnum("coach_role", ["user", "assistant"]);
+
+/** The coach chat, one thread per player (DESIGN.md §5.9). `suggestions`: CoachSuggestionDto[]. */
+export const coachMessages = pgTable(
+  "coach_messages",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: coachRole().notNull(),
+    content: text().notNull(),
+    suggestions: jsonb().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.userId, t.createdAt)],
+);
