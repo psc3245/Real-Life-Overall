@@ -7,7 +7,9 @@ import { ChangeList } from "@/components/ChangeList";
 import { HistoryChart } from "@/components/charts/HistoryChart";
 import { Delta } from "@/components/Delta";
 import { GoalEditor } from "@/components/GoalEditor";
+import { ChartButton } from "@/components/ChartButton";
 import { StatBar } from "@/components/ratings";
+import { formatScore, HiddenRating, scoreColor, useScore } from "@/components/score";
 import {
   Body,
   Button,
@@ -21,7 +23,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import { CONFIDENCE_LABEL } from "@/lib/labels";
-import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { colors, fonts, space } from "@/lib/theme";
 
 /** Everything about one attribute or category: value, history, why it moved, what feeds it. */
 export default function NodeScreen() {
@@ -51,6 +53,7 @@ export default function NodeScreen() {
 }
 
 function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[] }) {
+  const { mode } = useScore();
   const history = useHistory(90);
   const feed = useChangeFeed({ nodeId: node.id });
   const habits = useHabitStats("week");
@@ -68,7 +71,7 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
     for (const n of nodes) if (n.parentId && below.has(n.parentId)) below.add(n.id);
   }
   const linked = (habits.data?.habits ?? []).filter((h) => h.habit.links.some((l) => below.has(l)));
-  const color = tierColor(node.value ?? 0);
+  const color = scoreColor(mode, node.value ?? 0);
   const changes = feed.data?.pages.flat() ?? [];
   const crumbs = ancestors.filter((a) => a.parentId !== null);
 
@@ -80,7 +83,16 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
     >
       {node.description ? <Muted>{node.description}</Muted> : null}
       <View style={styles.value}>
-        <Text style={[styles.big, { color }]}>{node.value?.toFixed(1) ?? "—"}</Text>
+        <Text style={[styles.big, { color }]}>
+          {node.value == null ? "—" : formatScore(mode, node.value)}
+        </Text>
+        {mode === "growth" && <Muted style={{ fontSize: 12 }}>gained this season</Muted>}
+        <HiddenRating rating={node.rating} />
+        <ChartButton
+          ids={[`rating:${node.id}`]}
+          config={{ range: "season", trend: true }}
+          label="Chart and model →"
+        />
         {node.trend != null && (
           <Muted>
             <Delta value={node.trend} /> in 7 days

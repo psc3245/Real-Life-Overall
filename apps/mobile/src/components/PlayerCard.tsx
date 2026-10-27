@@ -3,7 +3,9 @@ import { Link } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, space } from "@/lib/theme";
+import { useTalk } from "@/lib/talk";
 import { OvrBadge, StatBar } from "./ratings";
+import { formatScore, ScoreProvider, useScore } from "./score";
 
 interface CardCategory {
   key: string;
@@ -30,8 +32,9 @@ export function CardView({
   note?: ReactNode;
   categories: CardCategory[];
 }) {
+  const talk = useTalk();
   return (
-    <View style={styles.card} accessibilityLabel="Player card">
+    <View style={styles.card} accessibilityLabel={talk.playerCard}>
       <View style={styles.head}>
         <OvrBadge value={overall} size={72} />
         <View style={{ flex: 1 }}>
@@ -61,16 +64,18 @@ export function CardView({
 
 /** OVR, archetype and category bars for your own ratings. */
 export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: string }) {
+  const talk = useTalk();
+  const { mode } = useScore();
   const root = ratings.nodes.find((n) => n.parentId === null);
   const categories = ratings.nodes.filter((n) => n.parentId === root?.id);
   return (
     <CardView
       name={name}
       overall={root?.value ?? 0}
-      subtitle={`${ratings.archetype?.name ?? "Unranked"} · ${ratings.season.label}`}
+      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}${mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
       note={
         root?.projection != null
-          ? `Projected ${Math.round(root.projection)} by season end${root.goal != null ? ` · goal ${Math.round(root.goal)}` : ""}`
+          ? `Projected ${formatScore(mode, root.projection, 0)} by season end${root.goal != null ? ` · goal ${formatScore(mode, root.goal, 0)}` : ""}`
           : undefined
       }
       categories={categories.map((c) => ({
@@ -86,16 +91,22 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
   );
 }
 
-/** Another player's shared card: Overall, archetype and categories only. */
+/**
+ * Another player's shared card: Overall, archetype and categories only, in their own mode (a
+ * growth card shows points gained, never ratings).
+ */
 export function PublicCard({ card, name }: { card: PublicCardDto; name: string }) {
+  const talk = useTalk();
   return (
-    <CardView
-      name={name}
-      overall={card.overall}
-      subtitle={`${card.archetype ?? "Unranked"} · ${card.seasonLabel}`}
-      note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
-      categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
-    />
+    <ScoreProvider mode={card.mode} values={[card.overall, ...card.categories.map((c) => c.value)]}>
+      <CardView
+        name={name}
+        overall={card.overall}
+        subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}${card.mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
+        note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
+        categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
+      />
+    </ScoreProvider>
   );
 }
 

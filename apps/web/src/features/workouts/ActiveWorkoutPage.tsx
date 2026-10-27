@@ -34,6 +34,13 @@ interface Draft {
   exercises: WorkoutExerciseDto[];
 }
 
+const draftOf = (w: WorkoutDto): Draft => ({
+  name: w.name,
+  notes: w.notes,
+  exercises: w.exercises,
+});
+const sameDraft = (a: Draft, b: Draft) => JSON.stringify(a) === JSON.stringify(b);
+
 function LiveWorkout({ workout }: { workout: WorkoutDto }) {
   const units = useUnits();
   const library = useExercises();
@@ -43,27 +50,42 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
   const cancel = useDeleteWorkout();
   const navigate = useNavigate();
   const timer = useRestTimer();
-  const [draft, setDraft] = useState<Draft>({
-    name: workout.name,
-    notes: workout.notes,
-    exercises: workout.exercises,
-  });
+  const [draft, setDraft] = useState<Draft>(() => draftOf(workout));
   const [dirty, setDirty] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [showNotes, setShowNotes] = useState(workout.notes !== "");
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const latest = useRef(draft);
+  /** The server copy our own last save returned, so its echo isn't mistaken for a remote edit. */
+  const lastSaved = useRef<Draft>(draftOf(workout));
+  const saving = useRef(0);
   useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  // Another device (the iOS app) edited this workout: adopt its copy, but only while nothing here
+  // is unsaved or in flight. Local edits win until they land; the next refetch brings the rest.
+  useEffect(() => {
+    const server = draftOf(workout);
+    if (dirty || saving.current > 0 || sameDraft(server, lastSaved.current)) return;
+    if (sameDraft(server, latest.current)) return;
+    lastSaved.current = server;
+    latest.current = server;
+    setDraft(server);
+  }, [workout, dirty]);
 
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   /** Saves run one after another so an older draft never lands after a newer one. */
   const persist = (changes: Draft) => {
+    saving.current += 1;
     const run = chain.current.then(() =>
       // A blank name isn't sent; it resets on blur.
-      save.mutateAsync({ ...changes, name: changes.name.trim() || undefined }).then(() => {
-        if (latest.current === changes) setDirty(false);
-      }),
+      save
+        .mutateAsync({ ...changes, name: changes.name.trim() || undefined })
+        .then((saved) => {
+          lastSaved.current = draftOf(saved);
+          if (latest.current === changes) setDirty(false);
+        })
+        .finally(() => (saving.current -= 1)),
     );
     chain.current = run.catch(() => undefined);
     return run;

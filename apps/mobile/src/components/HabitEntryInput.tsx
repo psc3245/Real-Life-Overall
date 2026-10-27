@@ -20,14 +20,20 @@ interface Props {
 
 const DEBOUNCE_MS = 500;
 
-/** Debounces rapid changes (stepper taps) into one save. */
+/** Debounces rapid changes (stepper taps) into one save; `pending` is true until it fires. */
 function useDebouncedSave(onSave: Props["onSave"]) {
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const pending = useRef(false);
   useEffect(() => () => clearTimeout(timer.current), []);
-  return (value: HabitEntryValue) => {
+  const save = (value: HabitEntryValue) => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => onSave(value), DEBOUNCE_MS);
+    pending.current = true;
+    timer.current = setTimeout(() => {
+      pending.current = false;
+      onSave(value);
+    }, DEBOUNCE_MS);
   };
+  return Object.assign(save, { pending });
 }
 
 /** The control for logging one habit, by type (mirrors the web's HabitEntryInput). */
@@ -35,11 +41,69 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
   const [num, setNum] = useState<number | null>(entry?.num ?? null);
   const [text, setText] = useState(entry?.text ?? "");
   const debounced = useDebouncedSave(onSave);
+  const typing = useRef(false);
+  // The entry changed on the server (another device, or a recap re-run): show it, unless a
+  // change made here is still waiting to save or being typed.
+  useEffect(() => {
+    if (!debounced.pending.current) setNum(entry?.num ?? null);
+    if (!typing.current) setText(entry?.text ?? "");
+  }, [entry?.num, entry?.text]);
+  const typingProps = {
+    onFocus: () => (typing.current = true),
+    onBlur: () => (typing.current = false),
+  };
   const { config } = habit;
+  const avoid = config.direction === "avoid";
+  /** Avoid habits: past the line turns the number red. */
+  const over = (n: number | null) => avoid && n !== null && n > (config.target ?? 0);
 
   switch (habit.type) {
     case "checkbox":
     case "checknote": {
+      if (avoid) {
+        const pick = (next: 0 | 1) => {
+          const value = num === next ? null : next;
+          setNum(value);
+          onSave({ num: value, text: value === 1 ? text || null : null });
+        };
+        const choice = (value: 0 | 1, label: string, on: string) => (
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ checked: num === value, disabled }}
+            disabled={disabled}
+            onPress={() => pick(value)}
+            style={[
+              styles.choice,
+              num === value && { borderColor: on, backgroundColor: `${on}26` },
+            ]}
+          >
+            <Text style={[styles.choiceText, num === value && { color: on }]}>{label}</Text>
+          </Pressable>
+        );
+        return (
+          <View style={styles.column}>
+            <View style={styles.row}>
+              {choice(0, "✓ Avoided", colors.neon)}
+              {choice(1, "✗ Slipped", colors.flare)}
+            </View>
+            {habit.type === "checknote" && num === 1 && (
+              <Field
+                accessibilityLabel={`${habit.name} note`}
+                value={text}
+                maxLength={MAX_HABIT_NOTE}
+                editable={!disabled}
+                placeholder="What happened?"
+                {...typingProps}
+                onChangeText={setText}
+                onEndEditing={() =>
+                  text !== (entry?.text ?? "") && onSave({ num: 1, text: text || null })
+                }
+                style={styles.note}
+              />
+            )}
+          </View>
+        );
+      }
       const done = num === 1;
       return (
         <View style={styles.column}>
@@ -64,6 +128,7 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
               maxLength={MAX_HABIT_NOTE}
               editable={!disabled}
               placeholder="Add a note"
+              {...typingProps}
               onChangeText={setText}
               onEndEditing={() =>
                 text !== (entry?.text ?? "") && onSave({ num: 1, text: text || null })
@@ -109,8 +174,8 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
             style={styles.amount}
           />
           <Step symbol="plus" disabled={disabled} onPress={() => set(value + step)} />
-          <Text style={styles.unit}>
-            / {config.target} {unit}
+          <Text style={[styles.unit, over(value) && { color: colors.flare }]}>
+            {avoid ? `/ ≤${config.target}` : `/ ${config.target}`} {unit}
           </Text>
         </View>
       );
@@ -134,7 +199,9 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
               disabled={disabled || value <= min}
               onPress={() => set(value - 1)}
             />
-            <Text style={styles.scaleValue}>{num ?? "–"}</Text>
+            <Text style={[styles.scaleValue, over(num) && { color: colors.flare }]}>
+              {num ?? "–"}
+            </Text>
             <Step
               symbol="plus"
               disabled={disabled || value >= max}
@@ -163,7 +230,11 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
                   setNum(next);
                   onSave({ num: next, text: null });
                 }}
-                style={[styles.scaleStep, on && styles.scaleOn]}
+                style={[
+                  styles.scaleStep,
+                  on && styles.scaleOn,
+                  on && over(num) && { backgroundColor: colors.flare, borderColor: colors.flare },
+                ]}
               >
                 <Text style={[styles.scaleText, on && { color: colors.court950 }]}>{n}</Text>
               </Pressable>
@@ -192,7 +263,13 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
             >
               <SymbolView
                 name={num !== null && star <= num ? "star.fill" : "star"}
-                tintColor={num !== null && star <= num ? tierColor(75) : colors.court500}
+                tintColor={
+                  num !== null && star <= num
+                    ? over(num)
+                      ? colors.flare
+                      : tierColor(75)
+                    : colors.court500
+                }
                 size={26}
               />
             </Pressable>
@@ -210,7 +287,10 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
           maxLength={journal ? MAX_HABIT_JOURNAL : MAX_HABIT_SHORT_TEXT}
           editable={!disabled}
           multiline={journal}
-          placeholder={journal ? "Write it down…" : "Answer…"}
+          placeholder={
+            avoid ? "Only if you slipped: what happened?" : journal ? "Write it down…" : "Answer…"
+          }
+          {...typingProps}
           onChangeText={setText}
           onEndEditing={() =>
             text !== (entry?.text ?? "") && onSave({ num: null, text: text || null })
@@ -249,6 +329,14 @@ function Step({
 }
 
 const styles = StyleSheet.create({
+  choice: {
+    borderWidth: 2,
+    borderColor: colors.court700,
+    borderRadius: 10,
+    paddingHorizontal: space.md,
+    paddingVertical: 7,
+  },
+  choiceText: { color: colors.court300, fontSize: 15, fontWeight: "600" },
   column: { gap: space.sm, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, flexWrap: "wrap" },
   check: {

@@ -1,17 +1,18 @@
 import { GROUP_RULE_LABELS, HABIT_TYPE_LABELS, type HabitDto } from "@rlo/shared";
 import { router } from "expo-router";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useArchiveHabit, useHabits } from "@/api/days";
 import { useRatings } from "@/api/ratings";
 import { Body, Button, Card, ErrorNote, Loading, Muted, Screen } from "@/components/ui";
 import { scheduleLabel } from "@/lib/habits";
 import { colors, space } from "@/lib/theme";
+import { FeatureGate } from "@/components/FeatureGate";
 
 const edit = (params: { id?: string; parent?: string }) =>
   router.push({ pathname: "/habits/edit", params });
 
 /** Every habit and group: edit, archive, add habits and sub-habits. */
-export default function ManageHabitsScreen() {
+function ManageHabitsScreen() {
   const habits = useHabits();
   const ratings = useRatings();
   const archive = useArchiveHabit();
@@ -42,6 +43,9 @@ export default function ManageHabitsScreen() {
         <View style={{ flex: 1, gap: 2 }}>
           <Body style={{ fontWeight: "600" }}>{h.name}</Body>
           <Muted style={{ fontSize: 13 }}>
+            {h.config.direction === "avoid" && (
+              <Text style={{ color: colors.flare }}>Avoid · </Text>
+            )}
             {HABIT_TYPE_LABELS[h.type]}
             {h.type === "group" &&
               ` · ${GROUP_RULE_LABELS[h.config.rule ?? "all"]}${h.config.rule === "count" ? ` (${h.config.target})` : ""}`}
@@ -109,3 +113,11 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
 });
+
+export default function GatedManageHabitsScreen() {
+  return (
+    <FeatureGate feature="habits">
+      <ManageHabitsScreen />
+    </FeatureGate>
+  );
+}

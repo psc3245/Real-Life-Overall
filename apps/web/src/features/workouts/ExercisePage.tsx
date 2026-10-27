@@ -81,12 +81,18 @@ export function ExercisePage() {
           </h1>
           <p className="text-sm text-court-500">
             {CATEGORY_LABELS[e.category]} · {TRACKING_LABELS[e.tracking]}
-            {e.custom && " · custom"} · done {e.timesDone}× ·{" "}
-            <ChartLink
-              ids={[`exercise:${e.id}`]}
-              config={{ range: "all", trend: true }}
-              className="text-neon hover:underline"
-            />
+            {e.custom && " · custom"} · done {e.timesDone}×
+            {/* The chart catalog only lists exercises from finished workouts. */}
+            {e.timesDone > 0 && (
+              <>
+                {" · "}
+                <ChartLink
+                  ids={[`exercise:${e.id}`]}
+                  config={{ range: "all", trend: true }}
+                  className="text-neon hover:underline"
+                />
+              </>
+            )}
           </p>
         </div>
       </header>

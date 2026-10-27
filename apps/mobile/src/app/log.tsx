@@ -3,7 +3,9 @@ import {
   BACKFILL_DAYS,
   groupProgress,
   isDayHabitDone,
+  isAvoid,
   isEntryDone,
+  isSlip,
   MAX_DAY_JOURNAL,
   type DayDto,
   type DayHabitDto,
@@ -13,7 +15,9 @@ import { SymbolView } from "expo-symbols";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDay, useSaveEntry, useSaveJournal } from "@/api/days";
+import { usePreferences } from "@/api/preferences";
 import { useRatings } from "@/api/ratings";
+import { DayBody, DayGoals, DayWorkouts } from "@/components/DaySections";
 import { DayPicker } from "@/components/DayPicker";
 import { GuidedPrompts } from "@/components/GuidedPrompts";
 import { HabitEntryInput } from "@/components/HabitEntryInput";
@@ -45,6 +49,7 @@ export default function LogScreen() {
   const { date } = useLocalSearchParams<{ date?: string }>();
   const day = useDay(date ?? null);
   const ratings = useRatings();
+  const on = usePreferences().features;
 
   if (ratings.data === null) return <NeedsRating />;
   if (day.isPending) return <Loading />;
@@ -84,9 +89,14 @@ export default function LogScreen() {
             </Muted>
           </Card>
         )}
-        <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
-        <Journal key={d.date} day={d} />
-        <Habits day={d} names={names} />
+        {on.guidedPrompts && (
+          <GuidedPrompts key={`prompts-${d.date}-${d.prompts.length}`} day={d} />
+        )}
+        {on.journal && <Journal key={d.date} day={d} />}
+        {on.habits && <Habits day={d} names={names} />}
+        {on.workouts && <DayWorkouts day={d} />}
+        <DayBody day={d} />
+        {on.goals && <DayGoals day={d} />}
         <RecapPanel day={d} />
       </Screen>
     </KeyboardAvoidingView>
@@ -123,13 +133,26 @@ function Journal({ day }: { day: DayDto }) {
   const [text, setText] = useState(day.journal);
   const [dirty, setDirty] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const latest = useRef(day.journal);
   useEffect(() => () => clearTimeout(timer.current), []);
+  // Written on another device while nothing here is unsaved, queued or in flight: show that copy.
+  useEffect(() => {
+    if (dirty || save.isPending || timer.current !== undefined) return;
+    if (day.journal === latest.current) return;
+    latest.current = day.journal;
+    setText(day.journal);
+  }, [day.journal, dirty, save.isPending]);
 
   const onChange = (value: string) => {
     setText(value);
+    latest.current = value;
     setDirty(true);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => save.mutate(value, { onSuccess: () => setDirty(false) }), 800);
+    timer.current = setTimeout(() => {
+      timer.current = undefined;
+      // Only the newest text clears "Saving…"; an older save landing late doesn't.
+      save.mutate(value, { onSuccess: () => latest.current === value && setDirty(false) });
+    }, 800);
   };
 
   return (
@@ -223,9 +246,13 @@ function HabitCard({
   const save = useSaveEntry(day.date, item.habit.id);
   const { habit, entry } = item;
   const done = isEntryDone(habit.type, habit.config, entry);
+  const slipped = isSlip(habit.type, habit.config, entry);
   const body = (
     <View style={{ gap: space.sm }}>
-      <Body style={{ fontWeight: "600" }}>{habit.name}</Body>
+      <Body style={{ fontWeight: "600" }}>
+        {habit.name}
+        {isAvoid(habit.config) && <Text style={styles.avoid}> AVOID</Text>}
+      </Body>
       {habit.links.length > 0 && (
         <View style={styles.chips}>
           {habit.links.map((id) => (
@@ -243,7 +270,7 @@ function HabitCard({
     </View>
   );
   if (nested) return body;
-  return <Card style={done ? styles.done : undefined}>{body}</Card>;
+  return <Card style={slipped ? styles.slipped : done ? styles.done : undefined}>{body}</Card>;
 }
 
 const styles = StyleSheet.create({
@@ -265,6 +292,8 @@ const styles = StyleSheet.create({
   },
   group: { gap: space.md },
   done: { borderColor: "rgba(60,242,200,0.5)" },
+  slipped: { borderColor: "rgba(255,77,109,0.6)" },
+  avoid: { color: colors.flare, fontSize: 11, letterSpacing: 1 },
   children: {
     gap: space.lg,
     borderLeftWidth: 1,

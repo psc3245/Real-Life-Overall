@@ -12,9 +12,10 @@ import { useResolveProposal, useWeeklyReview } from "@/api/weekly";
 import { shortDate } from "@/lib/format";
 import { colors, fonts, space } from "@/lib/theme";
 import { EarnedBadges } from "./badges";
-import { Delta } from "./Delta";
+import { ChangeDelta, OverallMove } from "./Delta";
 import { NodeChip } from "./NodeChip";
-import { OvrChange } from "./RecapPanel";
+import { ScoreProvider } from "./score";
+import { TreeProposalCard, WeightShiftList } from "./TreeEvolution";
 import { Body, Button, Card, ErrorNote, Label, Loading, Muted } from "./ui";
 
 /** A weekly review in full: narrative, archetype, focus, proposals, adjustments, decay. */
@@ -25,90 +26,113 @@ export function ReviewCard({
   review: WeeklyReviewDto;
   names: Map<string, string>;
 }) {
+  const { overallStart: start, overallEnd: end } = review;
   return (
-    <Card style={styles.card}>
-      <View style={{ gap: space.xs }}>
-        <Text style={styles.title}>The week</Text>
-        <OvrChange before={review.overallStart} after={review.overallEnd} />
-      </View>
-      <Body>{review.narrative}</Body>
-      <EarnedBadges badges={review.badges} />
-      {review.archetypeChange && (
-        <View style={styles.archetype}>
-          <Text style={{ color: colors.court100, fontSize: 14, lineHeight: 20 }}>
-            <Text style={styles.archetypeLabel}>New archetype: </Text>
-            {review.archetypeChange.from && (
-              <Text style={styles.struck}>{review.archetypeChange.from}</Text>
-            )}{" "}
-            <Text style={{ fontWeight: "700" }}>{review.archetypeChange.to}</Text>.{" "}
-            <Text style={{ color: colors.court300 }}>{review.archetypeChange.description}</Text>
-          </Text>
-        </View>
-      )}
-
-      {review.focusGoals.length > 0 && (
-        <View style={{ gap: space.sm }}>
-          <Label>Next week&apos;s focus</Label>
-          {review.focusGoals.map((g, i) => (
-            <View key={g.title} style={styles.goal}>
-              <Text style={styles.goalIndex}>{i + 1}</Text>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Body style={{ fontWeight: "600" }}>{g.title}</Body>
-                <Muted>{g.detail}</Muted>
-                {g.nodeIds.length > 0 && (
-                  <View style={styles.chips}>
-                    {g.nodeIds.map((id) => (
-                      <NodeChip key={id} id={id} name={names.get(id)} />
-                    ))}
-                  </View>
-                )}
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {review.habitProposals.length > 0 && (
-        <View style={{ gap: space.sm }}>
-          <Label>Suggested habits</Label>
-          {review.habitProposals.map((p) => (
-            <Proposal key={p.index} reviewId={review.id} proposal={p} names={names} />
-          ))}
-        </View>
-      )}
-
-      {review.corrections.length > 0 && (
-        <View>
-          <Label>Weekly adjustments</Label>
-          {review.corrections.map((c) => (
-            <View key={c.nodeId} style={styles.change}>
-              <Delta value={c.delta} style={{ width: 52, fontSize: 18 }} />
-              <View style={{ flex: 1 }}>
-                <Link
-                  href={{ pathname: "/node/[id]", params: { id: c.nodeId } }}
-                  style={styles.changeName}
-                >
-                  {c.nodeName}
-                </Link>
-                <Muted>{c.reason}</Muted>
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {review.decayRevisions.length > 0 && (
+    <ScoreProvider mode={review.mode} values={[]}>
+      <Card style={styles.card}>
         <View style={{ gap: space.xs }}>
-          <Label>Decay rule changes</Label>
-          {review.decayRevisions.map((d) => (
-            <Muted key={d.nodeId}>
-              <Text style={{ color: colors.court100, fontWeight: "600" }}>{d.nodeName}:</Text> fades{" "}
-              {d.perDay}/day after {d.graceDays} idle days, floor {d.floor}. {d.reason}
-            </Muted>
-          ))}
+          <Text style={styles.title}>The week</Text>
+          {start !== null && end !== null && (
+            <OverallMove mode={review.mode} before={start} after={end} />
+          )}
         </View>
-      )}
-    </Card>
+        <Body>{review.narrative}</Body>
+        <EarnedBadges badges={review.badges} />
+        {review.archetypeChange && (
+          <View style={styles.archetype}>
+            <Text style={{ color: colors.court100, fontSize: 14, lineHeight: 20 }}>
+              <Text style={styles.archetypeLabel}>New archetype: </Text>
+              {review.archetypeChange.from && (
+                <Text style={styles.struck}>{review.archetypeChange.from}</Text>
+              )}{" "}
+              <Text style={{ fontWeight: "700" }}>{review.archetypeChange.to}</Text>.{" "}
+              <Text style={{ color: colors.court300 }}>{review.archetypeChange.description}</Text>
+            </Text>
+          </View>
+        )}
+
+        {review.focusGoals.length > 0 && (
+          <View style={{ gap: space.sm }}>
+            <Label>Next week&apos;s focus</Label>
+            {review.focusGoals.map((g, i) => (
+              <View key={g.title} style={styles.goal}>
+                <Text style={styles.goalIndex}>{i + 1}</Text>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Body style={{ fontWeight: "600" }}>{g.title}</Body>
+                  <Muted>{g.detail}</Muted>
+                  {g.nodeIds.length > 0 && (
+                    <View style={styles.chips}>
+                      {g.nodeIds.map((id) => (
+                        <NodeChip key={id} id={id} name={names.get(id)} />
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {review.habitProposals.length > 0 && (
+          <View style={{ gap: space.sm }}>
+            <Label>Suggested habits</Label>
+            {review.habitProposals.map((p) => (
+              <Proposal key={p.index} reviewId={review.id} proposal={p} names={names} />
+            ))}
+          </View>
+        )}
+
+        {review.corrections.length > 0 && (
+          <View>
+            <Label>Weekly adjustments</Label>
+            {review.corrections.map((c) => (
+              <View key={c.nodeId} style={styles.change}>
+                <ChangeDelta
+                  delta={c.delta}
+                  growth={c.growth}
+                  style={{ width: 52, fontSize: 18 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Link
+                    href={{ pathname: "/node/[id]", params: { id: c.nodeId } }}
+                    style={styles.changeName}
+                  >
+                    {c.nodeName}
+                  </Link>
+                  <Muted>{c.reason}</Muted>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {review.treeProposal && <TreeProposalCard proposal={review.treeProposal} />}
+
+        {review.weightShifts.length > 0 && (
+          <View style={{ gap: space.xs }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Label>Weight shifts</Label>
+              <Link href="/scouting-report" style={{ color: colors.court300, fontSize: 12 }}>
+                Rating shape →
+              </Link>
+            </View>
+            <WeightShiftList changes={review.weightShifts} />
+          </View>
+        )}
+
+        {review.decayRevisions.length > 0 && (
+          <View style={{ gap: space.xs }}>
+            <Label>Decay rule changes</Label>
+            {review.decayRevisions.map((d) => (
+              <Muted key={d.nodeId}>
+                <Text style={{ color: colors.court100, fontWeight: "600" }}>{d.nodeName}:</Text>{" "}
+                fades {d.perDay}/day after {d.graceDays} idle days, floor {d.floor}. {d.reason}
+              </Muted>
+            ))}
+          </View>
+        )}
+      </Card>
+    </ScoreProvider>
   );
 }
 

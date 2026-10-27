@@ -1,8 +1,9 @@
-import type { ChangeFeedItemDto } from "@rlo/shared";
+import { growthDelta, type ChangeFeedItemDto, type SeasonMode } from "@rlo/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useChangeFeed, useRatings, type ChangeSource } from "@/api/ratings";
 import { ChangeList } from "@/components/ChangeList";
+import { useScore } from "@/components/score";
 import { Chip } from "@/components/controls";
 import { Delta } from "@/components/Delta";
 import { Button, Card, ErrorNote, Loading, Muted, Screen } from "@/components/ui";
@@ -20,6 +21,7 @@ const FILTERS: { key: string; label: string; sources?: ChangeSource[] }[] = [
 /** Every rating change this season, newest first, filterable by source and category. */
 export default function ActivityScreen() {
   const params = useLocalSearchParams<{ source?: string; node?: string }>();
+  const { mode } = useScore();
   const filter = FILTERS.find((f) => f.key === params.source) ?? FILTERS[0]!;
   const nodeId = params.node || undefined;
   const ratings = useRatings();
@@ -29,7 +31,7 @@ export default function ActivityScreen() {
   const root = nodes.find((n) => n.parentId === null);
   const categories = nodes.filter((n) => n.parentId === root?.id);
   const items = feed.data?.pages.flat() ?? [];
-  const groups = groupByDay(items);
+  const groups = groupByDay(items, mode);
 
   return (
     <Screen eyebrow="Rating" title="Activity" onRefresh={() => feed.refetch()}>
@@ -110,7 +112,7 @@ export default function ActivityScreen() {
   );
 }
 
-function groupByDay(items: ChangeFeedItemDto[]) {
+function groupByDay(items: ChangeFeedItemDto[], mode: SeasonMode) {
   const groups: { key: string; date: string | null; net: number; items: ChangeFeedItemDto[] }[] =
     [];
   for (const item of items) {
@@ -122,7 +124,8 @@ function groupByDay(items: ChangeFeedItemDto[]) {
       groups.push(group);
     }
     group.items.push(item);
-    group.net = Math.round((group.net + item.delta) * 100) / 100;
+    const counted = mode === "growth" ? growthDelta(item) : item.delta;
+    group.net = Math.round((group.net + counted) * 100) / 100;
   }
   return groups;
 }

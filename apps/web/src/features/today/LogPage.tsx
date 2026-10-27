@@ -149,13 +149,26 @@ function Journal({ day }: { day: DayDto }) {
   const [text, setText] = useState(day.journal);
   const [dirty, setDirty] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const latest = useRef(day.journal);
   useEffect(() => () => clearTimeout(timer.current), []);
+  // Written on another device while nothing here is unsaved, queued or in flight: show that copy.
+  useEffect(() => {
+    if (dirty || save.isPending || timer.current !== undefined) return;
+    if (day.journal === latest.current) return;
+    latest.current = day.journal;
+    setText(day.journal);
+  }, [day.journal, dirty, save.isPending]);
 
   const onChange = (value: string) => {
     setText(value);
+    latest.current = value;
     setDirty(true);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => save.mutate(value, { onSuccess: () => setDirty(false) }), 800);
+    timer.current = setTimeout(() => {
+      timer.current = undefined;
+      // Only the newest text clears "Saving…"; an older save landing late doesn't.
+      save.mutate(value, { onSuccess: () => latest.current === value && setDirty(false) });
+    }, 800);
   };
 
   return (

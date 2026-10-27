@@ -1,11 +1,29 @@
-import { TREND_THRESHOLD } from "@rlo/shared";
+import { TREND_THRESHOLD, type SeasonMode } from "@rlo/shared";
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
+import { useReducedMotion } from "@/lib/motion";
+import { useTalk } from "@/lib/talk";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { formatScore, scoreColor, useScore, type Score } from "./score";
 
-/** The big tier-colored OVR number (whole numbers, as on the web). */
-export function OvrBadge({ value, size = 96 }: { value: number | null; size?: number }) {
-  const color = value === null ? colors.court500 : tierColor(value);
+/**
+ * The big tier-colored OVR number (whole numbers, as on the web), or in a growth season the
+ * points gained. The mode defaults to the score in effect (your season, or the card shown).
+ */
+export function OvrBadge({
+  value,
+  size = 96,
+  mode: modeProp,
+}: {
+  value: number | null;
+  size?: number;
+  mode?: SeasonMode;
+}) {
+  const talk = useTalk();
+  const score = useScore();
+  const mode = modeProp ?? score.mode;
+  const growth = mode === "growth";
+  const color = value === null ? colors.court500 : scoreColor(mode, value);
   return (
     <View
       style={[
@@ -13,10 +31,20 @@ export function OvrBadge({ value, size = 96 }: { value: number | null; size?: nu
         { borderColor: color, shadowColor: color, width: size * 1.3, height: size * 1.3 },
       ]}
     >
-      <Text style={[styles.ovrValue, { color, fontSize: size * 0.62 }]}>
-        {value === null ? "—" : Math.round(value)}
+      <Text
+        style={[styles.ovrValue, { color, fontSize: size * (growth ? 0.42 : 0.62) }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {value === null
+          ? "—"
+          : growth
+            ? formatScore(mode, value, value >= 10 ? 0 : 1)
+            : Math.round(value)}
       </Text>
-      <Text style={[styles.ovrLabel, { fontSize: Math.max(10, size * 0.15) }]}>OVR</Text>
+      <Text style={[styles.ovrLabel, { fontSize: Math.max(10, size * 0.15) }]} numberOfLines={1}>
+        {growth ? talk.growthLabel : talk.ovr}
+      </Text>
     </View>
   );
 }
@@ -28,6 +56,7 @@ export function StatBar({
   trend,
   projection,
   goal,
+  score: scoreProp,
 }: {
   label: string;
   value: number | null;
@@ -37,12 +66,20 @@ export function StatBar({
   projection?: number | null;
   /** The player's target, drawn as a tick on the track. */
   goal?: number | null;
+  /** Overrides the score in effect (ratings out of 100, or growth on its own scale). */
+  score?: Score;
 }) {
+  const contextScore = useScore();
+  const { mode, max } = scoreProp ?? contextScore;
+  const pct = (v: number) => Math.min(100, Math.max(0, (v / max) * 100));
+  const reduced = useReducedMotion();
   const fill = useRef(new Animated.Value(0)).current;
+  const target = pct(value ?? 0);
   useEffect(() => {
-    Animated.timing(fill, { toValue: value ?? 0, duration: 900, useNativeDriver: false }).start();
-  }, [fill, value]);
-  const color = value === null ? colors.court500 : tierColor(value);
+    if (reduced) fill.setValue(target);
+    else Animated.timing(fill, { toValue: target, duration: 900, useNativeDriver: false }).start();
+  }, [fill, target, reduced]);
+  const color = value === null ? colors.court500 : scoreColor(mode, value);
   const hot = trend != null && Math.abs(trend) >= TREND_THRESHOLD ? trend > 0 : null;
 
   return (
@@ -58,18 +95,24 @@ export function StatBar({
             </Text>
           )}
         </View>
-        <Text style={[styles.statValue, { color }]}>{value === null ? "—" : value.toFixed(1)}</Text>
+        <Text style={[styles.statValue, { color }]}>
+          {value === null ? "—" : formatScore(mode, value)}
+        </Text>
       </View>
       <View
         style={styles.track}
         accessible
         accessibilityRole="progressbar"
         accessibilityLabel={label}
-        accessibilityValue={{ min: 0, max: 100, now: value ?? 0 }}
+        accessibilityValue={{ min: 0, max, now: value ?? 0 }}
       >
         {projection != null && (
           <View
-            style={[styles.fill, styles.ghost, { width: `${projection}%`, backgroundColor: color }]}
+            style={[
+              styles.fill,
+              styles.ghost,
+              { width: `${pct(projection)}%`, backgroundColor: color },
+            ]}
           />
         )}
         <Animated.View
@@ -81,7 +124,7 @@ export function StatBar({
             },
           ]}
         />
-        {goal != null && <View style={[styles.goal, { left: `${goal}%` }]} />}
+        {goal != null && <View style={[styles.goal, { left: `${pct(goal)}%` }]} />}
       </View>
     </View>
   );

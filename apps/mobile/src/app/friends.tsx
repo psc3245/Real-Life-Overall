@@ -6,8 +6,9 @@ import { useFriendAction, useFriends } from "@/api/social";
 import { OvrBadge } from "@/components/ratings";
 import { Button, Card, ErrorNote, Field, Label, Loading, Muted, Screen } from "@/components/ui";
 import { colors, fonts, space } from "@/lib/theme";
+import { FeatureGate } from "@/components/FeatureGate";
 
-export default function FriendsScreen() {
+function FriendsScreen() {
   const friends = useFriends();
   const action = useFriendAction();
   const [username, setUsername] = useState("");
@@ -169,3 +170,11 @@ const styles = StyleSheet.create({
   },
   actions: { flexDirection: "row", gap: space.sm },
 });
+
+export default function GatedFriendsScreen() {
+  return (
+    <FeatureGate feature="friends">
+      <FriendsScreen />
+    </FeatureGate>
+  );
+}

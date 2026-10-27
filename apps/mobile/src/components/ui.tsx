@@ -164,9 +164,10 @@ export function Button({
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
-  variant?: "primary" | "ghost";
+  variant?: "primary" | "ghost" | "danger";
 }) {
   const primary = variant === "primary";
+  const fg = primary ? colors.court950 : variant === "danger" ? colors.flare : colors.neon;
   return (
     <Pressable
       accessibilityRole="button"
@@ -174,16 +175,18 @@ export function Button({
       disabled={disabled || busy}
       style={({ pressed }) => [
         styles.button,
-        primary ? styles.buttonPrimary : styles.buttonGhost,
+        primary
+          ? styles.buttonPrimary
+          : variant === "danger"
+            ? styles.buttonDanger
+            : styles.buttonGhost,
         (pressed || disabled) && { opacity: 0.6 },
       ]}
     >
       {busy ? (
-        <ActivityIndicator color={primary ? colors.court950 : colors.neon} />
+        <ActivityIndicator color={fg} />
       ) : (
-        <Text style={[styles.buttonText, { color: primary ? colors.court950 : colors.neon }]}>
-          {title}
-        </Text>
+        <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -289,6 +292,7 @@ const styles = StyleSheet.create({
   },
   buttonPrimary: { backgroundColor: colors.neon },
   buttonGhost: { borderColor: colors.neonDim, borderWidth: 1 },
+  buttonDanger: { borderColor: "rgba(255,77,109,0.5)", borderWidth: 1 },
   buttonText: {
     fontFamily: fonts.display,
     fontSize: 17,

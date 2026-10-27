@@ -3,12 +3,13 @@ import {
   ALL_DAYS,
   GROUP_RULE_LABELS,
   GROUP_RULES,
+  HABIT_DIRECTIONS,
   HABIT_TYPE_LABELS,
   HABIT_TYPES,
-  leafIds,
   MAX_HABIT_LINKS,
   normalizeHabitConfig,
   type HabitConfig,
+  type HabitDirection,
   type HabitDto,
   type HabitType,
   type RatedNodeDto,
@@ -20,13 +21,27 @@ import { useState } from "react";
 import { KeyboardAvoidingView, StyleSheet, Text, View } from "react-native";
 import { useCreateHabit, useDay, useHabits, useSuggestLinks, useUpdateHabit } from "@/api/days";
 import { useRatings } from "@/api/ratings";
+import { AttributePicker } from "@/components/AttributePicker";
 import { Chip, FormRow, NumberField } from "@/components/controls";
 import { Button, Card, ErrorNote, Field, Loading, Muted, Screen } from "@/components/ui";
 import { dayLabel } from "@/lib/format";
 import { colors, space } from "@/lib/theme";
+import { FeatureGate } from "@/components/FeatureGate";
+
+/** What "kept" means for an avoid habit, by how it's logged. */
+const AVOID_HELP: Partial<Record<HabitType, string>> = {
+  checkbox: 'Every day counts as kept until you mark a slip. Mark "Avoided" to report a clean day.',
+  checknote: "Every day counts as kept until you mark a slip; add a note about what happened.",
+  counter: "Log how many. Staying at or under the limit keeps the day; a limit of 0 means none.",
+  duration: "Log the minutes. Staying at or under the limit keeps the day.",
+  slider: "Log the level. At or below your line keeps the day.",
+  rating: "Log the stars. At or below your line keeps the day.",
+  shorttext: "Write down slips only. A day with nothing written counts as kept.",
+  journal: "Write down slips only. A day with nothing written counts as kept.",
+};
 
 /** New habit, new sub-habit (`?parent=`) or edit (`?id=`), as a modal. */
-export default function EditHabitScreen() {
+function EditHabitScreen() {
   const { id, parent: parentId } = useLocalSearchParams<{ id?: string; parent?: string }>();
   const habits = useHabits();
   const ratings = useRatings();
@@ -80,18 +95,13 @@ function HabitEditor({
   const suggest = useSuggestLinks();
   const saving = create.isPending || update.isPending;
 
-  const leaves = new Set(leafIds(nodes));
-  const root = nodes.find((n) => n.parentId === null);
-  const categories = nodes.filter((n) => n.parentId === root?.id);
-  const leavesUnder = (nodeId: string): RatedNodeDto[] =>
-    leaves.has(nodeId)
-      ? nodes.filter((n) => n.id === nodeId)
-      : nodes.filter((n) => n.parentId === nodeId).flatMap((c) => leavesUnder(c.id));
-
+  const avoid = config.direction === "avoid";
   const changeType = (next: HabitType) => {
     setType(next);
-    setConfig(normalizeHabitConfig(next));
+    setConfig(normalizeHabitConfig(next, { direction: config.direction }));
   };
+  const changeDirection = (direction: HabitDirection) =>
+    setConfig(normalizeHabitConfig(type, { ...config, direction, target: null }));
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
   const toggleLink = (nodeId: string) =>
@@ -142,12 +152,36 @@ function HabitEditor({
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} keyboardVerticalOffset={100}>
       <Screen>
+        {type !== "group" && (
+          <FormRow label="Goal">
+            <View style={styles.wrap}>
+              {HABIT_DIRECTIONS.map((d) => (
+                <Chip
+                  key={d}
+                  label={d === "build" ? "Build: do it" : "Avoid: don't do it"}
+                  selected={(config.direction ?? "build") === d}
+                  disabled={Boolean(habit)}
+                  onPress={() => changeDirection(d)}
+                />
+              ))}
+            </View>
+            {avoid && (
+              <Muted style={{ fontSize: 13 }}>{AVOID_HELP[type] ?? AVOID_HELP.checkbox}</Muted>
+            )}
+          </FormRow>
+        )}
         <FormRow label="Name">
           <Field
             value={name}
             maxLength={60}
             autoFocus={!habit}
-            placeholder={parent ? `e.g. Stretch (in ${parent.name})` : "e.g. Morning run"}
+            placeholder={
+              parent
+                ? `e.g. Stretch (in ${parent.name})`
+                : avoid
+                  ? "e.g. No smoking, Coffee, Social media"
+                  : "e.g. Morning run"
+            }
             onChangeText={setName}
           />
         </FormRow>
@@ -173,7 +207,7 @@ function HabitEditor({
           <View style={styles.inline}>
             {type === "counter" && (
               <>
-                {num("target", "Daily goal")}
+                {num("target", avoid ? "Daily limit (at most)" : "Daily goal")}
                 <FormRow label="Unit">
                   <Field
                     value={config.unit ?? ""}
@@ -185,7 +219,7 @@ function HabitEditor({
                 </FormRow>
               </>
             )}
-            {type === "duration" && num("target", "Daily goal (min)")}
+            {type === "duration" && num("target", avoid ? "Daily limit (min)" : "Daily goal (min)")}
             {type === "slider" && (
               <>
                 {num("min", "From")}
@@ -193,6 +227,7 @@ function HabitEditor({
               </>
             )}
             {type === "rating" && num("max", "Stars (3–10)")}
+            {avoid && (type === "slider" || type === "rating") && num("target", "Stay at or below")}
           </View>
         )}
 
@@ -276,21 +311,7 @@ function HabitEditor({
             </View>
             {reason && <Muted style={styles.reason}>{reason}</Muted>}
             <ErrorNote error={suggest.error} />
-            {categories.map((c) => (
-              <View key={c.id} style={{ gap: space.xs }}>
-                <Text style={styles.category}>{c.name}</Text>
-                <View style={styles.wrap}>
-                  {leavesUnder(c.id).map((leaf) => (
-                    <Chip
-                      key={leaf.id}
-                      label={leaf.name}
-                      selected={links.includes(leaf.id)}
-                      onPress={() => toggleLink(leaf.id)}
-                    />
-                  ))}
-                </View>
-              </View>
-            ))}
+            <AttributePicker nodes={nodes} selected={links} onToggle={toggleLink} />
           </Card>
         )}
 
@@ -328,5 +349,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   reason: { borderLeftWidth: 2, borderLeftColor: colors.neonDim, paddingLeft: space.md },
-  category: { color: colors.court500, fontSize: 12, letterSpacing: 1, textTransform: "uppercase" },
 });
+
+export default function GatedEditHabitScreen() {
+  return (
+    <FeatureGate feature="habits">
+      <EditHabitScreen />
+    </FeatureGate>
+  );
+}

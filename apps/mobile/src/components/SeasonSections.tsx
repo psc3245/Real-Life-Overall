@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSeasonCards, useSeasonSetup } from "@/api/seasons";
 import { colors, fonts, space } from "@/lib/theme";
 import { OvrBadge } from "./ratings";
+import { formatScore, seasonCardScores } from "./score";
 import { Button, Card, Label, Muted, TextLink } from "./ui";
 
 /** Shown while a freshly rolled season can still be reshaped. */
@@ -14,7 +15,8 @@ export function NewSeasonBanner() {
       <Text style={{ color: colors.court100, fontSize: 14, lineHeight: 20 }}>
         <Text style={styles.bannerTitle}>Season {setup.data.label} has begun. </Text>
         <Text style={{ color: colors.court300 }}>
-          Your ratings carried over. You can reshape your categories until {setup.data.setupEndsOn}.
+          Your ratings carried over. You can reshape your categories and pick how the season is
+          scored until {setup.data.setupEndsOn}.
         </Text>
       </Text>
       <Button title="Season setup" onPress={() => router.push("/season-setup")} />
@@ -32,18 +34,21 @@ export function PastSeasons() {
         <TextLink href="/history">All seasons →</TextLink>
       </View>
       {cards.data.map((c) => {
-        const categories = c.nodes.filter((n) => n.depth === 1);
+        const { mode, overall, categories } = seasonCardScores(c);
         return (
           <Link key={c.id} href={{ pathname: "/history/[id]", params: { id: c.id } }} asChild>
             <Pressable>
               <Card style={styles.season}>
-                {c.overall !== null && <OvrBadge value={c.overall} size={48} />}
+                {overall !== null && <OvrBadge value={overall} size={48} mode={mode} />}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>{c.label}</Text>
                   {c.archetype && <Muted numberOfLines={1}>{c.archetype}</Muted>}
                   <Muted style={{ fontSize: 13, color: colors.court500 }}>
                     {categories
-                      .map((n) => `${n.name} ${n.value === null ? "–" : n.value.toFixed(0)}`)
+                      .map(
+                        (n) =>
+                          `${n.name} ${n.value === null ? "–" : formatScore(mode, n.value, 0)}`,
+                      )
                       .join(" · ")}
                   </Muted>
                 </View>

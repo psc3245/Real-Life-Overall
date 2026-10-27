@@ -10,8 +10,12 @@ import "./styles/index.css";
 // Style the page from the last session's preferences before the first paint.
 applyAppearance(cachedPreferences());
 
+// Data is shared with the iOS app, so coming back to the tab always refetches what's on screen
+// (a change made on the phone shows up at once); staleTime still keeps navigation snappy.
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: "always" },
+  },
 });
 
 createRoot(document.getElementById("root")!).render(

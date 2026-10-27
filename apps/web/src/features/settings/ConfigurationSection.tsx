@@ -36,7 +36,7 @@ export function ConfigurationSection() {
             <Toggle
               key={f}
               checked={prefs.features[f]}
-              onChange={(on) => setPreferences({ features: { ...prefs.features, [f]: on } })}
+              onChange={(on) => setPreferences({ features: { [f]: on } })}
               label={f === "coach" ? talk.coach : FEATURE_INFO[f].label}
               detail={FEATURE_INFO[f].detail}
             />

@@ -1,4 +1,6 @@
-import { ratingTier, type RatingTierKey } from "@rlo/shared";
+import { ratingTier, type Preferences, type RatingTierKey } from "@rlo/shared";
+
+type TierPalette = Preferences["tierPalette"];
 
 /** 2K-style menu palette, matching the web theme (apps/web/src/styles/index.css). */
 export const colors = {
@@ -14,16 +16,41 @@ export const colors = {
   flare: "#ff4d6d",
 } as const;
 
-const tiers: Record<RatingTierKey, string> = {
-  red: "#ff4d4d",
-  orange: "#ff9f1c",
-  yellow: "#e8e337",
-  green: "#3ce06b",
-  purple: "#b56cff",
+const TIER_PALETTES: Record<TierPalette, Record<RatingTierKey, string>> = {
+  classic: {
+    red: "#ff4d4d",
+    orange: "#ff9f1c",
+    yellow: "#e8e337",
+    green: "#3ce06b",
+    purple: "#b56cff",
+  },
+  // Okabe-Ito based, matching the web: distinguishable with common color-vision deficiencies.
+  colorblind: {
+    red: "#f0743a",
+    orange: "#e69f00",
+    yellow: "#f0e442",
+    green: "#56b4e9",
+    purple: "#d58bb5",
+  },
 };
+let tiers = TIER_PALETTES.classic;
 
+/**
+ * The player's tier palette (a synced preference). Set from the root layout before screens render;
+ * screens that read preferences re-render when it changes.
+ */
+export function setTierPalette(palette: TierPalette) {
+  tiers = TIER_PALETTES[palette];
+}
+
+/** A rating's tier color (0-100 scale). */
 export function tierColor(value: number): string {
   return tiers[ratingTier(value)];
+}
+
+/** A tier's color by key (growth uses its own thresholds). */
+export function tierKeyColor(tier: RatingTierKey): string {
+  return tiers[tier];
 }
 
 /** Condensed display type ships with iOS, standing in for the web's Oswald. */
