@@ -1,58 +1,63 @@
-import {
-  LEADERBOARD_MIN_RECAPPED_DAYS,
-  PROFILE_VISIBILITIES,
-  USERNAME_PATTERN,
-  type ProfileVisibility,
-} from "@rlo/shared";
+import { LEADERBOARD_MIN_RECAPPED_DAYS, PROFILE_VISIBILITIES, USERNAME_PATTERN } from "@rlo/shared";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
+import { useAuthState } from "../../api/auth";
 import { useMe, type Me } from "../../api/hooks";
 import { useUpdateProfile } from "../../api/social";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { TrackingSettings } from "../body/TrackingSettings";
 import { CopyLink } from "../social/CopyLink";
-import { VISIBILITY_LABEL } from "../social/ProfilePage";
+import { VISIBILITY_INFO } from "../social/visibility";
 import { fieldClass } from "../../components/form";
 import { DebugJson } from "../../components/debug/Debug";
 import { useHashScroll } from "../../components/useHashScroll";
-import { preferencesLink } from "./PreferencesModal";
-
-const VISIBILITY_DETAIL: Record<ProfileVisibility, string> = {
-  private: "Nobody else can open your profile.",
-  friends: "Players you've accepted as friends can see your card.",
-  public: "Anyone with your link can see your card, signed in or not.",
-};
+import { preferencesLink, type PreferencesTab } from "./PreferencesModal";
+import { SignInSettings } from "./PasswordSettings";
+import { Select, SettingBlock, SettingRow, SettingsCard, Toggle } from "./controls";
 
 export function SettingsPage() {
   const me = useMe();
+  const auth = useAuthState();
   useHashScroll(me.isSuccess);
   if (me.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
   if (me.isError) return <ErrorNote error={me.error} />;
+
+  const sections = [
+    { id: "profile", label: "Profile" },
+    ...(auth.mode === "better-auth" ? [{ id: "security", label: "Sign-in & security" }] : []),
+    { id: "sharing", label: "Sharing" },
+    { id: "units", label: "Units & body" },
+    { id: "personalize", label: "Personalize" },
+  ];
+
   return (
-    <div className="mx-auto max-w-xl space-y-10 pt-4">
+    <div className="mx-auto max-w-4xl space-y-6 pt-4">
       <h1 className="font-display text-4xl font-bold uppercase">Settings</h1>
-      <ProfileForm me={me.data} />
-      <Link
-        to={preferencesLink()}
-        className="flex items-center justify-between gap-3 rounded-lg border border-court-700 px-4 py-3 hover:border-neon"
-      >
-        <span>
-          <span className="block font-medium">Personalize</span>
-          <span className="block text-sm text-court-500">
-            Theme, colors and fonts, the Today page, and which parts of the app are on. Also on your
-            profile page.
-          </span>
-        </span>
-        <span className="text-neon">→</span>
-      </Link>
-      <div id="units" className="scroll-mt-16">
-        <TrackingSettings me={me.data} />
+      <div className="grid gap-6 md:grid-cols-[11rem_1fr] md:items-start">
+        <nav
+          aria-label="Settings sections"
+          className="-mx-4 flex gap-4 overflow-x-auto px-4 md:sticky md:top-20 md:mx-0 md:flex-col md:gap-1 md:px-0"
+        >
+          {sections.map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="whitespace-nowrap rounded-lg text-sm text-court-300 hover:text-neon md:px-3 md:py-1.5 md:hover:bg-court-900"
+            >
+              {s.label}
+            </a>
+          ))}
+        </nav>
+        <div className="min-w-0 space-y-6">
+          <ProfileForm me={me.data} />
+          {auth.mode === "better-auth" && <SignInSettings id="security" />}
+          <SharingSection me={me.data} />
+          <TrackingSettings me={me.data} id="units" />
+          <PersonalizeLinks />
+          <DebugJson label="me" data={me.data} />
+        </div>
       </div>
-      <div id="sharing" className="scroll-mt-16">
-        <SharingSection me={me.data} />
-      </div>
-      <DebugJson label="me" data={me.data} />
     </div>
   );
 }
@@ -74,108 +79,132 @@ function ProfileForm({ me }: { me: Me }) {
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4" aria-label="Profile">
-      <h2 className="font-display text-xl uppercase tracking-wider">Profile</h2>
-      <label className="block space-y-1">
-        <span className="text-xs uppercase tracking-wider text-court-300">Display name</span>
-        <input
-          value={displayName}
-          required
-          maxLength={40}
-          onChange={(e) => setDisplayName(e.target.value)}
-          className={fieldClass}
-        />
-      </label>
-      <label className="block space-y-1">
-        <span className="text-xs uppercase tracking-wider text-court-300">Username</span>
-        <input
-          value={username}
-          required
-          maxLength={24}
-          autoCapitalize="none"
-          spellCheck={false}
-          onChange={(e) => setUsername(e.target.value)}
-          className={fieldClass}
-          aria-invalid={!validUsername}
-        />
-        <span className={`text-xs ${validUsername ? "text-court-500" : "text-flare"}`}>
-          Your profile link is /u/{normalized || "…"}. 3-24 lowercase letters, digits, - or _.
-        </span>
-      </label>
-      <div className="flex items-center gap-3">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={!dirty || !validUsername || !displayName.trim() || update.isPending}
-        >
-          {update.isPending ? "Saving…" : "Save"}
-        </Button>
-        {update.isSuccess && !dirty && <span className="text-sm text-neon">Saved</span>}
-      </div>
-      <ErrorNote error={update.error} />
-    </form>
+    <SettingsCard id="profile" title="Profile" description="How you show up to other players.">
+      <SettingBlock>
+        <form onSubmit={onSubmit} className="space-y-4" aria-label="Profile">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-1">
+              <span className="text-xs uppercase tracking-wider text-court-300">Display name</span>
+              <input
+                value={displayName}
+                required
+                maxLength={40}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className={fieldClass}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs uppercase tracking-wider text-court-300">Username</span>
+              <input
+                value={username}
+                required
+                maxLength={24}
+                autoCapitalize="none"
+                spellCheck={false}
+                onChange={(e) => setUsername(e.target.value)}
+                className={fieldClass}
+                aria-invalid={!validUsername}
+              />
+            </label>
+          </div>
+          <p className={`text-xs ${validUsername ? "text-court-500" : "text-flare"}`}>
+            Your profile link is /u/{normalized || "…"}. 3-24 lowercase letters, digits, - or _.
+          </p>
+          <ErrorNote error={update.error} />
+          <div className="flex items-center gap-3">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!dirty || !validUsername || !displayName.trim() || update.isPending}
+            >
+              {update.isPending ? "Saving…" : "Save"}
+            </Button>
+            {update.isSuccess && !dirty && <span className="text-sm text-neon">Saved</span>}
+          </div>
+        </form>
+      </SettingBlock>
+    </SettingsCard>
   );
 }
 
 function SharingSection({ me }: { me: Me }) {
   const update = useUpdateProfile();
+  const isPublic = me.profileVisibility === "public";
   return (
-    <section className="space-y-4" aria-label="Sharing">
-      <h2 className="font-display text-xl uppercase tracking-wider">Sharing</h2>
-      <p className="text-sm text-court-300">
-        Shared cards show your Overall, archetype, category ratings and catalog badges. Journals,
-        recaps, attributes and the model's reasoning are never shared.
-      </p>
-      <fieldset className="space-y-2">
-        <legend className="sr-only">Who can see your card</legend>
-        {PROFILE_VISIBILITIES.map((v) => (
-          <label
-            key={v}
-            className={`flex cursor-pointer gap-3 rounded-lg border px-4 py-3 ${me.profileVisibility === v ? "border-neon bg-neon/5" : "border-court-700 hover:border-court-500"}`}
-          >
-            <input
-              type="radio"
-              name="visibility"
-              value={v}
-              checked={me.profileVisibility === v}
-              disabled={update.isPending}
-              onChange={() => update.mutate({ profileVisibility: v })}
-              className="mt-1 accent-[var(--color-neon)]"
-            />
-            <span>
-              <span className="block font-medium">{VISIBILITY_LABEL[v]}</span>
-              <span className="block text-sm text-court-500">{VISIBILITY_DETAIL[v]}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
-      <label
-        className={`flex gap-3 rounded-lg border border-court-700 px-4 py-3 ${me.profileVisibility === "public" ? "cursor-pointer" : "opacity-60"}`}
+    <SettingsCard
+      id="sharing"
+      title="Sharing"
+      description="Shared cards show your Overall, archetype, category ratings and catalog badges. Journals, recaps, attributes and the model's reasoning are never shared."
+    >
+      <SettingRow
+        label="Who can see your card"
+        detail={VISIBILITY_INFO[me.profileVisibility].detail}
+        htmlFor="visibility"
       >
-        <input
-          type="checkbox"
-          checked={me.leaderboardOptIn}
-          // Unchecking always works; opting in needs a public profile.
-          disabled={update.isPending || (me.profileVisibility !== "public" && !me.leaderboardOptIn)}
-          onChange={(e) => update.mutate({ leaderboardOptIn: e.target.checked })}
-          className="mt-1 accent-[var(--color-neon)]"
+        <Select
+          id="visibility"
+          label="Who can see your card"
+          value={me.profileVisibility}
+          disabled={update.isPending}
+          onChange={(profileVisibility) => update.mutate({ profileVisibility })}
+          options={PROFILE_VISIBILITIES.map((v) => ({ value: v, label: VISIBILITY_INFO[v].label }))}
         />
-        <span>
-          <span className="block font-medium">Show me on global leaderboards</span>
-          <span className="block text-sm text-court-500">
-            {me.profileVisibility === "public"
-              ? `Ratings count once at least ${LEADERBOARD_MIN_RECAPPED_DAYS} days this season are recapped. Friends boards don't need this.`
-              : "Global boards only include public profiles."}
-          </span>
-        </span>
-      </label>
-      <ErrorNote error={update.error} />
-      <div className="flex flex-wrap items-center gap-4">
+      </SettingRow>
+      <Toggle
+        checked={me.leaderboardOptIn}
+        // Unchecking always works; opting in needs a public profile.
+        disabled={update.isPending || (!isPublic && !me.leaderboardOptIn)}
+        onChange={(leaderboardOptIn) => update.mutate({ leaderboardOptIn })}
+        label="Show me on global leaderboards"
+        detail={
+          isPublic
+            ? `Ratings count once at least ${LEADERBOARD_MIN_RECAPPED_DAYS} days this season are recapped. Friends boards don't need this.`
+            : "Global boards only include public profiles."
+        }
+      />
+      <SettingRow label="Your profile" detail={`/u/${me.username}`}>
         {me.profileVisibility !== "private" && <CopyLink username={me.username} />}
-        <Link to={`/u/${me.username}`} className="text-sm text-neon hover:underline">
-          Preview your profile →
+        <Link
+          to={`/u/${me.username}`}
+          className="rounded-lg px-3 py-2 text-sm text-neon hover:bg-neon/10"
+        >
+          Preview →
         </Link>
-      </div>
-    </section>
+      </SettingRow>
+      {update.error && (
+        <SettingBlock>
+          <ErrorNote error={update.error} />
+        </SettingBlock>
+      )}
+    </SettingsCard>
+  );
+}
+
+const PERSONALIZE: { tab: PreferencesTab; label: string; detail: string }[] = [
+  { tab: "look", label: "Look", detail: "Theme, colors, fonts and layout." },
+  { tab: "today", label: "Today page", detail: "Greeting, layout and which widgets show." },
+  { tab: "configuration", label: "Features", detail: "Switch whole parts of the app on or off." },
+];
+
+/** The look-and-feel preferences live in the Personalize modal; these open its tabs. */
+function PersonalizeLinks() {
+  return (
+    <SettingsCard id="personalize" title="Personalize">
+      {PERSONALIZE.map((p) => (
+        <Link
+          key={p.tab}
+          to={preferencesLink(p.tab)}
+          className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-court-800/60"
+        >
+          <span>
+            <span className="block text-sm font-medium">{p.label}</span>
+            <span className="block text-xs text-court-500">{p.detail}</span>
+          </span>
+          <span aria-hidden className="text-court-300">
+            →
+          </span>
+        </Link>
+      ))}
+    </SettingsCard>
   );
 }

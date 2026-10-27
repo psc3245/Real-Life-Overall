@@ -7,7 +7,15 @@ import {
 import { Link } from "react-router";
 import { useMe } from "../../api/hooks";
 import { usePreferences, useSetPreferences } from "../../api/preferences";
-import { PrefsHeading, Segmented, Toggle } from "./controls";
+import {
+  HeaderAction,
+  SaveStatus,
+  Segmented,
+  Select,
+  SettingRow,
+  SettingsCard,
+  Toggle,
+} from "./controls";
 import { FEATURE_INFO } from "./featureInfo";
 
 const WIDGET_INFO: Record<TodayWidget, { label: string; detail: string }> = {
@@ -42,52 +50,53 @@ export function TodaySettings() {
   const isDefault = JSON.stringify(t) === JSON.stringify(DEFAULT_PREFERENCES.today);
 
   return (
-    <section className="space-y-5" aria-label="Today page">
-      <PrefsHeading
+    <div className="space-y-5">
+      <SettingsCard
         title="Today page"
+        description="What the Today page greets you with and how it's laid out."
         action={
           <>
+            <SaveStatus />
             {!isDefault && (
-              <button
-                type="button"
-                className="text-court-300 hover:text-neon"
-                onClick={() => setPreferences({ today: DEFAULT_PREFERENCES.today })}
-              >
+              <HeaderAction onClick={() => setPreferences({ today: DEFAULT_PREFERENCES.today })}>
                 Reset
-              </button>
+              </HeaderAction>
             )}
             <Link to="/today" className="text-neon hover:underline">
               View →
             </Link>
           </>
         }
-      />
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Segmented
-          label="Layout"
-          value={t.layout}
-          onChange={(layout) => set({ layout })}
-          options={[
-            { value: "columns", label: "Two columns" },
-            { value: "stack", label: "One column" },
-          ]}
-        />
-        <Segmented
-          label="Goals shown"
-          value={t.goalsShown}
-          onChange={(goalsShown) => set({ goalsShown })}
-          options={[2, 4, 6, 10].map((n) => ({ value: n, label: String(n) }))}
-        />
-        <Segmented
-          label="Rating movers shown"
-          value={t.moversShown}
-          onChange={(moversShown) => set({ moversShown })}
-          options={[0, 2, 4, 6].map((n) => ({ value: n, label: n ? String(n) : "None" }))}
-        />
-      </div>
-
-      <div className="space-y-2">
+      >
+        <SettingRow label="Layout">
+          <Segmented
+            label="Layout"
+            value={t.layout}
+            onChange={(layout) => set({ layout })}
+            options={[
+              { value: "columns", label: "Two columns" },
+              { value: "stack", label: "One column" },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label="Goals shown" htmlFor="today-goals">
+          <Select
+            id="today-goals"
+            label="Goals shown"
+            value={t.goalsShown}
+            onChange={(goalsShown) => set({ goalsShown })}
+            options={[2, 4, 6, 10].map((n) => ({ value: n, label: String(n) }))}
+          />
+        </SettingRow>
+        <SettingRow label="Rating movers shown" htmlFor="today-movers">
+          <Select
+            id="today-movers"
+            label="Rating movers shown"
+            value={t.moversShown}
+            onChange={(moversShown) => set({ moversShown })}
+            options={[0, 2, 4, 6].map((n) => ({ value: n, label: n ? String(n) : "None" }))}
+          />
+        </SettingRow>
         <Toggle
           checked={t.greeting}
           onChange={(greeting) => set({ greeting })}
@@ -105,11 +114,13 @@ export function TodaySettings() {
           label="Hide finished habits"
           detail="The habits card lists only what's left; the count still shows everything."
         />
-      </div>
+      </SettingsCard>
 
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-court-300">Widgets, top to bottom</p>
-        <ol className="divide-y divide-court-800 rounded-xl border border-court-700">
+      <SettingsCard
+        title="Widgets"
+        description="Top to bottom. Tick to show, use the arrows to reorder."
+      >
+        <ol className="divide-y divide-court-800">
           {t.widgets.map((w, i) => {
             const feature = TODAY_WIDGET_FEATURE[w.id];
             const off = feature !== undefined && !prefs.features[feature];
@@ -127,7 +138,7 @@ export function TodaySettings() {
                   <span className="block font-medium">{WIDGET_INFO[w.id].label}</span>
                   <span className="block text-sm text-court-500">
                     {off
-                      ? `${FEATURE_INFO[feature].label} is switched off in Configuration.`
+                      ? `${FEATURE_INFO[feature].label} is switched off in Features.`
                       : WIDGET_INFO[w.id].detail}
                   </span>
                 </span>
@@ -166,7 +177,7 @@ export function TodaySettings() {
             );
           })}
         </ol>
-      </div>
-    </section>
+      </SettingsCard>
+    </div>
   );
 }

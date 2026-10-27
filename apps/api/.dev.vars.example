@@ -3,6 +3,10 @@ DATABASE_URL=postgresql://user:password@your-neon-host/neondb?sslmode=require
 ANTHROPIC_API_KEY=
 # Signs session cookies (32+ chars): openssl rand -base64 32
 BETTER_AUTH_SECRET=
+# Confirmation and password-reset emails. Leave unset locally to print them (with links) to the
+# wrangler console instead. Required in production; EMAIL_FROM must be on a domain verified in Resend.
+# RESEND_API_KEY=
+# EMAIL_FROM=Real Life Overall <noreply@your-domain.com>
 # Optional Google sign-in (Google Cloud console → OAuth client, redirect URI
 # http://localhost:5173/api/auth/callback/google):
 # GOOGLE_CLIENT_ID=

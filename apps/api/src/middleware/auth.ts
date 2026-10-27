@@ -74,7 +74,7 @@ export const optionalUser = createMiddleware<AppEnv>(async (c, next) => {
 export function authFor(c: Context<AppEnv>): Auth {
   let auth = c.get("auth");
   if (!auth) {
-    auth = createAuth(c.get("env"), c.get("db"));
+    auth = createAuth(c.get("env"), c.get("db"), c.get("mailer"));
     c.set("auth", auth);
   }
   return auth;

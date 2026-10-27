@@ -183,6 +183,13 @@
       "when": 1793047347043,
       "tag": "0025_growth_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793050126231,
+      "tag": "0026_verify_existing_emails",
+      "breakpoints": true
     }
   ]
 }

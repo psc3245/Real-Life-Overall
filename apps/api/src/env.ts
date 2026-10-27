@@ -17,6 +17,10 @@ export const envSchema = z.object({
   PUBLIC_URL: z.string().url().default("http://localhost:5173"),
   GOOGLE_CLIENT_ID: optionalKey,
   GOOGLE_CLIENT_SECRET: optionalKey,
+  /** Sends verification and password-reset emails. Unset: emails are logged (dev only). */
+  RESEND_API_KEY: optionalKey,
+  /** Sender for auth emails; must be on a domain verified in Resend. */
+  EMAIL_FROM: z.string().default("Real Life Overall <onboarding@resend.dev>"),
   PASSWORD_HASH_ITERATIONS: z.coerce.number().int().min(10_000).default(100_000),
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
   /** "provider:modelId", e.g. "anthropic:claude-haiku-5-5". */
@@ -38,6 +42,9 @@ export function parseEnv(bindings: unknown): Env {
   }
   if (env.AUTH_MODE === "better-auth" && (env.BETTER_AUTH_SECRET?.length ?? 0) < 32) {
     throw new Error("BETTER_AUTH_SECRET (32+ characters) is required for AUTH_MODE=better-auth");
+  }
+  if (env.APP_ENV === "production" && env.AUTH_MODE === "better-auth" && !env.RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is required in production (verification and reset emails)");
   }
   return env;
 }

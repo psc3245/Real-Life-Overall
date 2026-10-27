@@ -24,7 +24,7 @@ export function FeatureGate({ feature, children }: { feature: Feature; children:
           Turn it on
         </Button>
         <Link to={preferencesLink("configuration")} className="text-sm text-neon hover:underline">
-          Configuration →
+          All features →
         </Link>
       </div>
     </div>

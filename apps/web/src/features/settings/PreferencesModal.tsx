@@ -7,7 +7,7 @@ import { TodaySettings } from "./TodaySettings";
 const TABS = [
   { id: "look", label: "Look" },
   { id: "today", label: "Today page" },
-  { id: "configuration", label: "Configuration" },
+  { id: "configuration", label: "Features" },
 ] as const;
 export type PreferencesTab = (typeof TABS)[number]["id"];
 

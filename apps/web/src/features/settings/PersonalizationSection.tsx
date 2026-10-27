@@ -22,7 +22,16 @@ import {
   loadFonts,
   THEME_INFO,
 } from "../../lib/appearance";
-import { PrefsHeading, Segmented, Toggle } from "./controls";
+import {
+  HeaderAction,
+  SaveStatus,
+  Segmented,
+  Select,
+  SettingBlock,
+  SettingRow,
+  SettingsCard,
+  Toggle,
+} from "./controls";
 
 /** The look-and-feel keys "Reset" puts back; Today and configuration have their own. */
 const APPEARANCE_KEYS = [
@@ -63,263 +72,299 @@ export function PersonalizationSection() {
     );
 
   return (
-    <section className="space-y-6" aria-label="Personalization">
-      <PrefsHeading
-        title="Personalization"
-        action={
-          !isDefault && (
-            <button type="button" className="text-court-300 hover:text-neon" onClick={reset}>
-              Reset look
-            </button>
-          )
-        }
-      />
-      <p className="text-sm text-court-300">
-        Changes apply instantly and follow you to any device you sign in on.
-      </p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 text-sm">
+        <p className="text-court-300">
+          Changes apply instantly and follow you to any device you sign in on.
+        </p>
+        <span className="flex items-baseline gap-4">
+          <SaveStatus />
+          {!isDefault && <HeaderAction onClick={reset}>Reset look</HeaderAction>}
+        </span>
+      </div>
 
       <Preview />
 
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-court-300">Theme</p>
-        <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {THEMES.map((theme) => {
-            const [bg, card, , border, , muted, text] = THEME_INFO[theme].scale;
-            const selected = prefs.theme === theme;
-            return (
-              <button
-                key={theme}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => set({ theme })}
-                className={`overflow-hidden rounded-xl border-2 text-left ${selected ? "border-neon" : "border-court-700 hover:border-court-500"}`}
-              >
-                <span className="block p-2.5" style={{ background: bg }}>
-                  <span
-                    className="block space-y-1.5 rounded-md border p-2"
-                    style={{ background: card, borderColor: border }}
-                  >
-                    <span
-                      className="block h-1.5 w-2/3 rounded-full"
-                      style={{ background: accentColor({ ...prefs, theme }) }}
-                    />
-                    <span className="block h-1 w-full rounded-full" style={{ background: muted }} />
-                    <span className="block h-1 w-1/2 rounded-full" style={{ background: muted }} />
-                  </span>
-                </span>
-                <span
-                  className="flex items-center justify-between px-2.5 py-1.5 text-xs font-medium"
-                  style={{ background: card, color: text }}
-                >
-                  {THEME_INFO[theme].label}
-                  <span style={{ color: muted }}>{isLightTheme(theme) ? "light" : "dark"}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-court-300">Accent color</p>
-        <div
-          role="radiogroup"
-          aria-label="Accent color"
-          className="flex flex-wrap items-center gap-2"
-        >
-          {ACCENTS.filter((a) => a !== "custom").map((accent) => {
-            const color = accentColor({ ...prefs, accent });
-            const selected = prefs.accent === accent;
-            return (
-              <button
-                key={accent}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={ACCENT_INFO[accent].label}
-                title={ACCENT_INFO[accent].label}
-                onClick={() => set({ accent })}
-                className={`h-9 w-9 rounded-full border-2 ${selected ? "border-court-100 ring-2 ring-neon ring-offset-2 ring-offset-court-950" : "border-court-700 hover:scale-110"} transition`}
-                style={{ background: color }}
-              />
-            );
-          })}
-          <label
-            className={`flex h-9 cursor-pointer items-center gap-2 rounded-full border-2 pr-3 pl-1 text-sm ${prefs.accent === "custom" ? "border-neon text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`}
+      <SettingsCard title="Theme & color">
+        <SettingBlock label="Theme">
+          <div
+            role="radiogroup"
+            aria-label="Theme"
+            className="grid grid-cols-2 gap-2 sm:grid-cols-4"
           >
-            <input
-              type="color"
-              value={prefs.customAccent}
-              onChange={(e) => set({ accent: "custom", customAccent: e.target.value })}
-              onClick={() => prefs.accent !== "custom" && set({ accent: "custom" })}
-              className="h-6 w-6 cursor-pointer rounded-full border-0 bg-transparent p-0"
-              aria-label="Custom accent color"
-            />
-            Custom
-          </label>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-court-300">Headline font</p>
-        <div
-          role="radiogroup"
-          aria-label="Headline font"
-          className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-        >
-          {DISPLAY_FONTS.map((font) => (
-            <FontOption
-              key={font}
-              selected={prefs.displayFont === font}
-              onSelect={() => set({ displayFont: font })}
-              stack={DISPLAY_FONT_INFO[font].stack}
-              label={DISPLAY_FONT_INFO[font].label}
-              sample={<span className="text-2xl font-bold uppercase">OVR 87</span>}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-court-300">Body font</p>
-        <div
-          role="radiogroup"
-          aria-label="Body font"
-          className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-        >
-          {BODY_FONTS.map((font) => (
-            <FontOption
-              key={font}
-              selected={prefs.bodyFont === font}
-              onSelect={() => set({ bodyFont: font })}
-              stack={BODY_FONT_INFO[font].stack}
-              label={BODY_FONT_INFO[font].label}
-              sample={<span className="text-sm">Logged a 5k run today.</span>}
-            />
-          ))}
-        </div>
-      </div>
-
-      <Segmented
-        label="Sports talk"
-        value={prefs.sportsTalk}
-        onChange={(sportsTalk) => set({ sportsTalk })}
-        options={SPORTS_TALK_LEVELS.map((level) => ({
-          value: level,
-          label: SPORTS_TALK_INFO[level].label,
-        }))}
-        hint={`${SPORTS_TALK_INFO[prefs.sportsTalk].detail} Changes the app's wording and how the AI writes your recaps, reviews and coach replies.`}
-      />
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Segmented
-          label="Text size"
-          value={prefs.textSize}
-          onChange={(textSize) => set({ textSize })}
-          options={[
-            { value: "sm", label: "S" },
-            { value: "md", label: "M" },
-            { value: "lg", label: "L" },
-            { value: "xl", label: "XL" },
-          ]}
-        />
-        <Segmented
-          label="Density"
-          value={prefs.density}
-          onChange={(density) => set({ density })}
-          options={[
-            { value: "compact", label: "Compact" },
-            { value: "cozy", label: "Cozy" },
-            { value: "roomy", label: "Roomy" },
-          ]}
-        />
-        <Segmented
-          label="Corners"
-          value={prefs.corners}
-          onChange={(corners) => set({ corners })}
-          options={[
-            { value: "sharp", label: "Sharp" },
-            { value: "soft", label: "Soft" },
-            { value: "round", label: "Round" },
-            { value: "pill", label: "Extra round" },
-          ]}
-        />
-        <Segmented
-          label="Background"
-          value={prefs.backdrop}
-          onChange={(backdrop) => set({ backdrop })}
-          options={[
-            { value: "glow", label: "Glow" },
-            { value: "grid", label: "Grid" },
-            { value: "plain", label: "Plain" },
-          ]}
-        />
-        <Segmented
+            {THEMES.map((theme) => {
+              const [bg, card, , border, , muted, text] = THEME_INFO[theme].scale;
+              const selected = prefs.theme === theme;
+              return (
+                <button
+                  key={theme}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => set({ theme })}
+                  className={`overflow-hidden rounded-xl border-2 text-left ${selected ? "border-neon" : "border-court-700 hover:border-court-500"}`}
+                >
+                  <span className="block p-2.5" style={{ background: bg }}>
+                    <span
+                      className="block space-y-1.5 rounded-md border p-2"
+                      style={{ background: card, borderColor: border }}
+                    >
+                      <span
+                        className="block h-1.5 w-2/3 rounded-full"
+                        style={{ background: accentColor({ ...prefs, theme }) }}
+                      />
+                      <span
+                        className="block h-1 w-full rounded-full"
+                        style={{ background: muted }}
+                      />
+                      <span
+                        className="block h-1 w-1/2 rounded-full"
+                        style={{ background: muted }}
+                      />
+                    </span>
+                  </span>
+                  <span
+                    className="flex items-center justify-between px-2.5 py-1.5 text-xs font-medium"
+                    style={{ background: card, color: text }}
+                  >
+                    {THEME_INFO[theme].label}
+                    <span style={{ color: muted }}>{isLightTheme(theme) ? "light" : "dark"}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </SettingBlock>
+        <SettingBlock label="Accent color">
+          <div
+            role="radiogroup"
+            aria-label="Accent color"
+            className="flex flex-wrap items-center gap-2"
+          >
+            {ACCENTS.filter((a) => a !== "custom").map((accent) => {
+              const color = accentColor({ ...prefs, accent });
+              const selected = prefs.accent === accent;
+              return (
+                <button
+                  key={accent}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={ACCENT_INFO[accent].label}
+                  title={ACCENT_INFO[accent].label}
+                  onClick={() => set({ accent })}
+                  className={`h-8 w-8 rounded-full border-2 ${selected ? "border-court-100 ring-2 ring-neon ring-offset-2 ring-offset-court-900" : "border-court-700 hover:scale-110"} transition`}
+                  style={{ background: color }}
+                />
+              );
+            })}
+            <label
+              className={`flex h-8 cursor-pointer items-center gap-2 rounded-full border-2 pr-3 pl-1 text-sm ${prefs.accent === "custom" ? "border-neon text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`}
+            >
+              <input
+                type="color"
+                value={prefs.customAccent}
+                onChange={(e) => set({ accent: "custom", customAccent: e.target.value })}
+                onClick={() => prefs.accent !== "custom" && set({ accent: "custom" })}
+                className="h-5 w-5 cursor-pointer rounded-full border-0 bg-transparent p-0"
+                aria-label="Custom accent color"
+              />
+              Custom
+            </label>
+          </div>
+        </SettingBlock>
+        <SettingRow
           label="Rating colors"
-          value={prefs.tierPalette}
-          onChange={(tierPalette) => set({ tierPalette })}
-          options={[
-            { value: "classic", label: "Classic" },
-            { value: "colorblind", label: "Color-blind safe" },
-          ]}
-        />
-        <Segmented
-          label="Animations"
-          value={prefs.motion}
-          onChange={(motion) => set({ motion })}
-          options={[
-            { value: "full", label: "Full" },
-            { value: "system", label: "Match system" },
-            { value: "off", label: "Off" },
-          ]}
-        />
-        <Segmented
-          label="Page width"
-          value={prefs.pageWidth}
-          onChange={(pageWidth) => set({ pageWidth })}
-          options={[
-            { value: "narrow", label: "Narrow" },
-            { value: "normal", label: "Normal" },
-            { value: "wide", label: "Wide" },
-            { value: "full", label: "Full" },
-          ]}
-        />
-        <Segmented
-          label="Open the app on"
-          value={prefs.startPage}
-          onChange={(startPage) => set({ startPage })}
-          options={[
-            { value: "home", label: "Home" },
-            { value: "today", label: "Today" },
-            { value: "log", label: "Log" },
-            { value: "ratings", label: "Rating" },
-            { value: "habits", label: "Habits" },
-          ]}
-        />
-      </div>
+          detail="How ratings are colored by tier."
+          htmlFor="pref-tiers"
+        >
+          <Select
+            id="pref-tiers"
+            label="Rating colors"
+            value={prefs.tierPalette}
+            onChange={(tierPalette) => set({ tierPalette })}
+            options={[
+              { value: "classic", label: "Classic" },
+              { value: "colorblind", label: "Color-blind safe" },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label="Background" htmlFor="pref-backdrop">
+          <Select
+            id="pref-backdrop"
+            label="Background"
+            value={prefs.backdrop}
+            onChange={(backdrop) => set({ backdrop })}
+            options={[
+              { value: "glow", label: "Glow" },
+              { value: "grid", label: "Grid" },
+              { value: "plain", label: "Plain" },
+            ]}
+          />
+        </SettingRow>
+      </SettingsCard>
 
-      <div className="space-y-2">
+      <SettingsCard title="Type">
+        <SettingBlock label="Headline font">
+          <div
+            role="radiogroup"
+            aria-label="Headline font"
+            className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+          >
+            {DISPLAY_FONTS.map((font) => (
+              <FontOption
+                key={font}
+                selected={prefs.displayFont === font}
+                onSelect={() => set({ displayFont: font })}
+                stack={DISPLAY_FONT_INFO[font].stack}
+                label={DISPLAY_FONT_INFO[font].label}
+                sample={<span className="text-2xl font-bold uppercase">OVR 87</span>}
+              />
+            ))}
+          </div>
+        </SettingBlock>
+        <SettingBlock label="Body font">
+          <div
+            role="radiogroup"
+            aria-label="Body font"
+            className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+          >
+            {BODY_FONTS.map((font) => (
+              <FontOption
+                key={font}
+                selected={prefs.bodyFont === font}
+                onSelect={() => set({ bodyFont: font })}
+                stack={BODY_FONT_INFO[font].stack}
+                label={BODY_FONT_INFO[font].label}
+                sample={<span className="text-sm">Logged a 5k run today.</span>}
+              />
+            ))}
+          </div>
+        </SettingBlock>
+        <SettingRow label="Text size">
+          <Segmented
+            label="Text size"
+            value={prefs.textSize}
+            onChange={(textSize) => set({ textSize })}
+            options={[
+              { value: "sm", label: "S" },
+              { value: "md", label: "M" },
+              { value: "lg", label: "L" },
+              { value: "xl", label: "XL" },
+            ]}
+          />
+        </SettingRow>
         <Toggle
           checked={prefs.allCaps}
           onChange={(allCaps) => set({ allCaps })}
           label="All-caps headings and labels"
           detail="The 2K menu look. Turn off for sentence case everywhere."
         />
+      </SettingsCard>
+
+      <SettingsCard title="Layout">
+        <SettingRow label="Density" detail="Spacing between things." htmlFor="pref-density">
+          <Select
+            id="pref-density"
+            label="Density"
+            value={prefs.density}
+            onChange={(density) => set({ density })}
+            options={[
+              { value: "compact", label: "Compact" },
+              { value: "cozy", label: "Cozy" },
+              { value: "roomy", label: "Roomy" },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label="Corners" htmlFor="pref-corners">
+          <Select
+            id="pref-corners"
+            label="Corners"
+            value={prefs.corners}
+            onChange={(corners) => set({ corners })}
+            options={[
+              { value: "sharp", label: "Sharp" },
+              { value: "soft", label: "Soft" },
+              { value: "round", label: "Round" },
+              { value: "pill", label: "Extra round" },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label="Page width" htmlFor="pref-width">
+          <Select
+            id="pref-width"
+            label="Page width"
+            value={prefs.pageWidth}
+            onChange={(pageWidth) => set({ pageWidth })}
+            options={[
+              { value: "narrow", label: "Narrow" },
+              { value: "normal", label: "Normal" },
+              { value: "wide", label: "Wide" },
+              { value: "full", label: "Full" },
+            ]}
+          />
+        </SettingRow>
         <Toggle
           checked={prefs.stickyNav}
           onChange={(stickyNav) => set({ stickyNav })}
           label="Pin the menu bar"
           detail="Keeps the main navigation at the top of the screen as you scroll."
         />
+      </SettingsCard>
+
+      <SettingsCard title="Behavior">
+        <SettingRow
+          label="Sports talk"
+          detail={`${SPORTS_TALK_INFO[prefs.sportsTalk].detail} Changes the app's wording and how the AI writes your recaps, reviews and coach replies.`}
+          htmlFor="pref-talk"
+        >
+          <Select
+            id="pref-talk"
+            label="Sports talk"
+            value={prefs.sportsTalk}
+            onChange={(sportsTalk) => set({ sportsTalk })}
+            options={SPORTS_TALK_LEVELS.map((level) => ({
+              value: level,
+              label: SPORTS_TALK_INFO[level].label,
+            }))}
+          />
+        </SettingRow>
+        <SettingRow label="Open the app on" htmlFor="pref-start">
+          <Select
+            id="pref-start"
+            label="Open the app on"
+            value={prefs.startPage}
+            onChange={(startPage) => set({ startPage })}
+            options={[
+              { value: "home", label: "Home" },
+              { value: "today", label: "Today" },
+              { value: "log", label: "Log" },
+              { value: "ratings", label: "Rating" },
+              { value: "habits", label: "Habits" },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label="Animations" htmlFor="pref-motion">
+          <Select
+            id="pref-motion"
+            label="Animations"
+            value={prefs.motion}
+            onChange={(motion) => set({ motion })}
+            options={[
+              { value: "full", label: "Full" },
+              { value: "system", label: "Match system" },
+              { value: "off", label: "Off" },
+            ]}
+          />
+        </SettingRow>
         <Toggle
           checked={prefs.showApiStatus}
           onChange={(showApiStatus) => set({ showApiStatus })}
           label="Show connection status"
           detail="The API dot in the header. It always shows when the connection is down."
         />
-      </div>
-    </section>
+      </SettingsCard>
+    </div>
   );
 }
 

@@ -49,6 +49,7 @@ export function createApp(makeDeps: DepsFactory) {
     const deps = makeDeps(env);
     c.set("db", deps.db);
     c.set("llm", deps.llm);
+    if (deps.mailer) c.set("mailer", deps.mailer);
     try {
       await next();
     } finally {

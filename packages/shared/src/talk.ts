@@ -42,7 +42,16 @@ export interface TalkTerms {
   archetype: string;
   /** Shown when there's no archetype yet. */
   unranked: string;
-  nav: { today: string; week: string; workouts: string; leaderboards: string };
+  /** Main menu links, plus the names of its dropdown groups (plan, social, stats). */
+  nav: {
+    today: string;
+    week: string;
+    workouts: string;
+    leaderboards: string;
+    plan: string;
+    social: string;
+    stats: string;
+  };
   todayEyebrow: string;
   weeklyReview: string;
   runWeekly: string;
@@ -70,7 +79,15 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     profileHeading: "Profile",
     archetype: "Profile type",
     unranked: "No profile type yet",
-    nav: { today: "Today", week: "Week", workouts: "Workouts", leaderboards: "Rankings" },
+    nav: {
+      today: "Today",
+      week: "Week",
+      workouts: "Workouts",
+      leaderboards: "Rankings",
+      plan: "Plan",
+      social: "Social",
+      stats: "Insights",
+    },
     todayEyebrow: "",
     weeklyReview: "Weekly review",
     runWeekly: "Run weekly review",
@@ -95,7 +112,15 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     profileHeading: "Player profile",
     archetype: "Archetype",
     unranked: "Unranked",
-    nav: { today: "Today", week: "Week", workouts: "Train", leaderboards: "Leaders" },
+    nav: {
+      today: "Today",
+      week: "Week",
+      workouts: "Train",
+      leaderboards: "Leaders",
+      plan: "Playbook",
+      social: "League",
+      stats: "Stats",
+    },
     todayEyebrow: "",
     weeklyReview: "Weekly review",
     runWeekly: "Run weekly review",
@@ -120,7 +145,15 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     profileHeading: "Player profile",
     archetype: "Build",
     unranked: "Undrafted",
-    nav: { today: "Game day", week: "Film room", workouts: "Practice", leaderboards: "Standings" },
+    nav: {
+      today: "Game day",
+      week: "Film room",
+      workouts: "Practice",
+      leaderboards: "Standings",
+      plan: "Playbook",
+      social: "Clubhouse",
+      stats: "Stat sheet",
+    },
     todayEyebrow: "Game day",
     weeklyReview: "Film session",
     runWeekly: "Roll the tape",
