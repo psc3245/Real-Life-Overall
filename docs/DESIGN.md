@@ -549,7 +549,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - **Phase 3:** Player card, charts, badges, goals and potential, season setup and archive.
   - **Phase 4:** Profile, friends, compare, leaderboards.
   - **Refinements (before mobile):** Today is an at-a-glance overview and logging lives at `/log`; `/habits` is the habit stats glance (week / month / season; management at `/habits/manage`); the Week page adds day-by-day detail and opens earlier reviews; `/ratings/activity` holds the full change feed; every attribute and category has a page (`/ratings/node/:id`: history, changes, children, linked habits) and is linked wherever it appears; long pages get sticky section nav; heatmap days show a hover card and open their log.
-  - **iOS app:** five tabs (Today, Habits, Week, Ratings, You). Today, Habits, Week and Ratings match their web pages; You gathers the web header's links (profile, friends, leaderboards, history) with Settings. Detail screens (a day's log, attribute pages, activity, seasons, profiles, onboarding) push over the tabs. Same dark 2K look, with SF Symbols and native sheets, prompts and share sheets.
+  - **iOS app:** five tabs (Today, Playbook, Week, Rating, You). Playbook switches between Habits, Goals and Train (the web's Playbook menu); You gathers the League and Stats menus and the account menu (profile, Scouting Report, coach, body, friends, leaderboards, charts, reports, history, settings, personalize, admin). Tabs and rows hide with their features. Detail screens (a day's log, attribute pages, activity, seasons, profiles, onboarding) push over the tabs. Same dark 2K look, with SF Symbols and native sheets, prompts and share sheets.
 - Responsive from the start (web first, mobile later). Consider making it an installable **PWA** before going native.
 - The 2K look is dark-first and the default; light themes and other styles are opt-in personalization (§7.9).
 
@@ -656,9 +656,11 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Coach chat: advice grounded in your data, with one-tap habit, goal and Scouting Report suggestions; a Today card (§5.9)
 - [x] Sports talk: none / normal / extra for the app's wording and every AI-written text (§7.10)
 - [x] Season modes: Rating or Growth ("Most Improved") picked each season, growth boards, the rating hidden but revealable by its owner (§4.6)
-- [ ] iOS: season modes (picker, growth display, growth boards)
-- [ ] iOS: Scouting Report, evolving tree, coach and sports talk
-- [ ] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
+- [x] iOS: season modes (picker, growth display, growth boards)
+- [x] iOS: Scouting Report, evolving tree, coach and sports talk
+- [x] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
+- [x] iOS parity for charts, reports, settings (password, devices), Personalize (behavior, Today page, features) and admin. Tabs: Today, Playbook (Habits / Goals / Train), Week, Rating, You; Coach opens from Today and You. The web's look options (themes, fonts, density) and its admin debug panel stay web-only.
+- [x] Cross-device sync: feature toggles merge per feature on the server; the web refetches on every tab focus; the live workout and the journal adopt edits from the other device whenever nothing local is unsaved or in flight.
 
 ---
 

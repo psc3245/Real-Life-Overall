@@ -1,4 +1,4 @@
-import type { RatedNodeDto, SeasonDetailDto, SeasonDetailNode } from "@rlo/shared";
+import type { RatedNodeDto, SeasonDetailDto, SeasonDetailNode, SeasonMode } from "@rlo/shared";
 import { Link, useLocalSearchParams } from "expo-router";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -8,11 +8,13 @@ import { Medallion } from "@/components/badges";
 import { HistoryChart } from "@/components/charts/HistoryChart";
 import { Delta } from "@/components/Delta";
 import { OvrBadge, StatBar } from "@/components/ratings";
+import { formatScore, ScoreProvider } from "@/components/score";
 import { EarlierWeek } from "@/components/ReviewCard";
 import { StatGrid, StatTile } from "@/components/StatTile";
 import { Body, Card, ErrorNote, Label, Loading, Muted, Screen, Section } from "@/components/ui";
 import { seasonDates } from "@/lib/format";
 import { colors, space } from "@/lib/theme";
+import { FeatureGate } from "@/components/FeatureGate";
 
 /** HistoryChart reads rated nodes; a season's nodes carry only what the chart needs. */
 const asRated = (nodes: SeasonDetailNode[]): RatedNodeDto[] =>
@@ -39,7 +41,7 @@ const change = (n: SeasonDetailNode) =>
   n.start !== null && n.end !== null ? n.end - n.start : null;
 
 /** One season in full: how Overall and each category moved, the stats, badges and weeks. */
-export default function SeasonScreen() {
+function SeasonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const detail = useSeasonDetail(id);
   if (detail.isPending) return <Loading />;
@@ -56,7 +58,11 @@ export default function SeasonScreen() {
       </Screen>
     );
   }
-  return <Season s={detail.data} />;
+  return (
+    <ScoreProvider mode={detail.data.mode} values={detail.data.nodes.map((n) => n.end)}>
+      <Season s={detail.data} />
+    </ScoreProvider>
+  );
 }
 
 function Season({ s }: { s: SeasonDetailDto }) {
@@ -85,13 +91,17 @@ function Season({ s }: { s: SeasonDetailDto }) {
       {root?.end != null && (
         <View style={styles.hero}>
           <OvrBadge value={root.end} size={64} />
-          {root.start !== null && (
-            <Muted>
-              Started at {root.start.toFixed(1)}
-              {"\n"}
-              <Delta value={root.end - root.start} style={{ fontSize: 18 }} />{" "}
-              {s.current ? "so far" : "over the season"}
-            </Muted>
+          {s.mode === "growth" ? (
+            <Muted>Gained {s.current ? "so far" : "over the season"}</Muted>
+          ) : (
+            root.start !== null && (
+              <Muted>
+                Started at {root.start.toFixed(1)}
+                {"\n"}
+                <Delta value={root.end - root.start} style={{ fontSize: 18 }} />{" "}
+                {s.current ? "so far" : "over the season"}
+              </Muted>
+            )
           )}
         </View>
       )}
@@ -116,7 +126,7 @@ function Season({ s }: { s: SeasonDetailDto }) {
         return (
           <Card key={c.id} style={{ gap: space.md }}>
             {nodeLink(c, <StatBar label={c.name} value={c.end ?? 0} />)}
-            <StartEnd node={c} />
+            <StartEnd node={c} mode={s.mode} />
             {attrs.length > 0 && (
               <View style={styles.attrs}>
                 {attrs.map((a) => (
@@ -124,7 +134,7 @@ function Season({ s }: { s: SeasonDetailDto }) {
                     <Body style={{ flex: 1, fontSize: 14 }} numberOfLines={1}>
                       {nodeLink(a, a.name)}
                     </Body>
-                    <StartEnd node={a} />
+                    <StartEnd node={a} mode={s.mode} />
                   </View>
                 ))}
               </View>
@@ -172,7 +182,14 @@ function Season({ s }: { s: SeasonDetailDto }) {
   );
 }
 
-function StartEnd({ node }: { node: SeasonDetailNode }) {
+function StartEnd({ node, mode }: { node: SeasonDetailNode; mode: SeasonMode }) {
+  if (mode === "growth") {
+    return (
+      <Muted style={{ fontSize: 13, color: colors.court500 }}>
+        {node.end === null ? "–" : `${formatScore(mode, node.end)} gained`}
+      </Muted>
+    );
+  }
   const d = change(node);
   return (
     <View style={styles.startEnd}>
@@ -216,3 +233,11 @@ const styles = StyleSheet.create({
   },
   startEnd: { flexDirection: "row", alignItems: "center", gap: space.sm },
 });
+
+export default function GatedSeasonScreen() {
+  return (
+    <FeatureGate feature="history">
+      <SeasonScreen />
+    </FeatureGate>
+  );
+}

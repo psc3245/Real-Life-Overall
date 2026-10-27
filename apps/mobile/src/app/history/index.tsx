@@ -3,12 +3,14 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRatings } from "@/api/ratings";
 import { useSeasonCards } from "@/api/seasons";
 import { OvrBadge } from "@/components/ratings";
+import { formatScore, seasonCardScores } from "@/components/score";
 import { Card, ErrorNote, Loading, Muted, Screen } from "@/components/ui";
 import { seasonDates } from "@/lib/format";
 import { colors, fonts, space } from "@/lib/theme";
+import { FeatureGate } from "@/components/FeatureGate";
 
 /** Every season: the one in progress first, then archived ones, newest first. */
-export default function HistoryScreen() {
+function HistoryScreen() {
   const ratings = useRatings();
   const cards = useSeasonCards();
   if (ratings.isPending || cards.isPending) return <Loading />;
@@ -30,6 +32,7 @@ export default function HistoryScreen() {
             id: live.season.id,
             label: live.season.label,
             dates: seasonDates(live.season.startsOn, live.season.endsOn),
+            mode: live.season.mode,
             overall: root?.value ?? null,
             archetype: live.archetype?.name ?? null,
             categories: live.nodes
@@ -43,11 +46,8 @@ export default function HistoryScreen() {
       id: c.id,
       label: c.label,
       dates: seasonDates(c.startsOn, c.endsOn),
-      overall: c.overall,
+      ...seasonCardScores(c),
       archetype: c.archetype,
-      categories: c.nodes
-        .filter((n) => n.depth === 1)
-        .map((n) => ({ name: n.name, value: n.value })),
       current: false,
     })),
   ];
@@ -67,7 +67,7 @@ export default function HistoryScreen() {
         >
           <Card style={styles.row}>
             {r.overall !== null ? (
-              <OvrBadge value={r.overall} size={48} />
+              <OvrBadge value={r.overall} size={48} mode={r.mode} />
             ) : (
               <View style={styles.empty} />
             )}
@@ -82,7 +82,9 @@ export default function HistoryScreen() {
               </Muted>
               <Muted numberOfLines={1} style={{ fontSize: 13 }}>
                 {r.categories
-                  .map((c) => `${c.name} ${c.value === null ? "–" : c.value.toFixed(0)}`)
+                  .map(
+                    (c) => `${c.name} ${c.value === null ? "–" : formatScore(r.mode, c.value, 0)}`,
+                  )
                   .join(" · ")}
               </Muted>
             </View>
@@ -114,3 +116,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 });
+
+export default function GatedHistoryScreen() {
+  return (
+    <FeatureGate feature="history">
+      <HistoryScreen />
+    </FeatureGate>
+  );
+}

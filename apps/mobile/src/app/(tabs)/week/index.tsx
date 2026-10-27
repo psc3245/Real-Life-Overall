@@ -19,11 +19,13 @@ import {
 } from "@/components/ui";
 import { WeekBreakdown } from "@/components/WeekBreakdown";
 import { shortDate } from "@/lib/format";
+import { cap, useTalk } from "@/lib/talk";
 import { space } from "@/lib/theme";
 
 const WORKING = ["Reading your week…", "Checking habits and decay…", "Setting next week's focus…"];
 
 export default function WeekScreen() {
+  const talk = useTalk();
   const weekly = useWeekly();
   const ratings = useRatings();
   const run = useRunWeekly();
@@ -49,7 +51,7 @@ export default function WeekScreen() {
 
   return (
     <Screen
-      eyebrow="Weekly review"
+      eyebrow={talk.weeklyReview}
       title={week ? `${shortDate(week.start)} – ${shortDate(week.end)}` : "Your week"}
       onRefresh={refresh}
     >
@@ -67,11 +69,11 @@ export default function WeekScreen() {
       {ready && (
         <Card style={{ gap: space.md }}>
           <Muted>
-            This week is done. The scout reviews it as a whole: what worked, what slipped, your
-            focus for next week, and any habits worth adding.
+            This week is done. {cap(talk.scout)} reviews it as a whole: what worked, what slipped,
+            your focus for next week, and any habits worth adding.
           </Muted>
           <Button
-            title={run.isPending ? WORKING[line]! : "Run weekly review"}
+            title={run.isPending ? WORKING[line]! : talk.runWeekly}
             disabled={run.isPending}
             onPress={() => run.mutate()}
           />

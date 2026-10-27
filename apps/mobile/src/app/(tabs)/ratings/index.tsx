@@ -15,6 +15,8 @@ import { DecayCard } from "@/components/DecayCard";
 import { GoalEditor } from "@/components/GoalEditor";
 import { PlayerCard } from "@/components/PlayerCard";
 import { StatBar } from "@/components/ratings";
+import { HiddenRating, useScore } from "@/components/score";
+import { useTalk } from "@/lib/talk";
 import { NewSeasonBanner, PastSeasons } from "@/components/SeasonSections";
 import {
   Body,
@@ -34,6 +36,8 @@ import { colors, space } from "@/lib/theme";
 
 /** Card, scouting report, charts, badges, activity, the tree, seasons and decay. */
 export default function RatingsScreen() {
+  const talk = useTalk();
+  const { mode } = useScore();
   const ratings = useRatings();
   const me = useMe();
   const refresh = () => ratings.refetch();
@@ -61,7 +65,18 @@ export default function RatingsScreen() {
         username={me.data?.username}
       />
 
-      <Section title="Scouting report">
+      <Section title={talk.profileHeading}>
+        {mode === "growth" && (
+          <Card style={{ gap: space.xs, borderColor: colors.neonDim }}>
+            <Muted>
+              <Text style={{ color: colors.neon, fontWeight: "700" }}>{talk.growthMode}. </Text>
+              Every number this season is points gained since it started. Gains add up; decay and
+              off days never take them away. Your rating keeps running underneath, and only you can
+              see it.
+            </Muted>
+            {root && <HiddenRating rating={root.rating} />}
+          </Card>
+        )}
         {data.archetype && (
           <Body>
             <Text style={{ color: colors.neon, fontWeight: "700" }}>{data.archetype.name}. </Text>
@@ -71,14 +86,26 @@ export default function RatingsScreen() {
         {data.summary && <Muted>{data.summary}</Muted>}
         {root && (
           <View style={styles.potential}>
-            <Label>Overall potential</Label>
+            <Label>{mode === "growth" ? "Overall growth target" : "Overall potential"}</Label>
             <GoalEditor node={root} />
           </View>
         )}
         <Muted style={{ fontSize: 13, color: colors.court500 }}>
-          Tap any attribute to see why it&apos;s rated that way.
+          {mode === "growth"
+            ? "Tap any attribute to see where its gains came from."
+            : "Tap any attribute to see why it's rated that way."}
         </Muted>
       </Section>
+      <Pressable onPress={() => router.push("/scouting-report")}>
+        <Card style={{ gap: 2 }}>
+          <Text style={{ color: colors.neon, fontSize: 16, fontWeight: "600" }}>
+            {talk.scoutingReport} →
+          </Text>
+          <Muted style={{ fontSize: 13 }}>
+            {talk.scoutingReportTagline}, and how your rating is adapting to it.
+          </Muted>
+        </Card>
+      </Pressable>
 
       <Charts ratings={data} />
       <BadgesSection />
@@ -97,6 +124,7 @@ export default function RatingsScreen() {
               />
             </Pressable>
           </Link>
+          <HiddenRating rating={c.rating} />
           <View style={styles.catFoot}>
             <GoalEditor node={c} />
             <TextLink href={{ pathname: "/node/[id]", params: { id: c.id } }}>Details →</TextLink>
@@ -157,6 +185,7 @@ function AttributeRow({ node }: { node: RatedNodeDto }) {
 function Detail({ node }: { node: RatedNodeDto }) {
   return (
     <View style={styles.detail}>
+      <HiddenRating rating={node.rating} />
       {node.rationale && <Body style={{ fontSize: 15 }}>{node.rationale}</Body>}
       <TextLink href={{ pathname: "/node/[id]", params: { id: node.id } }}>
         History, changes and linked habits →

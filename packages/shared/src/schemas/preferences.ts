@@ -190,8 +190,9 @@ export function parsePreferences(raw: unknown): Preferences {
 export const DEFAULT_PREFERENCES: Preferences = parsePreferences({});
 
 /**
- * PATCH /me body: any top-level keys, each replaced whole (send the full `features` or `today`
- * object). Strict here so typos are rejected rather than silently stored.
+ * PATCH /me body: any top-level keys, each replaced whole except `features`, which merges per
+ * feature so two devices toggling different features can't overwrite each other. `today` is
+ * replaced whole (send the full object). Strict here so typos are rejected rather than stored.
  */
 export const preferencesPatchSchema = z
   .object({
@@ -212,9 +213,12 @@ export const preferencesPatchSchema = z
     showApiStatus: z.boolean(),
     startPage: z.enum(START_PAGES),
     sportsTalk: z.enum(SPORTS_TALK_LEVELS),
-    features: z.object(
-      Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<Feature, z.ZodBoolean>,
-    ),
+    features: z
+      .object(
+        Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<Feature, z.ZodBoolean>,
+      )
+      .partial()
+      .strict(),
     today: z.object({
       layout: z.enum(["columns", "stack"]),
       greeting: z.boolean(),
@@ -228,3 +232,19 @@ export const preferencesPatchSchema = z
   .partial()
   .strict();
 export type PreferencesPatch = z.infer<typeof preferencesPatchSchema>;
+
+/** Two queued patches as one: later keys win, and `features` merges per feature. */
+export function mergePreferencesPatches(
+  a: PreferencesPatch,
+  b: PreferencesPatch,
+): PreferencesPatch {
+  const merged = { ...a, ...b };
+  if (a.features && b.features) merged.features = { ...a.features, ...b.features };
+  return merged;
+}
+
+/** Preferences with a patch applied, the way the API stores it. */
+export function applyPreferencesPatch(prefs: Preferences, patch: PreferencesPatch): Preferences {
+  const { features, ...rest } = patch;
+  return { ...prefs, ...rest, features: { ...prefs.features, ...features } };
+}

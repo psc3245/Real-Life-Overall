@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyPreferencesPatch,
   DEFAULT_PREFERENCES,
+  mergePreferencesPatches,
   normalizeTodayWidgets,
   parsePreferences,
   preferencesPatchSchema,
@@ -53,9 +55,25 @@ describe("preferences", () => {
   it("reject unknown keys in a patch", () => {
     expect(preferencesPatchSchema.safeParse({ theme: "oled" }).success).toBe(true);
     expect(preferencesPatchSchema.safeParse({ them: "oled" }).success).toBe(false);
-    // Top-level keys replace the stored value whole, so features must be complete.
-    expect(preferencesPatchSchema.safeParse({ features: { goals: false } }).success).toBe(false);
+    // Features merge per feature, so a patch may name just one, but no unknown ones.
+    expect(preferencesPatchSchema.safeParse({ features: { goals: false } }).success).toBe(true);
+    expect(preferencesPatchSchema.safeParse({ features: { gone: false } }).success).toBe(false);
     const features = { ...DEFAULT_PREFERENCES.features, goals: false };
     expect(preferencesPatchSchema.safeParse({ features }).success).toBe(true);
+  });
+
+  it("merge queued patches and apply them feature by feature", () => {
+    const merged = mergePreferencesPatches(
+      { theme: "oled", features: { goals: false } },
+      { features: { habits: false } },
+    );
+    expect(merged).toEqual({ theme: "oled", features: { goals: false, habits: false } });
+    const prefs = applyPreferencesPatch(DEFAULT_PREFERENCES, merged);
+    expect(prefs.theme).toBe("oled");
+    expect(prefs.features).toEqual({
+      ...DEFAULT_PREFERENCES.features,
+      goals: false,
+      habits: false,
+    });
   });
 });

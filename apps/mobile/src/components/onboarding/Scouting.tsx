@@ -18,6 +18,7 @@ import {
   useSaveAnswers,
   useSubmitQuestionnaire,
 } from "@/api/onboarding";
+import { useTalk } from "@/lib/talk";
 import { colors, fonts, space } from "@/lib/theme";
 import { Chip, NumberField } from "../controls";
 import { Body, Button, Card, ErrorNote, Field, Label, Muted } from "../ui";
@@ -47,11 +48,12 @@ function ScoutingIntro({
   state: OnboardingStateDto;
   onEditBuild: () => void;
 }) {
+  const talk = useTalk();
   const generate = useGenerateQuestionnaire();
   const attributes = leafIds(state.nodes).length;
   return (
     <Card style={{ gap: space.md }}>
-      <Text style={styles.big}>Scouting report</Text>
+      <Text style={styles.big}>{talk.scouting}</Text>
       <Muted>
         You&apos;ll get questions written for your {attributes} attributes, about what you&apos;ve
         actually been doing lately. Your answers set your starting ratings. It takes about 5–10
@@ -61,7 +63,7 @@ function ScoutingIntro({
         Generating the questions locks your build and weights for Season {state.season.label}.
       </Muted>
       <Button
-        title={generate.isPending ? "Writing your questions…" : "Start scouting"}
+        title={generate.isPending ? "Writing your questions…" : talk.startScouting}
         disabled={generate.isPending}
         onPress={() => generate.mutate()}
       />

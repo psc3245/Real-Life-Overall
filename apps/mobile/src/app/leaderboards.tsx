@@ -1,9 +1,11 @@
 import {
   LEADERBOARD_BOARDS,
   LEADERBOARD_MIN_RECAPPED_DAYS,
+  SEASON_MODES,
   type LeaderboardDto,
   type LeaderboardEntryDto,
   type LeaderboardScope,
+  type SeasonMode,
 } from "@rlo/shared";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -11,17 +13,24 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLeaderboard } from "@/api/social";
 import { Chip, Segmented } from "@/components/controls";
 import { Card, ErrorNote, Label, Loading, Muted, Screen, TextLink } from "@/components/ui";
-import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { formatScore, scoreColor } from "@/components/score";
+import { useTalk } from "@/lib/talk";
+import { colors, fonts, space } from "@/lib/theme";
+import { FeatureGate } from "@/components/FeatureGate";
 
-export default function LeaderboardsScreen() {
+function LeaderboardsScreen() {
   const [scope, setScope] = useState<LeaderboardScope>("friends");
   const [board, setBoard] = useState("overall");
-  const leaderboard = useLeaderboard(scope, board);
+  // Rating and growth boards are separate (DESIGN.md §4.6); no choice means your own mode's.
+  const [chosenMode, setMode] = useState<SeasonMode | undefined>();
+  const leaderboard = useLeaderboard(scope, board, chosenMode);
+  const mode = leaderboard.data?.mode ?? chosenMode ?? "rating";
+  const talk = useTalk();
 
   return (
     <Screen
       eyebrow={leaderboard.data ? `Season ${leaderboard.data.seasonLabel}` : "Social"}
-      title="Leaderboards"
+      title={talk.nav.leaderboards}
       onRefresh={() => leaderboard.refetch()}
     >
       <Segmented
@@ -32,6 +41,15 @@ export default function LeaderboardsScreen() {
         ]}
         value={scope}
         onChange={setScope}
+      />
+      <Segmented
+        label="Mode"
+        options={SEASON_MODES.map((m) => ({
+          value: m,
+          label: m === "growth" ? talk.growthMode : talk.ratingMode,
+        }))}
+        value={mode}
+        onChange={setMode}
       />
       <ScrollView
         horizontal
@@ -52,8 +70,21 @@ export default function LeaderboardsScreen() {
       <ErrorNote error={leaderboard.error} onRetry={() => void leaderboard.refetch()} />
       {leaderboard.data && (
         <>
-          {scope === "global" && !leaderboard.data.me && (
-            <GlobalStatus status={leaderboard.data.globalStatus} />
+          {leaderboard.data.myMode && leaderboard.data.myMode !== leaderboard.data.mode ? (
+            <Card style={{ gap: space.xs }}>
+              <Muted>
+                You&apos;re playing{" "}
+                {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} this
+                season, so you rank on the{" "}
+                {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} board.
+              </Muted>
+              <Pressable onPress={() => setMode(leaderboard.data.myMode!)} hitSlop={6}>
+                <Text style={{ color: colors.neon }}>Show that board →</Text>
+              </Pressable>
+            </Card>
+          ) : (
+            scope === "global" &&
+            !leaderboard.data.me && <GlobalStatus status={leaderboard.data.globalStatus} />
           )}
           <Board data={leaderboard.data} />
         </>
@@ -80,19 +111,19 @@ function Board({ data }: { data: LeaderboardDto }) {
   return (
     <View style={{ gap: space.sm }}>
       {data.entries.map((e) => (
-        <EntryRow key={e.username} entry={e} />
+        <EntryRow key={e.username} entry={e} mode={data.mode} />
       ))}
       {meBelow && (
         <>
           <Text style={{ textAlign: "center", color: colors.court700 }}>⋯</Text>
-          <EntryRow entry={data.me!} />
+          <EntryRow entry={data.me!} mode={data.mode} />
         </>
       )}
     </View>
   );
 }
 
-function EntryRow({ entry }: { entry: LeaderboardEntryDto }) {
+function EntryRow({ entry, mode }: { entry: LeaderboardEntryDto; mode: SeasonMode }) {
   return (
     <Pressable
       onPress={() =>
@@ -113,8 +144,8 @@ function EntryRow({ entry }: { entry: LeaderboardEntryDto }) {
             {entry.provisional && " · PROVISIONAL"}
           </Muted>
         </View>
-        <Text style={[styles.value, { color: tierColor(entry.value) }]}>
-          {entry.value.toFixed(1)}
+        <Text style={[styles.value, { color: scoreColor(mode, entry.value) }]}>
+          {formatScore(mode, entry.value)}
         </Text>
       </Card>
     </Pressable>
@@ -145,7 +176,7 @@ function GlobalStatus({ status }: { status: LeaderboardDto["globalStatus"] }) {
         <Muted key={s}>• {s}</Muted>
       ))}
       {(status.visibility !== "public" || !status.optedIn) && (
-        <TextLink href="/me">Sharing settings →</TextLink>
+        <TextLink href="/settings">Sharing settings →</TextLink>
       )}
     </Card>
   );
@@ -170,3 +201,11 @@ const styles = StyleSheet.create({
   },
   value: { fontFamily: fonts.heavy, fontSize: 28 },
 });
+
+export default function GatedLeaderboardsScreen() {
+  return (
+    <FeatureGate feature="leaderboards">
+      <LeaderboardsScreen />
+    </FeatureGate>
+  );
+}

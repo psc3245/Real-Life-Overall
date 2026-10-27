@@ -1,5 +1,7 @@
 import {
+  applyPreferencesPatch,
   DEFAULT_PREFERENCES,
+  mergePreferencesPatches,
   parsePreferences,
   type Feature,
   type Preferences,
@@ -96,10 +98,12 @@ export function useSetPreferences() {
   const queryClient = useQueryClient();
   return useCallback(
     (patch: PreferencesPatch) => {
+      // A /me refetch landing mid-edit would overwrite the optimistic copy; stop it first.
+      void queryClient.cancelQueries({ queryKey: queryKeys.me });
       queryClient.setQueryData<Me>(queryKeys.me, (me) =>
-        me ? { ...me, preferences: { ...me.preferences, ...patch } } : me,
+        me ? { ...me, preferences: applyPreferencesPatch(me.preferences, patch) } : me,
       );
-      pending = { ...pending, ...patch };
+      pending = mergePreferencesPatches(pending, patch);
       setStatus("saving");
       clearTimeout(timer);
       timer = setTimeout(() => void flush(queryClient), 400);

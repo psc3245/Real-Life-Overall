@@ -44,7 +44,7 @@ export default function ProfileScreen() {
             </Text>
           </Muted>
           {p.visibility !== "private" && <ShareLink username={p.username} />}
-          <TextLink href="/me">Sharing settings →</TextLink>
+          <TextLink href="/settings">Sharing settings →</TextLink>
         </Card>
       )}
       {p.card ? (

@@ -11,6 +11,7 @@ import {
 import { Chip } from "@/components/controls";
 import { Chat } from "@/components/onboarding/Chat";
 import { RevealStep } from "@/components/onboarding/Reveal";
+import { useTalk } from "@/lib/talk";
 import { ScoutingStep } from "@/components/onboarding/Scouting";
 import { TreeBuilder } from "@/components/onboarding/TreeBuilder";
 import { WeightsStep } from "@/components/onboarding/WeightsStep";
@@ -40,6 +41,7 @@ const STAGE_TO_STEP: Record<string, StepKey> = {
 
 /** Create your player: discover → build → weights → scouting → reveal (as on the web). */
 export default function OnboardingScreen() {
+  const talk = useTalk();
   const onboarding = useOnboarding();
   const saveTree = useSaveTree();
   /** Lets the player revisit an earlier step; null follows the server's stage. */
@@ -76,7 +78,7 @@ export default function OnboardingScreen() {
           {STEPS.map((s, i) => (
             <Chip
               key={s.key}
-              label={`${i + 1} ${s.label}`}
+              label={`${i + 1} ${s.key === "questionnaire" ? talk.scouting : s.key === "reveal" ? talk.reveal : s.label}`}
               selected={s.key === step}
               disabled={!reachable.includes(s.key) || s.key === step}
               onPress={() => setViewing(s.key)}
@@ -128,6 +130,7 @@ const DRAFTING = [
 
 /** Step 1: get to know the player, then let the scout draft their rating tree. */
 function DiscoveryStep({ state }: { state: OnboardingStateDto }) {
+  const talk = useTalk();
   const chat = useDiscovery();
   const draft = useDraftTemplate();
   const skip = useSkipDiscovery();
@@ -154,7 +157,7 @@ function DiscoveryStep({ state }: { state: OnboardingStateDto }) {
   return (
     <View style={{ gap: space.lg }}>
       <Muted>
-        First, a short conversation so the scout understands what matters in your life. Then it
+        First, a short conversation so {talk.scout} understands what matters in your life. Then it
         drafts your rating tree for you to edit.
       </Muted>
       {done ? (

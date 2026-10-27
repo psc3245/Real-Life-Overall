@@ -103,7 +103,18 @@ describe("usernames", () => {
     expect(me.preferences.features.goals).toBe(false);
     expect(me.preferences.features.habits).toBe(true);
 
-    for (const bad of [{ theme: "neon" }, { colour: "red" }, { features: { goals: false } }]) {
+    // A single feature merges into the rest (another device's toggle isn't overwritten).
+    const merged = await body<MeDto>(
+      await t.request("/me", {
+        method: "PATCH",
+        ...json({ preferences: { features: { habits: false } } }),
+      }),
+    );
+    expect(merged.preferences.features.goals).toBe(false);
+    expect(merged.preferences.features.habits).toBe(false);
+    expect(merged.preferences.features.charts).toBe(true);
+
+    for (const bad of [{ theme: "neon" }, { colour: "red" }, { features: { gone: false } }]) {
       const rejected = await t.request("/me", { method: "PATCH", ...json({ preferences: bad }) });
       expect(rejected.status, JSON.stringify(bad)).toBe(400);
     }

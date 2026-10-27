@@ -1,4 +1,10 @@
-import { alignCategories, type ComparisonRow, type ProfileDto } from "@rlo/shared";
+import {
+  alignCategories,
+  type ComparisonRow,
+  type ProfileDto,
+  type PublicCardDto,
+  type SeasonMode,
+} from "@rlo/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ApiError } from "@/api/client";
@@ -6,10 +12,17 @@ import { useMe } from "@/api/hooks";
 import { useProfile } from "@/api/social";
 import { OvrBadge } from "@/components/ratings";
 import { Card, ErrorNote, Loading, Muted, Screen } from "@/components/ui";
-import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { formatScore, scoreColor, ScoreProvider, useScore } from "@/components/score";
+import { useTalk } from "@/lib/talk";
+import { colors, fonts, space } from "@/lib/theme";
+import { FeatureGate } from "@/components/FeatureGate";
+
+/** A card's numbers for the comparison's mode: growth is on every card, ratings only on some. */
+const scoresIn = (card: PublicCardDto, mode: SeasonMode) =>
+  mode === "growth" ? card.growth : { overall: card.overall, categories: card.categories };
 
 /** Side-by-side cards: you on the left, them on the right. */
-export default function CompareScreen() {
+function CompareScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
   const me = useMe();
   const mine = useProfile(me.data?.username ?? "", Boolean(me.data));
@@ -43,27 +56,44 @@ export default function CompareScreen() {
     );
   }
 
-  const rows = alignCategories(mine.data.card.categories, theirs.data.card.categories);
+  // Ratings compare only when both play for rating; otherwise both sides show growth.
+  const mode: SeasonMode =
+    mine.data.card.mode === "rating" && theirs.data.card.mode === "rating" ? "rating" : "growth";
+  const left = scoresIn(mine.data.card, mode);
+  const right = scoresIn(theirs.data.card, mode);
+  const rows = alignCategories(left.categories, right.categories);
   return (
-    <Screen eyebrow="Compare" title="Head to head">
-      <View style={styles.sides}>
-        <Side profile={mine.data} align="left" />
-        <Text style={styles.vs}>VS</Text>
-        <Side profile={theirs.data} align="right" />
-      </View>
-      <View style={{ gap: space.lg }}>
-        {rows.map((row) => (
-          <Row key={row.name} row={row} />
-        ))}
-      </View>
-      <Muted style={{ textAlign: "center", fontSize: 12, color: colors.court500 }}>
-        Template categories line up even when renamed; custom ones match by name.
-      </Muted>
-    </Screen>
+    <ScoreProvider mode={mode} values={rows.flatMap((r) => [r.mine, r.theirs])}>
+      <Screen eyebrow="Compare" title="Head to head">
+        <View style={styles.sides}>
+          <Side profile={mine.data} overall={left.overall} align="left" />
+          <Text style={styles.vs}>VS</Text>
+          <Side profile={theirs.data} overall={right.overall} align="right" />
+        </View>
+        <View style={{ gap: space.lg }}>
+          {rows.map((row) => (
+            <Row key={row.name} row={row} />
+          ))}
+        </View>
+        <Muted style={{ textAlign: "center", fontSize: 12, color: colors.court500 }}>
+          Template categories line up even when renamed; custom ones match by name.
+          {mode === "growth" && " Compared on points gained this season."}
+        </Muted>
+      </Screen>
+    </ScoreProvider>
   );
 }
 
-function Side({ profile, align }: { profile: ProfileDto; align: "left" | "right" }) {
+function Side({
+  profile,
+  overall,
+  align,
+}: {
+  profile: ProfileDto;
+  overall: number;
+  align: "left" | "right";
+}) {
+  const talk = useTalk();
   const card = profile.card!;
   return (
     <Pressable
@@ -72,12 +102,12 @@ function Side({ profile, align }: { profile: ProfileDto; align: "left" | "right"
       }
       style={[styles.side, { alignItems: align === "left" ? "flex-start" : "flex-end" }]}
     >
-      <OvrBadge value={card.overall} size={56} />
+      <OvrBadge value={overall} size={56} />
       <Text style={[styles.name, { textAlign: align }]} numberOfLines={1}>
         {profile.displayName}
       </Text>
       <Text style={[styles.archetype, { textAlign: align }]} numberOfLines={1}>
-        {card.archetype ?? "Unranked"}
+        {card.archetype ?? talk.unranked}
       </Text>
     </Pressable>
   );
@@ -98,14 +128,15 @@ function Row({ row }: { row: ComparisonRow }) {
 }
 
 function Value({ value, align = "left" }: { value: number | null; align?: "left" | "right" }) {
+  const { mode } = useScore();
   return (
     <Text
       style={[
         styles.value,
-        { textAlign: align, color: value == null ? colors.court700 : tierColor(value) },
+        { textAlign: align, color: value == null ? colors.court700 : scoreColor(mode, value) },
       ]}
     >
-      {value == null ? "—" : value.toFixed(1)}
+      {value == null ? "—" : formatScore(mode, value)}
     </Text>
   );
 }
@@ -119,16 +150,25 @@ function Bar({
   side: "left" | "right";
   label: string;
 }) {
+  const { mode, max } = useScore();
   return (
     <View
       style={[styles.track, { alignItems: side === "left" ? "flex-end" : "flex-start" }]}
       accessible
       accessibilityRole="progressbar"
       accessibilityLabel={label}
-      accessibilityValue={{ min: 0, max: 100, now: value ?? 0 }}
+      accessibilityValue={{ min: 0, max, now: value ?? 0 }}
     >
       {value != null && (
-        <View style={[styles.fill, { width: `${value}%`, backgroundColor: tierColor(value) }]} />
+        <View
+          style={[
+            styles.fill,
+            {
+              width: `${Math.min(100, (value / max) * 100)}%`,
+              backgroundColor: scoreColor(mode, value),
+            },
+          ]}
+        />
       )}
     </View>
   );
@@ -165,3 +205,11 @@ const styles = StyleSheet.create({
   track: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.court700 },
   fill: { height: "100%", borderRadius: 4 },
 });
+
+export default function GatedCompareScreen() {
+  return (
+    <FeatureGate feature="friends">
+      <CompareScreen />
+    </FeatureGate>
+  );
+}

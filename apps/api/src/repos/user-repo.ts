@@ -84,10 +84,9 @@ export async function update(
     .update(users)
     .set({
       ...rest,
-      // Shallow merge: each top-level key in the patch replaces the stored one.
-      ...(preferences && {
-        preferences: sql`${users.preferences} || ${JSON.stringify(preferences)}::jsonb`,
-      }),
+      // Each top-level key in the patch replaces the stored one, except `features`, which merges
+      // per feature in the same statement so concurrent toggles from two devices both land.
+      ...(preferences && { preferences: mergePreferencesSql(preferences) }),
     })
     .where(eq(users.id, id))
     .returning(publicUserColumns);
@@ -151,4 +150,11 @@ export async function createForAuth(
     if (existing) return existing;
   }
   throw new Error("Could not allocate a username");
+}
+
+function mergePreferencesSql(patch: PreferencesPatch) {
+  const { features, ...rest } = patch;
+  const merged = sql`coalesce(${users.preferences}, '{}'::jsonb) || ${JSON.stringify(rest)}::jsonb`;
+  if (!features) return merged;
+  return sql`${merged} || jsonb_build_object('features', coalesce(${users.preferences} -> 'features', '{}'::jsonb) || ${JSON.stringify(features)}::jsonb)`;
 }

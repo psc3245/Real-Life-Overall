@@ -15,6 +15,7 @@ import { shortDate } from "@/lib/format";
 import { colors, fonts, space } from "@/lib/theme";
 import { DayStrip } from "./DayStrip";
 import { Delta } from "./Delta";
+import { formatScore, useScore } from "./score";
 import { StatGrid, StatTile } from "./StatTile";
 import { Body, Card, Label, Muted, TextLink } from "./ui";
 
@@ -31,6 +32,7 @@ export function WeekBreakdown({
   today: string;
   nodes: RatedNodeDto[];
 }) {
+  const { mode } = useScore();
   // Activity and history are "last N days"; reach back to the day before the week.
   const span = Math.min(MAX_HISTORY_DAYS, daysBetween(addDays(week.start, -1), today) + 1);
   const activity = useActivity(span);
@@ -89,7 +91,7 @@ export function WeekBreakdown({
         />
         <StatTile
           label="Overall"
-          value={overall ? overall.to.toFixed(1) : "—"}
+          value={overall ? formatScore(mode, overall.to) : "—"}
           detail={overall ? <Delta value={overall.delta} /> : undefined}
         />
       </StatGrid>
@@ -107,7 +109,7 @@ export function WeekBreakdown({
                 {m ? (
                   <>
                     <Muted style={{ fontSize: 13, color: colors.court500 }}>
-                      {m.from.toFixed(1)} → {m.to.toFixed(1)}
+                      {formatScore(mode, m.from)} → {formatScore(mode, m.to)}
                     </Muted>
                     <Delta value={m.delta} />
                   </>

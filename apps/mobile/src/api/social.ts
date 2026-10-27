@@ -5,6 +5,8 @@ import type {
   LeaderboardScope,
   ProfileDto,
   ProfileVisibility,
+  SeasonMode,
+  UnitSystem,
 } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
@@ -26,6 +28,9 @@ export interface ProfileSettings {
   username?: string;
   profileVisibility?: ProfileVisibility;
   leaderboardOptIn?: boolean;
+  unitSystem?: UnitSystem;
+  trackWeight?: boolean;
+  trackHeight?: boolean;
 }
 
 export function useUpdateProfile() {
@@ -38,6 +43,9 @@ export function useUpdateProfile() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["profile"] }),
         queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
+        // Units and body tracking change the day log and the body page.
+        queryClient.invalidateQueries({ queryKey: ["day"] }),
+        queryClient.invalidateQueries({ queryKey: ["body"] }),
       ]);
     },
   });
@@ -62,14 +70,21 @@ export function useFriendAction() {
         queryClient.invalidateQueries({ queryKey: friendsKey }),
         queryClient.invalidateQueries({ queryKey: ["profile"] }),
         queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
+        // Units and body tracking change the day log and the body page.
+        queryClient.invalidateQueries({ queryKey: ["day"] }),
+        queryClient.invalidateQueries({ queryKey: ["body"] }),
       ]);
     },
   });
 }
 
-export function useLeaderboard(scope: LeaderboardScope, board: string) {
+/** Without a mode, the server picks your own season's mode. */
+export function useLeaderboard(scope: LeaderboardScope, board: string, mode?: SeasonMode) {
   return useQuery({
-    queryKey: ["leaderboard", scope, board],
-    queryFn: () => api<LeaderboardDto>(`/leaderboards?scope=${scope}&board=${board}`),
+    queryKey: ["leaderboard", scope, board, mode ?? "mine"],
+    queryFn: () =>
+      api<LeaderboardDto>(
+        `/leaderboards?scope=${scope}&board=${board}${mode ? `&mode=${mode}` : ""}`,
+      ),
   });
 }

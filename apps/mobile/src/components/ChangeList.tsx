@@ -1,10 +1,10 @@
-import type { ChangeFeedItemDto } from "@rlo/shared";
+import { growthDelta, type ChangeFeedItemDto } from "@rlo/shared";
 import { Link, router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { ChangeSource } from "@/api/ratings";
 import { dayLabel } from "@/lib/format";
 import { colors, space } from "@/lib/theme";
-import { Delta } from "./Delta";
+import { ChangeDelta } from "./Delta";
 import { Card, Muted } from "./ui";
 
 export const SOURCE_LABEL: Record<ChangeSource, string> = {
@@ -27,7 +27,11 @@ export function ChangeList({
     <Card style={{ padding: 0 }}>
       {items.map((c, i) => (
         <View key={c.id} style={[styles.row, i > 0 && styles.border]}>
-          <Delta value={c.delta} style={{ width: 52, fontSize: 18 }} />
+          <ChangeDelta
+            delta={c.delta}
+            growth={growthDelta(c)}
+            style={{ width: 52, fontSize: 18 }}
+          />
           <View style={{ flex: 1 }}>
             <Link href={{ pathname: "/node/[id]", params: { id: c.nodeId } }} style={styles.name}>
               {c.nodeName}
