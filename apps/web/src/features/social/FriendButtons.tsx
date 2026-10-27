@@ -2,6 +2,7 @@ import type { FriendshipState } from "@rlo/shared";
 import { Link } from "react-router";
 import { useFriendAction } from "../../api/social";
 import { Button } from "../../components/Button";
+import { Menu, MenuButton } from "../../components/Menu";
 import { ErrorNote } from "../onboarding/ErrorNote";
 
 /** The friend actions for one player, matching where the two of you stand. */
@@ -43,7 +44,6 @@ export function FriendButtons({
             </Button>
           </>
         )}
-        {state === "friends" && <span className="text-sm text-neon">✓ Friends</span>}
         {canCompare && (
           <Link
             to={`/compare/${username}`}
@@ -52,10 +52,17 @@ export function FriendButtons({
             Compare
           </Link>
         )}
+        {/* Removing is rare and destructive, so it sits behind the Friends menu. */}
         {state === "friends" && (
-          <Button variant="danger" disabled={busy} onClick={() => run("remove")}>
-            Remove
-          </Button>
+          <Menu
+            align="end"
+            triggerClassName="rounded-lg border border-neon/50 px-3 py-2 text-sm text-neon hover:bg-neon/10"
+            trigger="✓ Friends"
+          >
+            <MenuButton danger onSelect={() => !busy && run("remove")}>
+              Remove friend
+            </MenuButton>
+          </Menu>
         )}
       </div>
       <ErrorNote error={action.error} />

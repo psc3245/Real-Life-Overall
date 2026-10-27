@@ -48,9 +48,7 @@ export function BodyPage() {
             </p>
           )}
           <DebugJson label="body" data={body.data} />
-          <div className="rounded-xl border border-court-700 bg-court-900/40 p-5">
-            <TrackingSettings me={me.data} />
-          </div>
+          <TrackingSettings me={me.data} />
         </>
       )}
     </div>
