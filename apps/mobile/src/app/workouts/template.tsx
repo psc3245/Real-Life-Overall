@@ -1,5 +1,5 @@
 import type { WorkoutTemplateDto } from "@rlo/shared";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { useCreateTemplate, useExercises, useTemplates, useUpdateTemplate } from "@/api/workouts";
@@ -52,7 +52,8 @@ function TemplateForm({ template }: { template?: WorkoutTemplateDto }) {
   };
 
   return (
-    <Screen eyebrow={template ? "Edit template" : "New template"}>
+    <Screen>
+      <Stack.Screen options={{ title: template ? "Edit template" : "New template" }} />
       <FormRow label="Name">
         <Field
           value={name}

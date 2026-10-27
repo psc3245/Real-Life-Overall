@@ -11,7 +11,7 @@ import {
   type ReportOptions,
   type ReportRange,
 } from "@rlo/shared";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useState } from "react";
 import { ActionSheetIOS, Pressable, StyleSheet, Text, View } from "react-native";
@@ -119,7 +119,8 @@ function ReportForm({ report }: { report?: ReportDto }) {
   };
 
   return (
-    <Screen eyebrow={report ? "Edit report" : "New report"}>
+    <Screen>
+      <Stack.Screen options={{ title: report ? "Edit report" : "New report" }} />
       <FormRow label="Name">
         <Field
           value={name}

@@ -10,7 +10,7 @@ import {
   type ObjectiveDto,
   type ObjectiveSource,
 } from "@rlo/shared";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useDay, useHabits } from "@/api/days";
@@ -124,7 +124,8 @@ function Editor({
   };
 
   return (
-    <Screen eyebrow={objective ? "Edit goal" : "New goal"}>
+    <Screen>
+      <Stack.Screen options={{ title: objective ? "Edit goal" : "New goal" }} />
       <FormRow label="Goal">
         <Field
           value={name}

@@ -13,6 +13,18 @@ const PAD = { top: 10, right: 10, bottom: 22, left: 40 };
 export const fmtChart = (v: number) =>
   Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : String(Math.round(v * 100) / 100);
 
+/** Widens lo..hi to two round steps so the three axis ticks read as clean numbers. */
+function roundRange(lo: number, hi: number) {
+  const raw = (hi - lo) / 2;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  for (const m of [1, 2, 2.5, 5, 10, 20]) {
+    const step = m * mag;
+    const start = Math.floor(lo / step) * step;
+    if (start + 2 * step >= hi) return { lo: start, hi: start + 2 * step };
+  }
+  return { lo, hi };
+}
+
 /**
  * Any set of metrics as one chart (the web's MetricChart): a scale per unit, plus optional
  * average and trend lines. Touch and drag to read values.
@@ -67,7 +79,7 @@ export function MetricChart({
       const pad = Math.max((hi - lo) * 0.08, hi === lo ? 1 : 0);
       if (config.style === "line") lo -= pad;
       hi += pad;
-      return [a.id, { lo, hi }] as const;
+      return [a.id, roundRange(lo, hi)] as const;
     }),
   );
 

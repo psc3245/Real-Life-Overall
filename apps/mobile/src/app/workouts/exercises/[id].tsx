@@ -85,7 +85,10 @@ function ExerciseScreen() {
       title={e.name}
       onRefresh={() => detail.refetch()}
     >
-      <ChartButton ids={[`exercise:${e.id}`]} config={{ range: "all", trend: true }} />
+      {/* The chart catalog only lists exercises from finished workouts. */}
+      {e.timesDone > 0 && (
+        <ChartButton ids={[`exercise:${e.id}`]} config={{ range: "all", trend: true }} />
+      )}
       {recordKeys.length > 0 ? (
         <StatGrid>
           {recordKeys.map((k) => (
