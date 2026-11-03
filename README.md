@@ -124,22 +124,25 @@ is one Worker serving the web app and the API on the same origin.
 
 1. **Cloudflare:** run `npx wrangler login` in `apps/api`. Create an API token from the "Edit
    Cloudflare Workers" template, and note your account ID.
-2. **Neon:** create a separate project for production; staging can use the dev database. Never
-   run `seed:demo` against production, because the demo login is in this repo.
+2. **Neon:** production has its own project, linked with `neon.ts` (`neon init`, Postgres only:
+   sign-in stays on Better Auth). `neon env pull` writes its URLs to `.env.local` (gitignored):
+   `DATABASE_URL` is pooled, for the Worker; `DATABASE_URL_UNPOOLED` is direct, for migrations.
+   Staging can use the dev database. Never run `seed:demo` against production, because the demo
+   login is in this repo.
 3. **Worker secrets:** set these once per environment (`--env staging`, then `--env production`):
 
    ```bash
    npx wrangler secret put DATABASE_URL --env production
    ```
 
-   Repeat for `ANTHROPIC_API_KEY`, `BETTER_AUTH_SECRET` (new per environment:
+   `DATABASE_URL` is the pooled URL. Repeat for `ANTHROPIC_API_KEY`, `BETTER_AUTH_SECRET` (new per environment:
    `openssl rand -base64 32`), `RESEND_API_KEY` and `EMAIL_FROM`. Add `GOOGLE_CLIENT_ID` and
    `GOOGLE_CLIENT_SECRET` too if you use Google sign-in. The first `secret put` creates the Worker
    if it doesn't exist yet.
 4. **GitHub environments:** in **Settings → Environments**, create `staging` and `production`, and
    give each:
-   - secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `DATABASE_URL` (used for
-     migrations);
+   - secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `DATABASE_URL_UNPOOLED` (the
+     direct URL, used for migrations);
    - the variable `PUBLIC_URL`: the `https://` origin people load the app from. Production refuses to
      boot without it.
 

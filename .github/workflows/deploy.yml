@@ -1,7 +1,8 @@
 name: Deploy
 
 # development → staging, main → production. Each GitHub environment holds:
-#   secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, DATABASE_URL (that environment's Neon DB)
+#   secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and DATABASE_URL_UNPOOLED (that
+#   environment's direct Neon URL, no -pooler; the Worker's own DATABASE_URL is the pooled one)
 #   variables: PUBLIC_URL (the origin people load the app from, e.g. https://example.com)
 # The Worker's own secrets (ANTHROPIC_API_KEY, BETTER_AUTH_SECRET, RESEND_API_KEY, ...) are set
 # once with `wrangler secret put --env <env>`; see README.md.
@@ -31,10 +32,11 @@ jobs:
       - run: npm ci
       - run: npm run build -w @rlo/web
       # Migrations run before the new code goes live, so each one must keep the running version
-      # working (add columns and tables; drop them in a later deploy).
+      # working (add columns and tables; drop them in a later deploy). Over the direct connection:
+      # PgBouncer's transaction pooling breaks session-level work like migrations.
       - run: npm run db:migrate -w @rlo/api
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
       - run: >
           npx wrangler deploy --env "$WRANGLER_ENV"
           --var "PUBLIC_URL:$PUBLIC_URL" --var "CORS_ORIGINS:$PUBLIC_URL"
