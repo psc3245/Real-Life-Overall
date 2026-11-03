@@ -4,7 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
-import { LlmError } from "./llm/client";
+import { LlmBudgetError, LlmError } from "./llm/client";
 import { authFor, optionalUser, requireAdmin, requireUser } from "./middleware/auth";
 import { adminRoutes } from "./routes/admin";
 import { badgeRoutes } from "./routes/badges";
@@ -75,6 +75,7 @@ export function createApp(makeDeps: DepsFactory) {
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
+    if (err instanceof LlmBudgetError) return c.json({ error: err.message }, 429);
     if (err instanceof LlmError) {
       console.error(err, err.cause);
       return c.json({ error: err.message, retryable: true }, 502);

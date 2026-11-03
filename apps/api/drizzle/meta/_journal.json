@@ -190,6 +190,13 @@
       "when": 1793050126231,
       "tag": "0026_verify_existing_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793746344619,
+      "tag": "0027_auth_rate_limits",
+      "breakpoints": true
     }
   ]
 }

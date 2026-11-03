@@ -1,15 +1,47 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The top level is local development (`wrangler dev`). Deploys always name an environment
+  // (`--env staging` or `--env production`); see .github/workflows/deploy.yml.
   "name": "rlo-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   // Hourly at :05. Decay catches up for everyone; users whose local time is 4am get auto-recaps.
   "triggers": { "crons": ["5 * * * *"] },
+  "observability": { "enabled": true },
   "vars": {
     "APP_ENV": "development",
     "AUTH_MODE": "better-auth",
     "PUBLIC_URL": "http://localhost:5173",
     "CORS_ORIGINS": "http://localhost:5173",
+  },
+  "env": {
+    // Deployed from the development branch. PUBLIC_URL and CORS_ORIGINS come from the deploy
+    // (`--var`), so the URL lives in the GitHub environment rather than here.
+    "staging": {
+      // No cron: staging shouldn't spend LLM money recapping test accounts every night.
+      "triggers": { "crons": [] },
+      "assets": {
+        "directory": "../web/dist",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"],
+      },
+      "vars": {
+        "APP_ENV": "production",
+        "AUTH_MODE": "better-auth",
+      },
+    },
+    // Deployed from main. One Worker serves the web app and the API on one origin (DESIGN.md §8.5).
+    "production": {
+      "assets": {
+        "directory": "../web/dist",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"],
+      },
+      "vars": {
+        "APP_ENV": "production",
+        "AUTH_MODE": "better-auth",
+      },
+    },
   },
 }

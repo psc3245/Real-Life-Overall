@@ -26,6 +26,8 @@ export const envSchema = z.object({
   /** "provider:modelId", e.g. "anthropic:claude-haiku-5-5". */
   LLM_FAST_MODEL: optionalKey,
   LLM_SMART_MODEL: optionalKey,
+  /** Estimated LLM spend one user can trigger in a rolling 24h; the hourly job is exempt. */
+  LLM_USER_DAILY_BUDGET_USD: z.coerce.number().positive().default(1),
   ANTHROPIC_API_KEY: optionalKey,
   /** Required by Anthropic when the API key is not scoped to a single workspace. */
   ANTHROPIC_WORKSPACE_ID: optionalKey,
@@ -45,6 +47,10 @@ export function parseEnv(bindings: unknown): Env {
   }
   if (env.APP_ENV === "production" && env.AUTH_MODE === "better-auth" && !env.RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY is required in production (verification and reset emails)");
+  }
+  // Deploys pass PUBLIC_URL with --var; without it auth would issue cookies for localhost.
+  if (env.APP_ENV === "production" && !env.PUBLIC_URL.startsWith("https://")) {
+    throw new Error("PUBLIC_URL must be an https:// URL in production");
   }
   return env;
 }

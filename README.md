@@ -109,3 +109,56 @@ Edit `apps/api/src/db/schema.ts`, then generate a migration and commit it:
 ```bash
 npm run db:generate -w @rlo/api
 ```
+
+Deploys apply migrations before the new code goes live, so a migration must keep the running
+version working: add columns and tables, and drop old ones in a later deploy.
+
+## Deploying
+
+Branch off `development` and open PRs into it. Merging into `development` deploys **staging**;
+merging `development` into `main` deploys **production** (DESIGN.md §8.8). Both run through
+`.github/workflows/deploy.yml`: CI, web build, migrations, then `wrangler deploy`. Each environment
+is one Worker serving the web app and the API on the same origin.
+
+### One-time setup
+
+1. **Cloudflare:** run `npx wrangler login` in `apps/api`. Create an API token from the "Edit
+   Cloudflare Workers" template, and note your account ID.
+2. **Neon:** create a separate project for production; staging can use the dev database. Never
+   run `seed:demo` against production, because the demo login is in this repo.
+3. **Worker secrets:** set these once per environment (`--env staging`, then `--env production`):
+
+   ```bash
+   npx wrangler secret put DATABASE_URL --env production
+   ```
+
+   Repeat for `ANTHROPIC_API_KEY`, `BETTER_AUTH_SECRET` (new per environment:
+   `openssl rand -base64 32`), `RESEND_API_KEY` and `EMAIL_FROM`. Add `GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET` too if you use Google sign-in. The first `secret put` creates the Worker
+   if it doesn't exist yet.
+4. **GitHub environments:** in **Settings → Environments**, create `staging` and `production`, and
+   give each:
+   - secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `DATABASE_URL` (used for
+     migrations);
+   - the variable `PUBLIC_URL`: the `https://` origin people load the app from. Production refuses to
+     boot without it.
+
+   Limit `production`'s deployment branches to `main`.
+5. **Branch protection:** in **Settings → Rules**, add a ruleset for `main` that requires a pull
+   request (0 approvals), requires the `check` status, and blocks force pushes and deletion.
+6. **Domain and email:** add the domain to the production Worker (**Workers → Settings → Domains &
+   Routes**) and verify it in Resend. For Google sign-in, add the redirect URI
+   `<PUBLIC_URL>/api/auth/callback/google`.
+7. **Spend limit:** set a monthly limit in the Anthropic Console. The API also caps each user's daily
+   LLM spend (`LLM_USER_DAILY_BUDGET_USD`, default $1).
+
+To deploy by hand instead, build the web app first (`npm run build -w @rlo/web`), then in
+`apps/api`:
+
+```bash
+npx wrangler deploy --env staging --var PUBLIC_URL:https://your-staging-url --var CORS_ORIGINS:https://your-staging-url
+```
+
+On the free Workers plan, each request and cron run gets 10 ms of CPU. After the first deploy, check
+sign-in and the hourly job in **Workers → Observability**. If they exceed that limit, move to
+Workers Paid.
