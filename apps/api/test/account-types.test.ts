@@ -19,7 +19,10 @@ async function setup() {
   const t = await createTestApp();
   const me = await body<MeDto>(await t.request("/me"));
   const setRole = (role: "user" | "premium" | "dev" | "admin") =>
-    t.db.update(users).set({ role }).where(eq(users.id, me.id));
+    t.db
+      .update(users)
+      .set({ role, premiumSince: role === "user" ? null : new Date() })
+      .where(eq(users.id, me.id));
   await setRole("user");
   return { ...t, me, setRole };
 }
@@ -41,6 +44,7 @@ describe("account types", () => {
     });
     expect(links.status).toBe(403);
 
+    expect(free.premiumSince).toBeNull();
     await setRole("dev");
     const dev = await body<MeDto>(await request("/me"));
     expect(dev.locked).toEqual({});
@@ -135,5 +139,28 @@ describe("account types", () => {
     });
     expect(resolve.status).toBe(204);
     expect(await body<BugReportDto[]>(await request("/admin/bug-reports?status=open"))).toEqual([]);
+  });
+
+  it("starts the Premium clock when an admin upgrades someone, and stops it on Free", async () => {
+    const { request, setRole } = await setup();
+    await setRole("admin");
+    await request("/me", { user: "other" });
+    const other = (
+      await body<{ id: string; username: string }[]>(await request("/admin/users"))
+    ).find((u) => u.username === "other")!;
+    const patch = (role: string) =>
+      request(`/admin/users/${other.id}`, { method: "PATCH", ...json({ role }) });
+    const since = async () =>
+      (await body<MeDto>(await request("/me", { user: "other" }))).premiumSince;
+
+    await patch("user");
+    expect(await since()).toBeNull();
+    await patch("premium");
+    const started = await since();
+    expect(started).not.toBeNull();
+    await patch("dev"); // still premium: the clock keeps running
+    expect(await since()).toBe(started);
+    await patch("user");
+    expect(await since()).toBeNull();
   });
 });

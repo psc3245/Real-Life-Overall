@@ -73,6 +73,8 @@ export const users = pgTable("users", {
   trackHeight: boolean().notNull().default(false),
   /** "admin" unlocks /admin and debug panels (DESIGN.md §8.7). Set with `npm run set-role`. */
   role: userRole().notNull().default("user"),
+  /** When the account last became Premium, Dev or Admin; null on Free (DESIGN.md §8.9). */
+  premiumSince: timestamp({ withTimezone: true }),
   /** Personalization and configuration (DESIGN.md §7.9); read through `parsePreferences`. */
   preferences: jsonb().notNull().default({}),
   /** What the player wants out of life (DESIGN.md §5.8); read through `parseScoutingReport`. */

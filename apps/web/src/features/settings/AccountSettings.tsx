@@ -1,0 +1,57 @@
+import {
+  isPremiumRole,
+  premiumTenure,
+  PREMIUM_PERKS,
+  ROLE_DETAILS,
+  ROLE_LABELS,
+} from "@rlo/shared";
+import { Link } from "react-router";
+import type { Me } from "../../api/hooks";
+import { AccountBadge } from "../../components/Premium";
+import { SettingsCard } from "./controls";
+
+/** The account type, how long it's been Premium, and the way up for Free (DESIGN.md §8.9). */
+export function AccountSettings({ me, id }: { me: Me; id: string }) {
+  const premium = isPremiumRole(me.role);
+  const tenure = premiumTenure(me.premiumSince);
+  return (
+    <SettingsCard id={id} title="Account type">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-4 p-4 ${premium ? "bg-gradient-to-r from-tier-purple/15 to-transparent" : ""}`}
+      >
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <AccountBadge role={me.role} size="lg" />
+            {tenure && <span className="text-sm text-court-300">{tenure}</span>}
+          </div>
+          <p className="text-sm text-court-300">{ROLE_DETAILS[me.role]}</p>
+        </div>
+        {premium ? (
+          me.role !== "premium" && (
+            <span className="text-xs uppercase tracking-wider text-court-500">
+              {me.role === "dev" ? "Lifetime Premium" : "Premium included"}
+            </span>
+          )
+        ) : (
+          <Link
+            to="/upgrade"
+            className="rounded-lg bg-neon px-4 py-2 text-sm font-semibold uppercase tracking-wider text-court-950 hover:brightness-110"
+          >
+            Upgrade to Premium
+          </Link>
+        )}
+      </div>
+      <ul className="grid gap-x-6 gap-y-1.5 border-t border-court-800 p-4 text-sm sm:grid-cols-2">
+        {PREMIUM_PERKS.map((perk) => (
+          <li key={perk} className={`flex gap-2 ${premium ? "text-court-100" : "text-court-500"}`}>
+            <span aria-hidden="true" className={premium ? "text-tier-purple" : ""}>
+              {premium ? "✓" : "🔒"}
+            </span>
+            {perk}
+          </li>
+        ))}
+      </ul>
+      <p className="sr-only">Account type: {ROLE_LABELS[me.role]}</p>
+    </SettingsCard>
+  );
+}

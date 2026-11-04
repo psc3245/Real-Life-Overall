@@ -12,6 +12,8 @@ import { VISIBILITY_INFO } from "../social/visibility";
 import { fieldClass } from "../../components/form";
 import { DebugJson } from "../../components/debug/Debug";
 import { useHashScroll } from "../../components/useHashScroll";
+import { useActiveSection } from "../../components/SectionNav";
+import { AccountSettings } from "./AccountSettings";
 import { preferencesLink, type PreferencesTab } from "./PreferencesModal";
 import { SignInSettings } from "./PasswordSettings";
 import { Select, SettingBlock, SettingRow, SettingsCard, Toggle } from "./controls";
@@ -24,6 +26,7 @@ export function SettingsPage() {
   if (me.isError) return <ErrorNote error={me.error} />;
 
   const sections = [
+    { id: "account", label: "Account type" },
     { id: "profile", label: "Profile" },
     ...(auth.mode === "better-auth" ? [{ id: "security", label: "Sign-in & security" }] : []),
     { id: "sharing", label: "Sharing" },
@@ -35,21 +38,9 @@ export function SettingsPage() {
     <div className="mx-auto max-w-4xl space-y-6 pt-4">
       <h1 className="font-display text-4xl font-bold uppercase">Settings</h1>
       <div className="grid gap-6 md:grid-cols-[11rem_1fr] md:items-start">
-        <nav
-          aria-label="Settings sections"
-          className="-mx-4 flex gap-4 overflow-x-auto px-4 md:sticky md:top-20 md:mx-0 md:flex-col md:gap-1 md:px-0"
-        >
-          {sections.map((s) => (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              className="whitespace-nowrap rounded-lg text-sm text-court-300 hover:text-neon md:px-3 md:py-1.5 md:hover:bg-court-900"
-            >
-              {s.label}
-            </a>
-          ))}
-        </nav>
+        <SettingsNav sections={sections} />
         <div className="min-w-0 space-y-6">
+          <AccountSettings me={me.data} id="account" />
           <ProfileForm me={me.data} />
           {auth.mode === "better-auth" && <SignInSettings id="security" />}
           <SharingSection me={me.data} />
@@ -59,6 +50,32 @@ export function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** The side menu (a row on phones); the section in view is highlighted. */
+function SettingsNav({ sections }: { sections: { id: string; label: string }[] }) {
+  const [active, setActive] = useActiveSection(sections.map((s) => s.id));
+  return (
+    <nav
+      aria-label="Settings sections"
+      className="sticky top-0 z-10 -mx-4 flex gap-1 overflow-x-auto bg-court-950/90 px-4 py-2 backdrop-blur md:top-20 md:mx-0 md:flex-col md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none"
+    >
+      {sections.map((s) => {
+        const current = active === s.id;
+        return (
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            aria-current={current ? "location" : undefined}
+            onClick={() => setActive(s.id)}
+            className={`whitespace-nowrap rounded-lg border-l-2 px-3 py-1.5 text-sm transition ${current ? "border-neon bg-neon/10 font-semibold text-neon" : "border-transparent text-court-300 hover:bg-court-900 hover:text-court-100"}`}
+          >
+            {s.label}
+          </a>
+        );
+      })}
+    </nav>
   );
 }
 

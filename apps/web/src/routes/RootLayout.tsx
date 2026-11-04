@@ -14,6 +14,8 @@ import type { Feature, Preferences } from "@rlo/shared";
 import { useTalk } from "../lib/talk";
 import { OwnScoreProvider } from "../components/score";
 import { BugReportModal } from "../components/BugReportModal";
+import { AccountBadge } from "../components/Premium";
+import { premiumTenure } from "@rlo/shared";
 import { useState } from "react";
 
 const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
@@ -264,6 +266,9 @@ function AccountMenu({
   onSignOut?: () => void;
 }) {
   const [reporting, setReporting] = useState(false);
+  const { role, premium } = useAccount();
+  const me = useMe();
+  const tenure = premiumTenure(me.data?.premiumSince ?? null);
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
@@ -278,14 +283,34 @@ function AccountMenu({
         triggerClassName="rounded-full py-0.5 pr-2 pl-0.5 text-sm text-court-300 hover:text-court-100"
         trigger={
           <>
-            <span className="grid h-7 w-7 place-items-center rounded-full border border-neon/60 bg-neon/10 font-display text-xs font-semibold text-neon">
+            <span
+              className={`relative grid h-7 w-7 place-items-center rounded-full border font-display text-xs font-semibold ${premium ? "border-tier-purple bg-tier-purple/15 text-tier-purple shadow-[0_0_12px_-2px] shadow-tier-purple/70" : "border-neon/60 bg-neon/10 text-neon"}`}
+            >
               {initials}
+              {premium && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 text-[10px] leading-none text-tier-purple"
+                >
+                  ★
+                </span>
+              )}
             </span>
             <span className="hidden max-w-40 truncate sm:inline">{name}</span>
+            {premium && <span className="sr-only">(Premium)</span>}
           </>
         }
       >
         <MenuLabel>{username ? `@${username}` : name}</MenuLabel>
+        <div className="flex items-center gap-2 px-3.5 pb-2">
+          <AccountBadge role={role} />
+          {tenure && <span className="text-xs text-court-500">{tenure}</span>}
+        </div>
+        {!premium && (
+          <MenuLink to="/upgrade" detail="Rating seasons, the coach and every AI assist">
+            Upgrade to Premium
+          </MenuLink>
+        )}
         {username && (
           <MenuLink to={`/u/${username}`} detail="How other players see your card">
             Your profile

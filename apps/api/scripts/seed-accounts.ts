@@ -19,12 +19,14 @@ export const TEST_PASSWORD = "test-player-2026";
 const DOMAIN = "accounts.test";
 const TIMEZONE = "America/Chicago";
 
-const ACCOUNTS: { username: string; name: string; role: UserRole }[] = [
+/** `weeks`: how long ago they went Premium, so the "N weeks Premium" markers have something to show. */
+const ACCOUNTS: { username: string; name: string; role: UserRole; weeks?: number }[] = [
   { username: "free", name: "Frankie Free", role: "user" },
-  { username: "premium", name: "Pat Premium", role: "premium" },
-  { username: "playtester", name: "Dana Dev", role: "dev" },
-  { username: "boss", name: "Alex Admin", role: "admin" },
+  { username: "premium", name: "Pat Premium", role: "premium", weeks: 3 },
+  { username: "playtester", name: "Dana Dev", role: "dev", weeks: 6 },
+  { username: "boss", name: "Alex Admin", role: "admin", weeks: 12 },
 ];
+const weeksAgo = (weeks: number) => new Date(Date.now() - weeks * 7 * 86_400_000);
 
 const RIVAL_ROLES: Record<string, UserRole> = {
   maya: "premium",
@@ -62,13 +64,14 @@ async function main() {
         timezone: TIMEZONE,
         authSubject: authId,
         role: a.role,
+        premiumSince: a.weeks === undefined ? null : weeksAgo(a.weeks),
       });
       console.log(`${ROLE_LABELS[a.role].padEnd(8)} ${email}`);
     }
 
     const demo = await db
       .update(users)
-      .set({ role: "premium" })
+      .set({ role: "premium", premiumSince: weeksAgo(8) })
       .where(eq(users.username, "demo"))
       .returning({ email: users.email });
     console.log(
@@ -84,7 +87,10 @@ async function main() {
     for (const r of rivals) {
       await db
         .update(users)
-        .set({ role: RIVAL_ROLES[r.username] ?? "user" })
+        .set({
+          role: RIVAL_ROLES[r.username] ?? "user",
+          premiumSince: RIVAL_ROLES[r.username] ? weeksAgo(4) : null,
+        })
         .where(eq(users.id, r.id));
     }
     console.log(`Gave ${rivals.length} rivals a mix of account types (they can't sign in)`);

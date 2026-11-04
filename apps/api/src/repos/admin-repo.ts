@@ -121,10 +121,11 @@ export async function findUsers(db: Executor) {
     .orderBy(desc(users.createdAt));
 }
 
+/** Also keeps `premium_since`: set on the way up from Free, kept between paid types, cleared on Free. */
 export async function setRole(db: Executor, id: string, role: UserRole) {
   const rows = await db
     .update(users)
-    .set({ role })
+    .set({ role, premiumSince: premiumSinceFor(role) })
     .where(eq(users.id, id))
     .returning({ id: users.id });
   return rows[0] ?? null;
@@ -147,3 +148,6 @@ export async function findRecap(db: Executor, id: string) {
     .orderBy(asc(recaps.createdAt));
   return { row, runs };
 }
+
+export const premiumSinceFor = (role: UserRole) =>
+  role === "user" ? null : sql`coalesce(${users.premiumSince}, now())`;

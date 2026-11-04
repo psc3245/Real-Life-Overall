@@ -14,6 +14,7 @@ import { useMe, type Me } from "@/api/hooks";
 import { useAuthState, useSignOut } from "@/api/session";
 import { useUpdateProfile } from "@/api/social";
 import { TrackingSettings } from "@/components/body/TrackingSettings";
+import { AccountCard } from "@/components/Premium";
 import { FormRow } from "@/components/controls";
 import { SettingRow, SettingsGroup } from "@/components/settings";
 import { ShareLink, VISIBILITY_LABEL } from "@/components/social";
@@ -55,6 +56,10 @@ export default function SettingsScreen() {
   }
   return (
     <Screen title="Settings" onRefresh={() => me.refetch()}>
+      <View style={{ gap: space.sm }}>
+        <Label>Account type</Label>
+        <AccountCard role={me.data.role} premiumSince={me.data.premiumSince} perks />
+      </View>
       <ProfileForm me={me.data} />
       {auth.mode === "better-auth" && <SignInSettings />}
       <SharingSection me={me.data} />

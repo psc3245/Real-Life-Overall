@@ -528,6 +528,8 @@ Four types, stored as `users.role` (the enum gained `premium` and `dev`; `user` 
 - **Seasons:** a Free account's season in setup switches to Growth, and rollover turns a lapsed Premium player's Rating season into Growth (goals don't carry over then, since they're in the old mode's units).
 - **Features:** `PREMIUM_FEATURES` (the coach) and `BETA_FEATURES` (features still in testing, empty for now; only dev and admin see them) in `packages/shared`. `GET /me` returns `locked` (feature → `premium` or `beta`) and switches locked features off in `preferences.features`, so nav links and Today widgets hide on both clients without extra code. Feature gates show a Premium lock (or a not-found page for beta), and Personalize shows locked toggles disabled with a Premium badge. To ship a beta feature, move it out of `BETA_FEATURES`.
 - **Bug reports:** dev and admin accounts get "Report a bug" (web account menu, iOS You tab), which sends the message with the page, platform, app version and device to `bug_reports` (30 per day). `/admin` lists them, open first, with resolve and reopen.
+- **Showing it:** `users.premium_since` (set when an account leaves Free, kept between paid types, cleared on Free) drives "3 weeks Premium". Settings opens with an Account type card (type, tenure, what Premium includes, Upgrade for Free); on the web the header avatar gets a ★ and the premium color (the 90+ tier purple) and the account menu shows the type; on iOS the card tops the You tab and Settings. `/upgrade` (both clients) compares Free and Premium; its button says Coming soon until there's a checkout. Locked screens link to it.
+- **Test accounts:** `npm run seed:accounts -w @rlo/api` creates one sign-in account per type on the dev database (`<free|premium|playtester|boss>@accounts.test`, the password is `TEST_PASSWORD` in the script), makes the demo player Premium and mixes the rivals' types.
 - Dev-mode users (`AUTH_MODE=dev`: tests and local experiments) start Premium; tests of Free accounts set the role.
 
 ---
@@ -560,7 +562,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `exercises` | `user_id`, `name`, `category`, `tracking`, `archived_at` | Custom exercises; the library is in `packages/shared` |
 | `body_measurements` | `user_id`, `local_date`, `kind` (`weight`/`height`), `value` (kg/cm) | Unique per user, day and kind |
 | `users.unit_system`, `users.track_weight`, `users.track_height` | | Units and opt-in body tracking |
-| `users.role` | `user` (Free) / `premium` / `dev` / `admin` | §8.7, §8.9 |
+| `users.role`, `users.premium_since` | `user` (Free) / `premium` / `dev` / `admin`; when it last left Free | §8.7, §8.9 |
 | `bug_reports` | `user_id`, `message`, `page`, `platform` (`web`/`ios`), `app_version`, `device`, `status` (`open`/`resolved`), `resolved_at` | From dev and admin accounts (§8.9) |
 | `chart_views` | `user_id`, `name`, `config` jsonb (ChartConfig), `pinned` | §7.7 |
 | `reports` / `report_runs` | `name`, `description`, `charts` jsonb, `options` jsonb, `default_range`; `report_id`, `from`, `to`, `used_ai`, `result` jsonb | §7.8 |

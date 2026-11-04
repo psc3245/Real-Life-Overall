@@ -3,6 +3,7 @@ import { useIsAdmin } from "@/api/admin";
 import { useMe } from "@/api/hooks";
 import { usePreferences } from "@/api/preferences";
 import { useFriends } from "@/api/social";
+import { AccountCard } from "@/components/Premium";
 import { NavRow, SettingsGroup } from "@/components/settings";
 import { ErrorNote, Loading, Screen } from "@/components/ui";
 import { useTalk } from "@/lib/talk";
@@ -76,6 +77,7 @@ export default function MeScreen() {
       title={me.data.displayName}
       onRefresh={() => Promise.all([me.refetch(), friends.refetch()])}
     >
+      <AccountCard role={me.data.role} premiumSince={me.data.premiumSince} />
       <SettingsGroup>
         <NavRow
           icon="person.text.rectangle"

@@ -8,6 +8,7 @@
 import { ROLE_LABELS, USER_ROLES, type UserRole } from "@rlo/shared";
 import { eq, or } from "drizzle-orm";
 import { createNeonDb } from "../src/db/client";
+import { premiumSinceFor } from "../src/repos/admin-repo";
 import { users } from "../src/db/schema";
 
 const [who, type = "admin"] = process.argv.slice(2);
@@ -27,7 +28,7 @@ if (!url) {
 const { db, dispose } = createNeonDb(url);
 const rows = await db
   .update(users)
-  .set({ role })
+  .set({ role, premiumSince: premiumSinceFor(role) })
   .where(or(eq(users.email, who), eq(users.username, who.toLowerCase())))
   .returning({ username: users.username, email: users.email, role: users.role });
 await dispose();

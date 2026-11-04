@@ -18,6 +18,7 @@ import { HistoryPage } from "./features/history/HistoryPage";
 import { HabitsGlancePage } from "./features/habits/HabitsGlancePage";
 import { ManageHabitsPage } from "./features/habits/ManageHabitsPage";
 import { CoachPage } from "./features/coach/CoachPage";
+import { UpgradePage } from "./features/account/UpgradePage";
 import { ScoutingReportPage } from "./features/scouting/ScoutingReportPage";
 import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
@@ -133,6 +134,14 @@ export const router = createBrowserRouter([
             <Suspense fallback={loading}>
               <ActivityPage />
             </Suspense>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "upgrade",
+        element: (
+          <RequireAuth>
+            <UpgradePage />
           </RequireAuth>
         ),
       },
