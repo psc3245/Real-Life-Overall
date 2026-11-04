@@ -16,6 +16,7 @@ import {
   type SeasonMode,
   type SeasonSetupDto,
   type TreeDraft,
+  isPremiumRole,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
 import { conflict, notFound } from "../errors";
@@ -95,6 +96,8 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
     ),
   ]);
 
+  // Free accounts play Growth seasons (DESIGN.md §8.9); a lapsed Rating season turns Growth.
+  const mode = isPremiumRole(user.role) ? active.mode : "growth";
   await db.transaction(async (tx) => {
     if (!(await seasonRepo.archiveIfActive(tx, active.id, snapshot))) return; // already rolled
     const next = await seasonRepo.findOrCreate(tx, userId, period);
@@ -102,7 +105,7 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
     await nodeRepo.deleteBySeason(tx, next.id);
     await seasonRepo.update(tx, next.id, {
       status: "active",
-      mode: active.mode,
+      mode,
       archetype: old?.archetype ?? null,
       archetypeDescription: old?.archetypeDescription ?? null,
       setupEndsOn: addDays(today, SEASON_SETUP_DAYS),
@@ -136,7 +139,10 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
         authoredBy: r.authoredBy,
       })),
     );
-    for (const g of goals) await goalRepo.upsert(tx, ids.get(g.nodeId)!, g.targetValue);
+    // Goals are in the mode's units, so they carry over only when the mode does.
+    if (mode === active.mode) {
+      for (const g of goals) await goalRepo.upsert(tx, ids.get(g.nodeId)!, g.targetValue);
+    }
     await eventRepo.insertMany(
       tx,
       [...leaves]

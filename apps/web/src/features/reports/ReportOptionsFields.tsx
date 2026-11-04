@@ -1,4 +1,6 @@
 import type { ReportOptions } from "@rlo/shared";
+import { useAccount } from "../../api/account";
+import { PremiumBadge } from "../../components/Premium";
 
 const FIELDS: { key: keyof ReportOptions; label: string; detail: string; ai: boolean }[] = [
   {
@@ -31,6 +33,8 @@ export function ReportOptionsFields({
   onChange: (next: ReportOptions) => void;
   compact?: boolean;
 }) {
+  // The AI parts are premium (DESIGN.md §8.9); free runs get summaries only.
+  const { premium } = useAccount();
   return (
     <fieldset className={compact ? "flex flex-wrap gap-x-5 gap-y-2" : "space-y-2"}>
       <legend className="sr-only">Include</legend>
@@ -45,17 +49,19 @@ export function ReportOptionsFields({
         >
           <input
             type="checkbox"
-            checked={value[f.key]}
+            disabled={f.ai && !premium}
+            checked={value[f.key] && (premium || !f.ai)}
             onChange={(e) => onChange({ ...value, [f.key]: e.target.checked })}
             className={`${compact ? "" : "mt-1 "}accent-[var(--color-neon)]`}
           />
           <span>
             <span className="font-medium">{f.label}</span>
-            {f.ai && (
+            {f.ai && premium && (
               <span className="ml-2 rounded bg-court-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-court-300">
                 AI
               </span>
             )}
+            {f.ai && !premium && <PremiumBadge className="ml-2" />}
             {!compact && <span className="block text-sm text-court-500">{f.detail}</span>}
           </span>
         </label>

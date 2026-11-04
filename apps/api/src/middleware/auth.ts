@@ -1,3 +1,4 @@
+import { isPremiumRole, isTesterRole, type SeasonMode, type UserRole } from "@rlo/shared";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../context";
@@ -45,6 +46,36 @@ export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
   if (c.get("role") !== "admin") throw new HTTPException(404, { message: "Not found" });
   await next();
 });
+
+/** Premium-only routes (DESIGN.md §8.9); runs after requireUser. Free accounts get a 403. */
+export const requirePremium = createMiddleware<AppEnv>(async (c, next) => {
+  if (!isPremiumRole(c.get("role") ?? "user")) throw premiumRequired();
+  await next();
+});
+
+/** Dev and admin accounts only (bug reports); runs after requireUser. */
+export const requireTester = createMiddleware<AppEnv>(async (c, next) => {
+  if (!isTesterRole(c.get("role") ?? "user"))
+    throw new HTTPException(404, { message: "Not found" });
+  await next();
+});
+
+/** The 403 for a free account reaching a premium feature; answered with `code: "premium_required"`. */
+export class PremiumRequiredError extends HTTPException {
+  constructor(message = "This is a Premium feature.") {
+    super(403, { message });
+  }
+}
+const premiumRequired = () => new PremiumRequiredError();
+
+/** Rating seasons are premium; free accounts play Growth seasons (DESIGN.md §8.9). */
+export function assertSeasonModeAllowed(role: UserRole | undefined, mode: SeasonMode) {
+  if (mode === "rating" && !isPremiumRole(role ?? "user")) {
+    throw new PremiumRequiredError(
+      "Rating seasons are a Premium feature. Free seasons score growth.",
+    );
+  }
+}
 
 /**
  * For pages anyone can open (public profiles): sets `userId` when the caller is signed in and

@@ -1,13 +1,23 @@
-import { USER_ROLES, type LlmCallDto, type UsageRowDto } from "@rlo/shared";
+import {
+  ROLE_LABELS,
+  USER_ROLES,
+  type LlmCallDto,
+  type UsageRowDto,
+  type UserRole,
+} from "@rlo/shared";
 import { Redirect } from "expo-router";
 import { useState } from "react";
 import { ActionSheetIOS, Pressable, StyleSheet, Text, View } from "react-native";
+import { useBugReports, useSetBugReportStatus } from "@/api/bugReports";
 import { useAdminOverview, useAdminUsers, useIsAdmin, useLlmCalls, useSetRole } from "@/api/admin";
 import { useMe } from "@/api/hooks";
 import { Segmented } from "@/components/controls";
 import { StatGrid, StatTile } from "@/components/StatTile";
 import { Card, ErrorNote, Label, Loading, Muted, Screen } from "@/components/ui";
 import { colors, space, tierColor } from "@/lib/theme";
+
+const roleColor = (role: UserRole) =>
+  role === "admin" ? tierColor(65) : role === "dev" ? tierColor(95) : colors.neon;
 
 const usd = (n: number) => (n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
 const when = (iso: string) =>
@@ -18,7 +28,7 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
-type Tab = "usage" | "calls" | "users";
+type Tab = "usage" | "calls" | "users" | "bugs";
 
 /** Usage, costs, LLM calls and accounts (DESIGN.md §8.7). Admins only. */
 export default function AdminScreen() {
@@ -37,9 +47,11 @@ export default function AdminScreen() {
           { value: "usage", label: "Usage" },
           { value: "calls", label: "LLM calls" },
           { value: "users", label: "Users" },
+          { value: "bugs", label: "Bugs" },
         ]}
       />
       {tab === "usage" && <Usage />}
+      {tab === "bugs" && <BugReports />}
       {tab === "calls" && <Calls />}
       {tab === "users" && <Users myId={me.data!.id} />}
     </Screen>
@@ -181,6 +193,76 @@ function CallList({ calls }: { calls: LlmCallDto[] }) {
   );
 }
 
+/** Reports from dev and admin accounts (DESIGN.md §8.9); tap one to resolve or reopen it. */
+function BugReports() {
+  const [showResolved, setShowResolved] = useState(false);
+  const reports = useBugReports(showResolved ? undefined : "open");
+  const setStatus = useSetBugReportStatus();
+  return (
+    <View style={{ gap: space.sm }}>
+      <Segmented
+        label="Filter"
+        value={showResolved ? "all" : "open"}
+        onChange={(v) => setShowResolved(v === "all")}
+        options={[
+          { value: "open", label: "Open" },
+          { value: "all", label: "All" },
+        ]}
+      />
+      <ErrorNote error={reports.error ?? setStatus.error} />
+      {reports.isPending && <Loading />}
+      {reports.data && (
+        <Card style={{ padding: 0 }}>
+          {reports.data.length === 0 && (
+            <Muted style={{ padding: space.lg }}>
+              {showResolved ? "No bug reports yet." : "Nothing open. Nice."}
+            </Muted>
+          )}
+          {reports.data.map((r, i) => (
+            <Pressable
+              key={r.id}
+              accessibilityHint={r.status === "open" ? "Marks it resolved" : "Reopens it"}
+              disabled={setStatus.isPending}
+              onPress={() =>
+                setStatus.mutate({ id: r.id, status: r.status === "open" ? "resolved" : "open" })
+              }
+              style={[
+                styles.row,
+                i > 0 && styles.border,
+                { alignItems: "flex-start" },
+                r.status === "resolved" && { opacity: 0.55 },
+              ]}
+            >
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text selectable style={{ color: colors.court100, fontSize: 15 }}>
+                  {r.message}
+                </Text>
+                <Muted style={{ fontSize: 12 }}>
+                  @{r.username} · {r.platform}
+                  {r.page ? ` · ${r.page}` : ""} · {when(r.createdAt)}
+                </Muted>
+                {r.device ? (
+                  <Muted numberOfLines={1} style={{ fontSize: 12 }}>
+                    {r.device}
+                  </Muted>
+                ) : null}
+              </View>
+              <Text
+                style={[
+                  styles.mono,
+                  { color: r.status === "open" ? colors.neon : colors.court500 },
+                ]}
+              >
+                {r.status === "open" ? "Resolve" : "Reopen"}
+              </Text>
+            </Pressable>
+          ))}
+        </Card>
+      )}
+    </View>
+  );
+}
+
 function Users({ myId }: { myId: string }) {
   const users = useAdminUsers();
   const setRole = useSetRole();
@@ -204,13 +286,13 @@ function Users({ myId }: { myId: string }) {
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Role for ${u.username}`}
+              accessibilityLabel={`Account type for ${u.username}`}
               disabled={u.id === myId || setRole.isPending}
               onPress={() =>
                 ActionSheetIOS.showActionSheetWithOptions(
                   {
-                    title: `Role for @${u.username}`,
-                    options: [...USER_ROLES, "Cancel"],
+                    title: `Account type for @${u.username}`,
+                    options: [...USER_ROLES.map((r) => ROLE_LABELS[r]), "Cancel"],
                     cancelButtonIndex: USER_ROLES.length,
                     userInterfaceStyle: "dark",
                   },
@@ -222,17 +304,17 @@ function Users({ myId }: { myId: string }) {
               }
               style={[
                 styles.role,
-                u.role === "admin" && { borderColor: tierColor(65) },
+                u.role !== "user" && { borderColor: roleColor(u.role) },
                 u.id === myId && { opacity: 0.5 },
               ]}
             >
               <Text
                 style={{
-                  color: u.role === "admin" ? tierColor(65) : colors.court300,
+                  color: u.role !== "user" ? roleColor(u.role) : colors.court300,
                   fontSize: 12,
                 }}
               >
-                {u.role}
+                {ROLE_LABELS[u.role]}
               </Text>
             </Pressable>
           </View>

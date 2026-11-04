@@ -27,6 +27,8 @@ import { Button, Card, ErrorNote, Field, Loading, Muted, Screen } from "@/compon
 import { dayLabel } from "@/lib/format";
 import { colors, space } from "@/lib/theme";
 import { FeatureGate } from "@/components/FeatureGate";
+import { useAccount } from "@/api/account";
+import { PremiumBadge } from "@/components/Premium";
 
 /** What "kept" means for an avoid habit, by how it's logged. */
 const AVOID_HELP: Partial<Record<HabitType, string>> = {
@@ -93,6 +95,7 @@ function HabitEditor({
   const create = useCreateHabit();
   const update = useUpdateHabit();
   const suggest = useSuggestLinks();
+  const { premium } = useAccount();
   const saving = create.isPending || update.isPending;
 
   const avoid = config.direction === "avoid";
@@ -302,12 +305,16 @@ function HabitEditor({
               <Text style={styles.linksTitle}>
                 Builds these attributes ({links.length}/{MAX_HABIT_LINKS})
               </Text>
-              <Button
-                title={suggest.isPending ? "Thinking…" : "✦ Suggest"}
-                variant="ghost"
-                disabled={!name.trim() || suggest.isPending}
-                onPress={runSuggest}
-              />
+              {premium ? (
+                <Button
+                  title={suggest.isPending ? "Thinking…" : "✦ Suggest"}
+                  variant="ghost"
+                  disabled={!name.trim() || suggest.isPending}
+                  onPress={runSuggest}
+                />
+              ) : (
+                <PremiumBadge />
+              )}
             </View>
             {reason && <Muted style={styles.reason}>{reason}</Muted>}
             <ErrorNote error={suggest.error} />

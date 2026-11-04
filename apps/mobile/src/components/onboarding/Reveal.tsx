@@ -11,6 +11,7 @@ import { colors, fonts, space } from "@/lib/theme";
 import { ModePicker } from "../ModePicker";
 import { OvrBadge, StatBar } from "../ratings";
 import { useShowRatings } from "../score";
+import { useAccount } from "@/api/account";
 import { Button, Card, ErrorNote, Loading, Muted } from "../ui";
 
 const WORKING_LINES = [
@@ -75,6 +76,7 @@ function Reveal() {
   const ratings = useRatings();
   const me = useMe();
   const [showRatings, setShowRatings] = useShowRatings();
+  const { premium } = useAccount();
   const reduced = useReducedMotion();
   const growth = ratings.data?.season.mode === "growth";
   // Ratings show unless it's a growth season and the player hasn't asked to see them.
@@ -131,21 +133,23 @@ function Reveal() {
           <View style={{ alignItems: "center", gap: space.xs }}>
             <Muted style={{ textAlign: "center" }}>
               You&apos;re playing {talk.growthMode}: everyone starts at +0 and every point you gain
-              this season counts. Your scouting ratings keep running underneath, visible only to
-              you.
+              this season counts. Your scouting ratings keep running underneath, visible only to you
+              {premium ? "." : " on Premium."}
             </Muted>
-            <Text
-              accessibilityRole="button"
-              onPress={() => setShowRatings(!showRatings)}
-              style={{
-                color: colors.court500,
-                fontSize: 12,
-                letterSpacing: 1,
-                textTransform: "uppercase",
-              }}
-            >
-              {showRatings ? "Hide my ratings" : "Peek at my ratings"}
-            </Text>
+            {premium && (
+              <Text
+                accessibilityRole="button"
+                onPress={() => setShowRatings(!showRatings)}
+                style={{
+                  color: colors.court500,
+                  fontSize: 12,
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                {showRatings ? "Hide my ratings" : "Peek at my ratings"}
+              </Text>
+            )}
           </View>
         )}
         {categories.map((c) =>

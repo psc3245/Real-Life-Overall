@@ -10,6 +10,7 @@ import { StatBar } from "../../components/StatBar";
 import { ErrorNote } from "./ErrorNote";
 import { ModePicker } from "../seasons/ModePicker";
 import { useShowRatings } from "../../components/score";
+import { useAccount } from "../../api/account";
 import { useTalk } from "../../lib/talk";
 
 const WORKING_LINES = [
@@ -89,6 +90,7 @@ function Reveal() {
   const ratings = useRatings();
   const me = useMe();
   const [showRatings, setShowRatings] = useShowRatings();
+  const { premium } = useAccount();
   if (ratings.isPending) return <p className="text-court-500">Loading…</p>;
   if (!ratings.data) return <ErrorNote error={ratings.error ?? new Error("No ratings found")} />;
 
@@ -121,15 +123,18 @@ function Reveal() {
         >
           <p>
             You're playing {talk.growthMode}: everyone starts at +0 and every point you gain this
-            season counts. Your scouting ratings keep running underneath, visible only to you.
+            season counts. Your scouting ratings keep running underneath, visible only to you
+            {premium ? "." : " on Premium."}
           </p>
-          <button
-            type="button"
-            onClick={() => setShowRatings(!showRatings)}
-            className="mt-1 text-xs uppercase tracking-wider text-court-500 hover:text-neon"
-          >
-            {showRatings ? "Hide my ratings" : "Peek at my ratings"}
-          </button>
+          {premium && (
+            <button
+              type="button"
+              onClick={() => setShowRatings(!showRatings)}
+              className="mt-1 text-xs uppercase tracking-wider text-court-500 hover:text-neon"
+            >
+              {showRatings ? "Hide my ratings" : "Peek at my ratings"}
+            </button>
+          )}
         </div>
       )}
       {archetype && (

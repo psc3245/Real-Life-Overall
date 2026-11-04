@@ -18,3 +18,4 @@ BETTER_AUTH_SECRET=
 # LLM_SMART_MODEL=anthropic:claude-sonnet-5-5
 # Estimated LLM spend one user can trigger per rolling 24h (the hourly job is exempt):
 # LLM_USER_DAILY_BUDGET_USD=1
+# LLM_FREE_DAILY_BUDGET_USD=0.25

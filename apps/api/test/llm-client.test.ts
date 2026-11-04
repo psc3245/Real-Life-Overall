@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { llmCalls, users } from "../src/db/schema";
 import {
-  dbBudgetGuard,
+  dbAccessGuard,
   dbCallRecorder,
   LlmBudgetError,
   LlmClient,
@@ -97,7 +97,10 @@ describe("daily budget", () => {
   it("refuses a user's call over budget without reaching the model", async () => {
     const db = await createTestDb();
     const { resolver, model } = mockResolver(jsonResult({ answer: 1 }));
-    const llm = new LlmClient(resolver, dbCallRecorder(db), undefined, async () => false);
+    const llm = new LlmClient(resolver, dbCallRecorder(db), undefined, async () => ({
+      premium: true,
+      withinBudget: false,
+    }));
 
     await expect(llm.generateStructured({ ...request, userId: "u1" })).rejects.toBeInstanceOf(
       LlmBudgetError,
@@ -115,7 +118,8 @@ describe("daily budget", () => {
       (await db.select().from(users).where(eq(users.username, username)))[0]!.id;
     const spender = await idOf("spender");
     const other = await idOf("other");
-    const guard = dbBudgetGuard(db, 1);
+    const guard = async (id: string) =>
+      (await dbAccessGuard(db, { premiumUsd: 1, freeUsd: 0.25 })(id)).withinBudget;
     const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
     await db.insert(llmCalls).values([call(spender, 0.6), call(spender, 5, twoDaysAgo)]);
     await db.insert(llmCalls).values(call(other, 5));

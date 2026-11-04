@@ -2,7 +2,7 @@
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
 > **Status:** In development: Phases 0–4 built, web refinements done, iOS app started. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
-> **Last updated:** 2026-10-26
+> **Last updated:** 2026-11-04
 
 ---
 
@@ -492,7 +492,7 @@ There is no snapshot job: charts replay the ledger (`node_snapshots` stays a pos
 Jobs must be **idempotent**: unique constraints on `(user_id, local_date, kind)` for recaps, plus status columns.
 
 ### 8.7 Roles, admin and debug tools (added 2026-10-25)
-- `users.role` is `user` (default) or `admin`. There's no self-serve path: grant it with `npm run set-role -w @rlo/api -- <email or username> admin` (uses `apps/api/.env`), or from `/admin` once you're an admin. Admins can't remove their own role, and `PATCH /me` ignores `role`.
+- `users.role` is the account type (§8.9): `user` (Free, the default), `premium`, `dev` or `admin`. There's no self-serve path: set it with `npm run set-role -w @rlo/api -- <email or username> <free|premium|dev|admin>` (uses `apps/api/.env`), or from `/admin` once you're an admin. Admins can't remove their own role, and `PATCH /me` ignores `role`.
 - `requireUser` puts the role on the request; `requireAdmin` guards `/api/admin/*` and answers 404 to everyone else.
 - **Admin API:** `/admin/overview` (users, active users, LLM calls/errors/cost for 24h/7d/30d, by purpose, by model and by day, recent errors), `/admin/llm-calls` (filter by user, purpose, errors), `/admin/users` (role, last logged day, LLM spend) with `PATCH /admin/users/:id`, and `/admin/recaps/:id` (stored model output, prompt version, re-runs, and the LLM calls within five minutes before it: `llm_calls` has no recap id).
 - **Web:** `/admin` ("Control room") plus debug info for admins all over the app: a floating DBG panel (recent API calls with status, timing and size; the TanStack Query cache; route and viewport; session and env; run the 4am job in dev), orange dashed raw-JSON blocks at the bottom of the main pages, id chips next to habits, goals, workouts, exercises and attributes, and model details under each recap. Ctrl+Shift+D (or the panel's checkbox) hides the inline blocks; the choice is remembered per browser.
@@ -506,6 +506,24 @@ Jobs must be **idempotent**: unique constraints on `(user_id, local_date, kind)`
 - **`.github/workflows/deploy.yml`:** runs CI, builds the web app, applies migrations, then deploys. Migrations run before the new code is live, so each one must keep the running version working.
 - **iOS app** (added 2026-11-03): release builds call production (`https://getovr.dev/api`, links to `https://getovr.dev`); dev builds call the Mac's API on port 8787. `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WEB_URL` override either, e.g. to point a build at staging. The app talks to the API directly, so `CORS_ORIGINS` doesn't apply to it.
 - **Config:** `PUBLIC_URL` is a GitHub environment variable passed with `--var`; production refuses to boot unless it's `https://`. Database and Cloudflare credentials are GitHub environment secrets. The Worker's own secrets are set with `wrangler secret put`.
+
+### 8.9 Account types (added 2026-11-04)
+Four types, stored as `users.role` (the enum gained `premium` and `dev`; `user` is Free, so the migration is additive). Upgrades are by an admin until there's a monetization model (§13).
+
+| Type | Gets |
+|---|---|
+| **Free** (`user`) | Growth seasons only, daily recaps and weekly reviews, template ratings at onboarding. A smaller daily AI budget (`LLM_FREE_DAILY_BUDGET_USD`, default $0.25). |
+| **Premium** | Everything: Rating seasons and peeking at the hidden rating in a Growth season, the coach, the AI scout at onboarding, AI report write-ups and suggestions, habit link suggestions. The full budget (`LLM_USER_DAILY_BUDGET_USD`). |
+| **Dev** | Play testers: lifetime Premium, plus features in testing and bug reports. |
+| **Admin** | Premium plus `/admin` and the debug tools (§8.7). |
+
+- **Enforcement** is on the server. `requirePremium` guards `/coach/*` and `/habits/suggest-links` (403 with `code: "premium_required"`); `PUT /onboarding/mode` and `/seasons/setup/mode` refuse `rating` for Free. The LLM client also refuses premium purposes (`PREMIUM_PURPOSES` in `llm/models.ts`) for Free accounts with `LlmPremiumError`, an `LlmError`, so AI-optional flows (report write-ups) degrade instead of failing. The hourly job runs unguarded, so recaps and reviews always run.
+- **Seasons:** a Free account's season in setup switches to Growth, and rollover turns a lapsed Premium player's Rating season into Growth (goals don't carry over then, since they're in the old mode's units).
+- **Features:** `PREMIUM_FEATURES` (the coach) and `BETA_FEATURES` (features still in testing, empty for now; only dev and admin see them) in `packages/shared`. `GET /me` returns `locked` (feature → `premium` or `beta`) and switches locked features off in `preferences.features`, so nav links and Today widgets hide on both clients without extra code. Feature gates show a Premium lock (or a not-found page for beta), and Personalize shows locked toggles disabled with a Premium badge. To ship a beta feature, move it out of `BETA_FEATURES`.
+- **Bug reports:** dev and admin accounts get "Report a bug" (web account menu, iOS You tab), which sends the message with the page, platform, app version and device to `bug_reports` (30 per day). `/admin` lists them, open first, with resolve and reopen.
+- Dev-mode users (`AUTH_MODE=dev`: tests and local experiments) start Premium; tests of Free accounts set the role.
+
+---
 
 ## 9. Data Model
 
@@ -535,7 +553,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `exercises` | `user_id`, `name`, `category`, `tracking`, `archived_at` | Custom exercises; the library is in `packages/shared` |
 | `body_measurements` | `user_id`, `local_date`, `kind` (`weight`/`height`), `value` (kg/cm) | Unique per user, day and kind |
 | `users.unit_system`, `users.track_weight`, `users.track_height` | | Units and opt-in body tracking |
-| `users.role` | `user` / `admin` | §8.7 |
+| `users.role` | `user` (Free) / `premium` / `dev` / `admin` | §8.7, §8.9 |
+| `bug_reports` | `user_id`, `message`, `page`, `platform` (`web`/`ios`), `app_version`, `device`, `status` (`open`/`resolved`), `resolved_at` | From dev and admin accounts (§8.9) |
 | `chart_views` | `user_id`, `name`, `config` jsonb (ChartConfig), `pinned` | §7.7 |
 | `reports` / `report_runs` | `name`, `description`, `charts` jsonb, `options` jsonb, `default_range`; `report_id`, `from`, `to`, `used_ai`, `result` jsonb | §7.8 |
 | `objective_links` / `objective_entries` | `objective_id` + `node_lineage_id`; `objective_id`, `local_date`, `value` | Links by lineage; one manual entry per goal per day |
@@ -652,7 +671,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - [x] Chunk 6, onboarding and season setup: discovery chat, tree builder, weights, scouting questionnaire and follow-up, the OVR reveal
   - [ ] Google sign-in, push notifications (recap ready, streaks)
   - [ ] EAS builds and TestFlight
-- [ ] Monetization model; per-user quotas and plan-based model tiers
+- [x] Account types: Free, Premium, Dev (play testers: lifetime Premium, beta features, bug reports) and Admin; premium gating on the server and both clients, a smaller Free AI budget (§8.9)
+- [ ] Monetization model (checkout); plan-based model tiers
 - [ ] Integrations (Strava, Health, etc.), if pursued
 
 ### Web features (after the iOS app)
@@ -688,7 +708,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 9. **Display precision:** OVR shown as an integer or with one decimal?
 10. **Decay rule visibility and editability** for users.
 11. ~~**Privacy model**~~ Decided: private by default, card-only opt-in visibility (§7.3).
-12. **Monetization model** (freemium, subscription, BYO key…) and quota design.
+12. **Monetization model**: freemium is decided (§8.9: Free and Premium accounts); still open is how Premium is bought (subscription, App Store vs. Stripe) and its price.
 13. ~~**Global leaderboard comparability**~~ Decided: boards are Overall plus template categories only (§7.3). Overall still mixes different trees; revisit if it feels unfair.
 14. **Data export and account deletion** (should be in place before launch).
 15. **Content safety:** journals may contain sensitive topics (mental health, etc.). Define how the LLM responds to distressing content, what data goes to providers, and the provider data-retention settings.

@@ -1,4 +1,11 @@
-import { USER_ROLES, type LlmCallDto, type UsageRowDto, type UserRole } from "@rlo/shared";
+import {
+  ROLE_DETAILS,
+  ROLE_LABELS,
+  USER_ROLES,
+  type LlmCallDto,
+  type UsageRowDto,
+  type UserRole,
+} from "@rlo/shared";
 import { useState } from "react";
 import { Navigate } from "react-router";
 import {
@@ -8,10 +15,18 @@ import {
   useLlmCalls,
   useSetRole,
 } from "../../api/admin";
+import { useBugReports, useSetBugReportStatus } from "../../api/bugReports";
 import { useMe } from "../../api/hooks";
 import { StatTile } from "../../components/StatTile";
 import { SectionNav } from "../../components/SectionNav";
 import { ErrorNote } from "../onboarding/ErrorNote";
+
+const ROLE_STYLE: Record<UserRole, string> = {
+  user: "border-court-700",
+  premium: "border-neon/60 text-neon",
+  dev: "border-tier-purple text-tier-purple",
+  admin: "border-tier-orange text-tier-orange",
+};
 
 const usd = (n: number) => (n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
 const when = (iso: string) =>
@@ -39,6 +54,7 @@ export function AdminPage() {
           { id: "usage", label: "Usage" },
           { id: "calls", label: "LLM calls" },
           { id: "users", label: "Users" },
+          { id: "bugs", label: "Bug reports" },
         ]}
       />
       <div id="usage" className="scroll-mt-16">
@@ -49,6 +65,9 @@ export function AdminPage() {
       </div>
       <div id="users" className="scroll-mt-16">
         <Users myId={me.data!.id} />
+      </div>
+      <div id="bugs" className="scroll-mt-16">
+        <BugReports />
       </div>
     </div>
   );
@@ -159,6 +178,66 @@ function UsageTable({ title, rows }: { title: string; rows: UsageRowDto[] }) {
   );
 }
 
+/** Reports from dev and admin accounts (DESIGN.md §8.9), open ones first. */
+function BugReports() {
+  const [showResolved, setShowResolved] = useState(false);
+  const reports = useBugReports(showResolved ? undefined : "open");
+  const setStatus = useSetBugReportStatus();
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="font-display text-xl uppercase tracking-wider">Bug reports</h2>
+        <label className="flex items-center gap-2 text-sm text-court-300">
+          <input
+            type="checkbox"
+            checked={showResolved}
+            onChange={(e) => setShowResolved(e.target.checked)}
+            className="accent-[var(--color-neon)]"
+          />
+          Show resolved
+        </label>
+      </div>
+      <ErrorNote error={reports.error ?? setStatus.error} />
+      {reports.data?.length === 0 && (
+        <p className="text-sm text-court-500">
+          {showResolved ? "No bug reports yet." : "Nothing open. Nice."}
+        </p>
+      )}
+      <ul className="space-y-2">
+        {reports.data?.map((r) => (
+          <li
+            key={r.id}
+            className={`rounded-lg border border-court-700 bg-court-900/60 p-3 ${r.status === "resolved" ? "opacity-60" : ""}`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{r.message}</p>
+              <button
+                type="button"
+                disabled={setStatus.isPending}
+                onClick={() =>
+                  setStatus.mutate({
+                    id: r.id,
+                    status: r.status === "open" ? "resolved" : "open",
+                  })
+                }
+                className="rounded border border-court-700 px-2 py-1 text-xs uppercase tracking-wider text-court-300 hover:border-neon hover:text-neon"
+              >
+                {r.status === "open" ? "Resolve" : "Reopen"}
+              </button>
+            </div>
+            <p className="mt-1 font-mono text-xs text-court-500">
+              @{r.username} · {r.platform}
+              {r.page && ` · ${r.page}`} · {when(r.createdAt)}
+              {r.appVersion && ` · ${r.appVersion}`}
+            </p>
+            {r.device && <p className="truncate font-mono text-xs text-court-500">{r.device}</p>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Calls() {
   const [errorsOnly, setErrorsOnly] = useState(false);
   const calls = useLlmCalls({ errorsOnly, limit: 100 });
@@ -258,7 +337,7 @@ function Users({ myId }: { myId: string }) {
               <th className="pr-3 font-semibold">Joined</th>
               <th className="pr-3 font-semibold">Last logged</th>
               <th className="pr-3 text-right font-semibold">LLM</th>
-              <th className="pr-3 font-semibold">Role</th>
+              <th className="pr-3 font-semibold">Account</th>
             </tr>
           </thead>
           <tbody>
@@ -279,16 +358,20 @@ function Users({ myId }: { myId: string }) {
                 </td>
                 <td className="pr-3">
                   <select
-                    aria-label={`Role for ${u.username}`}
+                    aria-label={`Account type for ${u.username}`}
                     value={u.role}
                     disabled={u.id === myId || setRole.isPending}
-                    title={u.id === myId ? "You can't change your own role" : undefined}
+                    title={
+                      u.id === myId
+                        ? "You can't change your own account type"
+                        : ROLE_DETAILS[u.role]
+                    }
                     onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as UserRole })}
-                    className={`rounded border bg-court-950 px-2 py-1 text-xs disabled:opacity-60 ${u.role === "admin" ? "border-tier-orange text-tier-orange" : "border-court-700"}`}
+                    className={`rounded border bg-court-950 px-2 py-1 text-xs disabled:opacity-60 ${ROLE_STYLE[u.role]}`}
                   >
                     {USER_ROLES.map((r) => (
                       <option key={r} value={r}>
-                        {r}
+                        {ROLE_LABELS[r]}
                       </option>
                     ))}
                   </select>

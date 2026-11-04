@@ -1,9 +1,11 @@
 import {
   isValidTimeZone,
+  lockedFeatures,
   preferencesPatchSchema,
   PROFILE_VISIBILITIES,
   UNIT_SYSTEMS,
   usernameSchema,
+  type Feature,
 } from "@rlo/shared";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -12,6 +14,14 @@ import type { AppEnv } from "../context";
 import { conflict, isUniqueViolation } from "../errors";
 import * as userRepo from "../repos/user-repo";
 import { parseJson } from "../validation";
+
+/** Adds the account's locked features and switches them off (DESIGN.md §8.9). */
+function withAccess(user: userRepo.PublicUser) {
+  const locked = lockedFeatures(user.role);
+  const features = { ...user.preferences.features };
+  for (const f of Object.keys(locked) as Feature[]) features[f] = false;
+  return { ...user, preferences: { ...user.preferences, features }, locked };
+}
 
 const updateMeSchema = z
   .object({
@@ -33,7 +43,7 @@ export const meRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
     const user = await userRepo.findById(c.get("db"), c.get("userId"));
     if (!user) throw new HTTPException(404, { message: "User not found" });
-    return c.json(user);
+    return c.json(withAccess(user));
   })
   .patch("/", async (c) => {
     const changes = await parseJson(c, updateMeSchema);
@@ -42,5 +52,5 @@ export const meRoutes = new Hono<AppEnv>()
       throw error;
     });
     if (!user) throw new HTTPException(404, { message: "User not found" });
-    return c.json(user);
+    return c.json(withAccess(user));
   });

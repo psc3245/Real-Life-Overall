@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { useAccount } from "../api/account";
 import { useIsAdmin } from "../api/admin";
 import { useHealth, useMe } from "../api/hooks";
 import { useApplyPreferences, usePreferences } from "../api/preferences";
@@ -12,6 +13,8 @@ import { preferencesLink, PreferencesModal } from "../features/settings/Preferen
 import type { Feature, Preferences } from "@rlo/shared";
 import { useTalk } from "../lib/talk";
 import { OwnScoreProvider } from "../components/score";
+import { BugReportModal } from "../components/BugReportModal";
+import { useState } from "react";
 
 const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
   narrow: "max-w-3xl",
@@ -27,6 +30,7 @@ export function RootLayout() {
   const navigate = useNavigate();
   const apiUp = health.data?.ok === true;
   const admin = useIsAdmin();
+  const { tester } = useAccount();
   const me = useMe(auth.signedIn);
   useApplyPreferences();
   const prefs = usePreferences();
@@ -59,6 +63,7 @@ export function RootLayout() {
               name={auth.name ?? me.data?.displayName ?? "Account"}
               username={me.data?.username}
               admin={admin}
+              tester={tester}
               onSignOut={
                 auth.mode === "better-auth"
                   ? async () => {
@@ -244,18 +249,21 @@ function MainNav({
   );
 }
 
-/** Name in the header; opens profile, settings, personalize, admin and sign out. */
+/** Name in the header; opens profile, settings, personalize, bug reports, admin and sign out. */
 function AccountMenu({
   name,
   username,
   admin,
+  tester,
   onSignOut,
 }: {
   name: string;
   username?: string;
   admin: boolean;
+  tester: boolean;
   onSignOut?: () => void;
 }) {
+  const [reporting, setReporting] = useState(false);
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
@@ -263,42 +271,46 @@ function AccountMenu({
     .slice(0, 2)
     .toUpperCase();
   return (
-    <Menu
-      align="end"
-      label={`Account menu for ${name}`}
-      triggerClassName="rounded-full py-0.5 pr-2 pl-0.5 text-sm text-court-300 hover:text-court-100"
-      trigger={
-        <>
-          <span className="grid h-7 w-7 place-items-center rounded-full border border-neon/60 bg-neon/10 font-display text-xs font-semibold text-neon">
-            {initials}
-          </span>
-          <span className="hidden max-w-40 truncate sm:inline">{name}</span>
-        </>
-      }
-    >
-      <MenuLabel>{username ? `@${username}` : name}</MenuLabel>
-      {username && (
-        <MenuLink to={`/u/${username}`} detail="How other players see your card">
-          Your profile
+    <>
+      <Menu
+        align="end"
+        label={`Account menu for ${name}`}
+        triggerClassName="rounded-full py-0.5 pr-2 pl-0.5 text-sm text-court-300 hover:text-court-100"
+        trigger={
+          <>
+            <span className="grid h-7 w-7 place-items-center rounded-full border border-neon/60 bg-neon/10 font-display text-xs font-semibold text-neon">
+              {initials}
+            </span>
+            <span className="hidden max-w-40 truncate sm:inline">{name}</span>
+          </>
+        }
+      >
+        <MenuLabel>{username ? `@${username}` : name}</MenuLabel>
+        {username && (
+          <MenuLink to={`/u/${username}`} detail="How other players see your card">
+            Your profile
+          </MenuLink>
+        )}
+        <MenuLink to="/settings" detail="Account, password, sharing, units">
+          Settings
         </MenuLink>
-      )}
-      <MenuLink to="/settings" detail="Account, password, sharing, units">
-        Settings
-      </MenuLink>
-      <MenuLink to={preferencesLink()} detail="Theme, Today page, features">
-        Personalize
-      </MenuLink>
-      {admin && (
-        <MenuLink to="/admin" detail="Admin tools">
-          Admin
+        <MenuLink to={preferencesLink()} detail="Theme, Today page, features">
+          Personalize
         </MenuLink>
-      )}
-      {onSignOut && (
-        <>
-          <MenuDivider />
-          <MenuButton onSelect={onSignOut}>Sign out</MenuButton>
-        </>
-      )}
-    </Menu>
+        {tester && <MenuButton onSelect={() => setReporting(true)}>Report a bug</MenuButton>}
+        {admin && (
+          <MenuLink to="/admin" detail="Admin tools">
+            Admin
+          </MenuLink>
+        )}
+        {onSignOut && (
+          <>
+            <MenuDivider />
+            <MenuButton onSelect={onSignOut}>Sign out</MenuButton>
+          </>
+        )}
+      </Menu>
+      {tester && <BugReportModal open={reporting} onClose={() => setReporting(false)} />}
+    </>
   );
 }

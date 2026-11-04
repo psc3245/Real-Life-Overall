@@ -4,8 +4,17 @@ import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import type { AppEnv, Deps } from "./context";
 import { parseEnv, type Env } from "./env";
-import { LlmBudgetError, LlmError } from "./llm/client";
-import { authFor, optionalUser, requireAdmin, requireUser } from "./middleware/auth";
+import { LlmBudgetError, LlmError, LlmPremiumError } from "./llm/client";
+import {
+  authFor,
+  optionalUser,
+  PremiumRequiredError,
+  requireAdmin,
+  requirePremium,
+  requireTester,
+  requireUser,
+} from "./middleware/auth";
+import { bugReportRoutes } from "./routes/bug-reports";
 import { adminRoutes } from "./routes/admin";
 import { badgeRoutes } from "./routes/badges";
 import { bodyRoutes } from "./routes/body";
@@ -74,8 +83,14 @@ export function createApp(makeDeps: DepsFactory) {
   );
 
   app.onError((err, c) => {
+    if (err instanceof PremiumRequiredError) {
+      return c.json({ error: err.message, code: "premium_required" }, 403);
+    }
     if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
     if (err instanceof LlmBudgetError) return c.json({ error: err.message }, 429);
+    if (err instanceof LlmPremiumError) {
+      return c.json({ error: err.message, code: "premium_required" }, 403);
+    }
     if (err instanceof LlmError) {
       console.error(err, err.cause);
       return c.json({ error: err.message, retryable: true }, 502);
@@ -109,6 +124,7 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/ratings/*", requireUser)
     .use("/habits", requireUser)
     .use("/habits/*", requireUser)
+    .use("/habits/suggest-links", requirePremium)
     .use("/days/*", requireUser)
     .use("/objectives", requireUser)
     .use("/objectives/*", requireUser)
@@ -139,15 +155,17 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/friends/*", requireUser)
     .use("/leaderboards", requireUser)
     .use("/scouting-report", requireUser)
-    .use("/coach", requireUser)
-    .use("/coach/*", requireUser)
+    .use("/coach", requireUser, requirePremium)
+    .use("/coach/*", requireUser, requirePremium)
     .use("/weights", requireUser)
     .use("/weights/*", requireUser)
     .use("/tree-proposals", requireUser)
     .use("/tree-proposals/*", requireUser)
     .use("/profiles/*", optionalUser)
+    .use("/bug-reports", requireUser, requireTester)
     .use("/admin/*", requireUser, requireAdmin)
     .route("/me", meRoutes)
+    .route("/bug-reports", bugReportRoutes)
     .route("/onboarding", onboardingRoutes)
     .route("/ratings", ratingsRoutes)
     .route("/habits", habitRoutes)

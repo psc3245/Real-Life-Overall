@@ -1,7 +1,9 @@
-import { setRoleBodySchema } from "@rlo/shared";
+import { BUG_REPORT_STATUSES, setRoleBodySchema, updateBugReportBodySchema } from "@rlo/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../context";
+import { notFound } from "../errors";
+import * as bugReportRepo from "../repos/bug-report-repo";
 import * as admin from "../services/admin-service";
 import { idParam, parseJson } from "../validation";
 
@@ -10,6 +12,11 @@ const callsQuerySchema = z.object({
   purpose: z.string().max(64).optional(),
   errors: z.enum(["1", "0"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const bugReportsQuerySchema = z.object({
+  status: z.enum(BUG_REPORT_STATUSES).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
 });
 
 /** Admin tools and debug data (DESIGN.md §8.7). Mounted behind requireUser + requireAdmin. */
@@ -33,4 +40,16 @@ export const adminRoutes = new Hono<AppEnv>()
   })
   .get("/recaps/:id", async (c) =>
     c.json(await admin.recapDebug(c.get("db"), idParam(c, "id", "Recap"))),
-  );
+  )
+  .get("/bug-reports", async (c) => {
+    const q = bugReportsQuerySchema.parse(c.req.query());
+    return c.json(await bugReportRepo.list(c.get("db"), q.status, q.limit));
+  })
+  .patch("/bug-reports/:id", async (c) => {
+    const { status } = await parseJson(c, updateBugReportBodySchema);
+    const id = idParam(c, "id", "Bug report");
+    if (!(await bugReportRepo.setStatus(c.get("db"), id, status))) {
+      throw notFound("Bug report not found");
+    }
+    return c.body(null, 204);
+  });

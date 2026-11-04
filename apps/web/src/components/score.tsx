@@ -9,6 +9,7 @@ import {
 import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { useRatings } from "../api/ratings";
 import { tierColor } from "./tier";
+import { useAccount } from "../api/account";
 
 /**
  * How numbers on screen are scored (DESIGN.md §4.6): ratings on the 0-100 scale, or growth
@@ -119,7 +120,9 @@ export function useShowRatings(): [boolean, (show: boolean) => void] {
     },
     () => showRatings,
   );
-  return [show, setShowRatings];
+  // Peeking is premium (DESIGN.md §8.9): ratings are a premium feature.
+  const { premium } = useAccount();
+  return [show && premium, setShowRatings];
 }
 
 /**
@@ -135,7 +138,8 @@ export function HiddenRating({
 }) {
   const { mode } = useScore();
   const [show, setShow] = useShowRatings();
-  if (mode !== "growth" || rating === null) return null;
+  const { premium } = useAccount();
+  if (mode !== "growth" || rating === null || !premium) return null;
   return (
     <button
       type="button"

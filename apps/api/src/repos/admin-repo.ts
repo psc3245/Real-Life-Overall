@@ -1,3 +1,4 @@
+import type { UserRole } from "@rlo/shared";
 import { and, asc, count, desc, eq, gte, isNotNull, lte, sql, type SQL } from "drizzle-orm";
 import type { Executor } from "../db/client";
 import { dayLogs, llmCalls, recaps, seasons, users } from "../db/schema";
@@ -120,7 +121,7 @@ export async function findUsers(db: Executor) {
     .orderBy(desc(users.createdAt));
 }
 
-export async function setRole(db: Executor, id: string, role: "user" | "admin") {
+export async function setRole(db: Executor, id: string, role: UserRole) {
   const rows = await db
     .update(users)
     .set({ role })

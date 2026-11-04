@@ -46,6 +46,10 @@ export async function findByUsername(db: Database, username: string): Promise<Pu
   return rows[0] ? toPublic(rows[0]) : null;
 }
 
+/**
+ * Dev-mode users (tests, local experiments) start Premium so every feature is reachable; tests of
+ * free accounts set the role themselves.
+ */
 export async function findOrCreateDevUser(db: Database, username: string): Promise<PublicUser> {
   const [existing] = await db
     .select(publicUserColumns)
@@ -54,7 +58,7 @@ export async function findOrCreateDevUser(db: Database, username: string): Promi
   if (existing) return toPublic(existing);
   await db
     .insert(users)
-    .values({ username, email: `${username}@dev.local`, displayName: username })
+    .values({ username, email: `${username}@dev.local`, displayName: username, role: "premium" })
     .onConflictDoNothing({ target: users.username });
   const rows = await db.select(publicUserColumns).from(users).where(eq(users.username, username));
   return toPublic(rows[0]!);

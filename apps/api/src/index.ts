@@ -1,11 +1,14 @@
 import { createApp, type DepsFactory } from "./app";
 import { createNeonDb } from "./db/client";
 import { parseEnv, type Env } from "./env";
-import { dbBudgetGuard, dbCallRecorder, dbVoiceResolver, LlmClient } from "./llm/client";
+import { dbAccessGuard, dbCallRecorder, dbVoiceResolver, LlmClient } from "./llm/client";
 import { createEnvModelResolver } from "./llm/providers";
 import { runHourly } from "./services/scheduler";
 
-/** Requests are held to each user's daily LLM budget; the hourly job (recaps, reviews) isn't. */
+/**
+ * Requests are held to each user's account type and daily LLM budget; the hourly job (recaps,
+ * reviews) isn't.
+ */
 const makeDeps = (env: Env, { capped }: { capped: boolean }) => {
   const { db, dispose } = createNeonDb(env.DATABASE_URL);
   return {
@@ -15,7 +18,12 @@ const makeDeps = (env: Env, { capped }: { capped: boolean }) => {
       createEnvModelResolver(env),
       dbCallRecorder(db),
       dbVoiceResolver(db),
-      capped ? dbBudgetGuard(db, env.LLM_USER_DAILY_BUDGET_USD) : undefined,
+      capped
+        ? dbAccessGuard(db, {
+            premiumUsd: env.LLM_USER_DAILY_BUDGET_USD,
+            freeUsd: env.LLM_FREE_DAILY_BUDGET_USD,
+          })
+        : undefined,
     ),
   };
 };

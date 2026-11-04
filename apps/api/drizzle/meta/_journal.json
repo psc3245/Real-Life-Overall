@@ -197,6 +197,20 @@
       "when": 1793746344619,
       "tag": "0027_auth_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793808581885,
+      "tag": "0028_account_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793809214503,
+      "tag": "0029_bug_reports",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,7 @@
 import { DEFAULT_PREFERENCES, FEATURES } from "@rlo/shared";
+import { useAccount } from "../../api/account";
 import { usePreferences, useSetPreferences } from "../../api/preferences";
+import { PremiumBadge } from "../../components/Premium";
 import { HeaderAction, SaveStatus, SettingsCard, Toggle } from "./controls";
 import { FEATURE_GROUPS, FEATURE_INFO } from "./featureInfo";
 import { useTalk } from "../../lib/talk";
@@ -9,7 +11,8 @@ export function ConfigurationSection() {
   const talk = useTalk();
   const prefs = usePreferences();
   const setPreferences = useSetPreferences();
-  const allOn = FEATURES.every((f) => prefs.features[f]);
+  const { locked } = useAccount();
+  const allOn = FEATURES.every((f) => prefs.features[f] || locked[f]);
 
   return (
     <div className="space-y-5">
@@ -32,15 +35,27 @@ export function ConfigurationSection() {
       </div>
       {FEATURE_GROUPS.map((group) => (
         <SettingsCard key={group.label} title={group.label}>
-          {group.features.map((f) => (
-            <Toggle
-              key={f}
-              checked={prefs.features[f]}
-              onChange={(on) => setPreferences({ features: { [f]: on } })}
-              label={f === "coach" ? talk.coach : FEATURE_INFO[f].label}
-              detail={FEATURE_INFO[f].detail}
-            />
-          ))}
+          {group.features
+            .filter((f) => locked[f] !== "beta")
+            .map((f) => (
+              <Toggle
+                key={f}
+                checked={prefs.features[f]}
+                disabled={!!locked[f]}
+                onChange={(on) => setPreferences({ features: { [f]: on } })}
+                label={f === "coach" ? talk.coach : FEATURE_INFO[f].label}
+                detail={
+                  locked[f] ? (
+                    <>
+                      <PremiumBadge className="mr-1.5" />
+                      {FEATURE_INFO[f].detail}
+                    </>
+                  ) : (
+                    FEATURE_INFO[f].detail
+                  )
+                }
+              />
+            ))}
         </SettingsCard>
       ))}
       <p className="text-xs text-court-500">
