@@ -1,4 +1,4 @@
-import type { OnboardingStage } from "@rlo/shared";
+import type { OnboardingMethod, OnboardingStage } from "@rlo/shared";
 import type { QuestionDto } from "@rlo/shared";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Executor } from "../db/client";
@@ -48,10 +48,11 @@ export async function setQuestionnaireIfAbsent(
   db: Executor,
   id: string,
   questions: QuestionDto[],
+  method: OnboardingMethod = "scout",
 ): Promise<boolean> {
   const rows = await db
     .update(onboardingSessions)
-    .set({ questionnaire: questions, answers: {} })
+    .set({ questionnaire: questions, answers: {}, method })
     .where(and(eq(onboardingSessions.id, id), isNull(onboardingSessions.questionnaire)))
     .returning({ id: onboardingSessions.id });
   return rows.length > 0;

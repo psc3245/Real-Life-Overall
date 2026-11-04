@@ -4,6 +4,7 @@ import {
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
   OBJECTIVE_SOURCES,
+  ONBOARDING_METHODS,
   RATING_EVENT_SOURCES,
   SEASON_MODES,
   UNIT_SYSTEMS,
@@ -245,6 +246,8 @@ export const onboardingStage = pgEnum("onboarding_stage", [
   "complete",
 ]);
 
+export const onboardingMethod = pgEnum("onboarding_method", ONBOARDING_METHODS);
+
 export const onboardingSessions = pgTable(
   "onboarding_sessions",
   {
@@ -258,6 +261,8 @@ export const onboardingSessions = pgTable(
     // New sessions start at "discovery" (set by the repo); the column default stays "tree"
     // because a migration can't use an enum value it adds in the same transaction.
     stage: onboardingStage().notNull().default("tree"),
+    /** The AI scout or the Combine (DESIGN.md §5.1), set with the questionnaire. */
+    method: onboardingMethod().notNull().default("scout"),
     /** What matters to the user: summarized from discovery, or typed on the weights step. */
     priorities: text(),
     /** ChatMessageDto[] of the discovery conversation. */

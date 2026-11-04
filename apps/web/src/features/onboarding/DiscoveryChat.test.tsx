@@ -26,8 +26,9 @@ const withMessages = (answers: number, done = false) =>
     },
   }) as unknown as OnboardingStateDto;
 
-function renderChat(state: OnboardingStateDto) {
+function renderChat(state: OnboardingStateDto, role = "premium") {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  client.setQueryData(["me"], { role, locked: {} });
   render(
     <QueryClientProvider client={client}>
       <DiscoveryChat state={state} />
@@ -76,5 +77,15 @@ describe("DiscoveryChat", () => {
     await waitFor(() =>
       expect(mockedApi).toHaveBeenCalledWith("/onboarding/discovery/skip", { method: "POST" }),
     );
+  });
+
+  it("sends free accounts to build from templates instead", async () => {
+    renderChat(withMessages(0), "user");
+    expect(screen.queryByRole("button", { name: "Build my template" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Start building" }));
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith("/onboarding/discovery/skip", { method: "POST" }),
+    );
+    expect(mockedApi).not.toHaveBeenCalledWith("/onboarding/discovery", expect.anything());
   });
 });

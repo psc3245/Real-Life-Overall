@@ -41,8 +41,21 @@ export interface SeasonDto {
   mode: SeasonMode;
 }
 
+/**
+ * How starting ratings are set (DESIGN.md §5.1): the AI scout (questionnaire, follow-up chat,
+ * model ratings; Premium) or the Combine (standard questions with fixed scores, no AI).
+ */
+export const ONBOARDING_METHODS = ["scout", "combine"] as const;
+export type OnboardingMethod = (typeof ONBOARDING_METHODS)[number];
+
+export const generateQuestionnaireBodySchema = z.object({
+  method: z.enum(ONBOARDING_METHODS).optional(),
+});
+
 export interface OnboardingStateDto {
   stage: OnboardingStage;
+  /** Picked when the questionnaire is generated. */
+  method: OnboardingMethod;
   season: SeasonDto;
   priorities: string | null;
   weightRationale: string | null;

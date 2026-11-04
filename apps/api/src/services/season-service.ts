@@ -17,6 +17,7 @@ import {
   type SeasonSetupDto,
   type TreeDraft,
   isPremiumRole,
+  combineDecay,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
 import { conflict, notFound } from "../errors";
@@ -287,6 +288,48 @@ export async function rateUnratedLeaves(
   if (!unrated.length) return 0;
 
   const values = computeNodeValues(nodes, leafValuesFromEvents(events));
+  const user = await userRepo.findById(db, userId);
+  const ratings =
+    user && isPremiumRole(user.role)
+      ? await rateLeavesWithModel(db, llm, userId, nodes, values, unrated)
+      : baselineLeafRatings(nodes, values, unrated);
+  await db.transaction(async (tx) => {
+    await eventRepo.insertMany(
+      tx,
+      ratings.map((r) => ({
+        nodeId: r.nodeId,
+        seasonId,
+        delta: r.value,
+        source: "recalibration" as const,
+        reason: r.rationale,
+        evidence: { confidence: r.confidence },
+      })),
+    );
+    await decayRuleRepo.insertMany(
+      tx,
+      ratings.map((r) => ({ nodeId: r.nodeId, ...r.decay, notes: "", authoredBy: "llm" as const })),
+    );
+  });
+  return ratings.length;
+}
+
+type NewLeafRating = {
+  nodeId: string;
+  value: number;
+  rationale: string;
+  confidence: "low" | "medium" | "high";
+  decay: { graceDays: number; perDay: number; floor: number };
+};
+
+/** Premium: the model rates new leaves from everything it knows about the player. */
+async function rateLeavesWithModel(
+  db: Database,
+  llm: LlmClient,
+  userId: string,
+  nodes: Awaited<ReturnType<typeof nodeRepo.findActiveBySeason>>,
+  values: Map<string, number>,
+  unrated: string[],
+): Promise<NewLeafRating[]> {
   const { refById, idByRef } = refsFor(nodes);
   const [profile, archived] = await Promise.all([
     userRepo.findProfileSummary(db, userId),
@@ -335,22 +378,32 @@ export async function rateUnratedLeaves(
       },
     ];
   });
-  await db.transaction(async (tx) => {
-    await eventRepo.insertMany(
-      tx,
-      ratings.map((r) => ({
-        nodeId: r.nodeId,
-        seasonId,
-        delta: r.value,
-        source: "recalibration" as const,
-        reason: r.rationale,
-        evidence: { confidence: r.confidence },
-      })),
-    );
-    await decayRuleRepo.insertMany(
-      tx,
-      ratings.map((r) => ({ nodeId: r.nodeId, ...r.decay, notes: "", authoredBy: "llm" as const })),
-    );
+  return ratings;
+}
+
+/**
+ * Free accounts (DESIGN.md §8.9): a new leaf starts at its parent's current rating (50 without
+ * one), with its category's Combine decay; recaps move it from there.
+ */
+function baselineLeafRatings(
+  nodes: Awaited<ReturnType<typeof nodeRepo.findActiveBySeason>>,
+  values: Map<string, number>,
+  unrated: string[],
+): NewLeafRating[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  return unrated.map((nodeId) => {
+    const node = byId.get(nodeId)!;
+    const parent = node.parentId ? byId.get(node.parentId) : undefined;
+    const fromParent = parent && parent.depth > 0 ? values.get(parent.id) : undefined;
+    const value = round(fromParent ?? 50, 1);
+    return {
+      nodeId,
+      value,
+      rationale: fromParent
+        ? `Starts at ${parent!.name}'s rating. Recaps move it from here.`
+        : "Starts at a typical 50. Recaps move it from here.",
+      confidence: "low" as const,
+      decay: combineDecay(node.templateKey ?? parent?.templateKey ?? null, value),
+    };
   });
-  return ratings.length;
 }

@@ -28,7 +28,15 @@ import {
   type TreeDraft,
   type WeightSuggestionDto,
   isPremiumRole,
+  buildCombineQuestionnaire,
+  combineArchetype,
+  combineDecay,
+  computeNodeValues,
+  scoreCombine,
+  type OnboardingMethod,
+  type SeasonDto,
 } from "@rlo/shared";
+import { PremiumRequiredError } from "../middleware/auth";
 import type { Database } from "../db/client";
 import { badRequest, conflict, notFound } from "../errors";
 import type { LlmClient } from "../llm/client";
@@ -80,13 +88,14 @@ async function loadSession(db: Database, userId: string) {
     season = { ...season, mode: "growth" };
   }
   const session = await onboardingRepo.findOrCreate(db, userId, season.id);
-  return { season, session };
+  return { season, session, premium: isPremiumRole(user.role) };
 }
 
 export async function getState(db: Database, userId: string): Promise<OnboardingStateDto> {
   const { season, session } = await loadSession(db, userId);
   return {
     stage: session.stage,
+    method: session.method,
     season,
     priorities: session.priorities,
     weightRationale: session.weightRationale,
@@ -256,17 +265,34 @@ export async function saveWeights(
   return getState(db, userId);
 }
 
+/**
+ * Writes the questionnaire, which locks the tree and weights. The scout (Premium) has the model
+ * write questions for this tree; the Combine uses the standard bank (DESIGN.md §5.1). Free
+ * accounts default to the Combine.
+ */
 export async function generateQuestionnaire(
   db: Database,
   llm: LlmClient,
   userId: string,
+  requested?: OnboardingMethod,
 ): Promise<OnboardingStateDto> {
-  const { season, session } = await loadSession(db, userId);
+  const { season, session, premium } = await loadSession(db, userId);
   if (session.questionnaire !== null) return getState(db, userId); // idempotent
   if (session.stage !== "questionnaire") throw conflict("Set your weights first");
+  const method = requested ?? (premium ? "scout" : "combine");
+  if (method === "scout" && !premium) {
+    throw new PremiumRequiredError("The AI scout is a Premium feature. Try the Combine.");
+  }
 
   const nodes = await nodeRepo.findActiveBySeason(db, season.id);
   const leaves = leafIds(nodes);
+  if (method === "combine") {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const questions = buildCombineQuestionnaire(leaves.map((id) => byId.get(id)!));
+    await onboardingRepo.setQuestionnaireIfAbsent(db, session.id, questions, "combine");
+    return getState(db, userId);
+  }
+
   const { refById, idByRef } = refsFor(nodes);
   const output = await llm.generateStructured({
     purpose: "onboarding.questionnaire",
@@ -326,7 +352,12 @@ export async function submitQuestionnaire(
   }
   const missing = unansweredRequired(questions, answersOf(session));
   if (missing.length) throw badRequest(`${missing.length} question(s) still need an answer`);
-  await onboardingRepo.update(db, session.id, { stage: "followup", chat: [] });
+  // The Combine has no follow-up chat: its answers score directly.
+  await onboardingRepo.update(
+    db,
+    session.id,
+    session.method === "combine" ? { stage: "rating" } : { stage: "followup", chat: [] },
+  );
   return getState(db, userId);
 }
 
@@ -414,6 +445,7 @@ export async function rateInitial(
   const { season, session } = await loadSession(db, userId);
   if (session.stage === "complete") return getState(db, userId);
   if (session.stage !== "rating") throw conflict("Finish scouting first");
+  if (session.method === "combine") return rateFromCombine(db, userId, season, session);
 
   const nodes = await nodeRepo.findActiveBySeason(db, season.id);
   const leaves = leafIds(nodes);
@@ -466,6 +498,66 @@ export async function rateInitial(
     });
   });
   // Badges the starting ratings already qualify for belong to onboarding, not the first recap.
+  await awardBadges(db, userId);
+  return getState(db, userId);
+}
+
+/**
+ * Starting ratings from the Combine (DESIGN.md §5.1), without the model: each leaf scores its
+ * answers, decay comes from its category's defaults and the archetype from the category ratings.
+ */
+async function rateFromCombine(
+  db: Database,
+  userId: string,
+  season: SeasonDto,
+  session: OnboardingSessionRow,
+): Promise<OnboardingStateDto> {
+  const nodes = await nodeRepo.findActiveBySeason(db, season.id);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const leaves = leafIds(nodes).map((id) => byId.get(id)!);
+  const ratings = scoreCombine(leaves, questionsOf(session) ?? [], answersOf(session));
+  const values = computeNodeValues(nodes, new Map(ratings.map((r) => [r.nodeId, r.value])));
+  const archetype = combineArchetype(
+    nodes
+      .filter((n) => n.depth === 1)
+      .map((n) => ({ name: n.name, templateKey: n.templateKey, value: values.get(n.id) ?? 50 })),
+  );
+  const result: OnboardingResult = {
+    summary: "Rated by the Combine: standard questions with fixed scores.",
+    archetypeDescription: archetype.description,
+  };
+  await db.transaction(async (tx) => {
+    const won = await onboardingRepo.transitionStage(tx, session.id, "rating", "complete", {
+      result,
+    });
+    if (!won) return; // A concurrent request already rated this season.
+    await eventRepo.insertMany(
+      tx,
+      ratings.map((r) => ({
+        nodeId: r.nodeId,
+        seasonId: season.id,
+        delta: r.value,
+        source: "onboarding" as const,
+        reason: r.rationale,
+        evidence: { confidence: r.confidence, method: "combine" },
+      })),
+    );
+    // Machine defaults, so weekly reviews may revise them like the scout's.
+    await decayRuleRepo.insertMany(
+      tx,
+      ratings.map((r) => ({
+        nodeId: r.nodeId,
+        ...combineDecay(byId.get(r.nodeId)!.templateKey, r.value),
+        notes: "Combine default for this category",
+        authoredBy: "llm" as const,
+      })),
+    );
+    await seasonRepo.update(tx, season.id, {
+      status: "active",
+      archetype: archetype.name,
+      archetypeDescription: archetype.description,
+    });
+  });
   await awardBadges(db, userId);
   return getState(db, userId);
 }

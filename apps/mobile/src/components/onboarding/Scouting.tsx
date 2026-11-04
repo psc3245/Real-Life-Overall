@@ -23,6 +23,8 @@ import { colors, fonts, space } from "@/lib/theme";
 import { Chip, NumberField } from "../controls";
 import { Body, Button, Card, ErrorNote, Field, Label, Muted } from "../ui";
 import { Chat } from "./Chat";
+import { useAccount } from "@/api/account";
+import { PremiumBadge } from "@/components/Premium";
 
 const AUTOSAVE_DELAY_MS = 700;
 
@@ -50,32 +52,60 @@ function ScoutingIntro({
 }) {
   const talk = useTalk();
   const generate = useGenerateQuestionnaire();
+  const { premium } = useAccount();
   const attributes = leafIds(state.nodes).length;
+  const pending = (method: "scout" | "combine") =>
+    generate.isPending && generate.variables === method;
   return (
-    <Card style={{ gap: space.md }}>
-      <Text style={styles.big}>{talk.scouting}</Text>
-      <Muted>
-        You&apos;ll get questions written for your {attributes} attributes, about what you&apos;ve
-        actually been doing lately. Your answers set your starting ratings. It takes about 5–10
-        minutes, and your answers save as you go.
-      </Muted>
-      <Muted style={{ color: colors.court500, fontSize: 13 }}>
-        Generating the questions locks your build and weights for Season {state.season.label}.
-      </Muted>
-      <Button
-        title={generate.isPending ? "Writing your questions…" : talk.startScouting}
-        disabled={generate.isPending}
-        onPress={() => generate.mutate()}
-      />
+    <View style={{ gap: space.md }}>
+      <Card style={{ gap: space.sm }}>
+        <Text style={styles.big}>{talk.scouting}</Text>
+        <Muted>
+          Your answers about what you&apos;ve actually been doing lately set your starting ratings
+          for your {attributes} attributes. Answers save as you go.
+        </Muted>
+        <Muted style={{ color: colors.court500, fontSize: 13 }}>
+          Starting locks your build and weights for Season {state.season.label}.
+        </Muted>
+      </Card>
+      <Card style={[{ gap: space.sm }, premium && styles.picked]}>
+        <Text style={styles.method}>
+          {talk.Scout} {premium ? "· AI" : ""}
+        </Text>
+        {!premium && <PremiumBadge />}
+        <Muted>
+          Questions written for your exact build, a short follow-up chat, and ratings with the
+          scout&apos;s reasoning. 5–10 minutes.
+        </Muted>
+        <Button
+          title={pending("scout") ? "Writing your questions…" : talk.startScouting}
+          variant={premium ? "primary" : "ghost"}
+          disabled={!premium || generate.isPending}
+          onPress={() => generate.mutate("scout")}
+        />
+        {pending("scout") && <Muted>This usually takes 10–30 seconds.</Muted>}
+      </Card>
+      <Card style={[{ gap: space.sm }, !premium && styles.picked]}>
+        <Text style={styles.method}>The Combine · No AI</Text>
+        <Muted>
+          Standard questions for every attribute, scored the same way for everyone. About 3 minutes,
+          and ratings right away.
+        </Muted>
+        <Button
+          title={pending("combine") ? "Setting up…" : "Run the Combine"}
+          variant={premium ? "ghost" : "primary"}
+          disabled={generate.isPending}
+          onPress={() => generate.mutate("combine")}
+        />
+      </Card>
+      <ErrorNote error={generate.error} />
       <Button
         title="← Adjust build or weights"
         variant="ghost"
         disabled={generate.isPending}
         onPress={onEditBuild}
       />
-      {generate.isPending && <Muted>This usually takes 10–30 seconds.</Muted>}
-      <ErrorNote error={generate.error} />
-    </Card>
+    </View>
   );
 }
 
@@ -420,6 +450,14 @@ function ScoutingRecap({ state }: { state: OnboardingStateDto }) {
 }
 
 const styles = StyleSheet.create({
+  picked: { borderColor: "rgba(60,242,200,0.4)" },
+  method: {
+    color: colors.court100,
+    fontFamily: fonts.display,
+    fontSize: 20,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
   big: {
     color: colors.neon,
     fontFamily: fonts.heavy,

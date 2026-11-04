@@ -211,6 +211,13 @@
       "when": 1793809214503,
       "tag": "0029_bug_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793809795495,
+      "tag": "0030_onboarding_method",
+      "breakpoints": true
     }
   ]
 }

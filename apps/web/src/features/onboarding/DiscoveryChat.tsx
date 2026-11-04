@@ -4,6 +4,8 @@ import { useDiscovery, useDraftTemplate, useSkipDiscovery } from "../../api/onbo
 import { Button } from "../../components/Button";
 import { ErrorNote } from "./ErrorNote";
 import { useTalk } from "../../lib/talk";
+import { useAccount } from "../../api/account";
+import { PremiumBadge } from "../../components/Premium";
 
 const DRAFTING = [
   "Reading your conversation…",
@@ -11,8 +13,41 @@ const DRAFTING = [
   "Weighing what matters…",
 ];
 
-/** Step 1: get to know the player, then let the scout draft their rating tree. */
+/**
+ * Step 1: get to know the player, then let the scout draft their rating tree. The scout is
+ * Premium (DESIGN.md §8.9); free accounts build from templates.
+ */
 export function DiscoveryChat({ state }: { state: OnboardingStateDto }) {
+  const { premium } = useAccount();
+  return premium ? <ScoutDiscovery state={state} /> : <BuildYourself />;
+}
+
+function BuildYourself() {
+  const skip = useSkipDiscovery();
+  return (
+    <div className="rounded-xl border border-court-700 bg-court-900/70 p-8 text-center">
+      <p className="font-display text-3xl uppercase tracking-wider text-neon">Build your roster</p>
+      <p className="mx-auto mt-3 max-w-lg text-court-300">
+        Pick the parts of life you want rated from the starter categories, or add your own. Then the
+        Combine, a set of quick standard questions, sets your starting ratings.
+      </p>
+      <p className="mx-auto mt-3 max-w-lg text-sm text-court-500">
+        <PremiumBadge className="mr-1.5" />
+        The AI scout can also interview you and draft a tree for you.
+      </p>
+      <div className="mt-6 flex justify-center">
+        <Button variant="primary" disabled={skip.isPending} onClick={() => skip.mutate()}>
+          Start building
+        </Button>
+      </div>
+      <div className="mt-4 flex justify-center">
+        <ErrorNote error={skip.error} />
+      </div>
+    </div>
+  );
+}
+
+function ScoutDiscovery({ state }: { state: OnboardingStateDto }) {
   const talk = useTalk();
   const chat = useDiscovery();
   const draft = useDraftTemplate();

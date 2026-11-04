@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useSaveWeights, useSuggestWeights } from "../../api/onboarding";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "./ErrorNote";
+import { useAccount } from "../../api/account";
 
 const clampImportance = (w: number) =>
   Math.min(IMPORTANCE_MAX, Math.max(IMPORTANCE_MIN, Math.round(w)));
@@ -31,6 +32,7 @@ export function WeightsStep({
       new Map(state.nodes.filter((n) => n.parentId).map((n) => [n.id, clampImportance(n.weight)])),
   );
   const suggest = useSuggestWeights();
+  const { premium } = useAccount();
   const save = useSaveWeights();
 
   const parents = state.nodes.filter((p) => state.nodes.some((n) => n.parentId === p.id));
@@ -49,33 +51,37 @@ export function WeightsStep({
 
   return (
     <div className="space-y-8">
-      <section className="rounded-xl border border-court-700 bg-court-900/70 p-5">
-        <label htmlFor="priorities" className="font-display text-xl uppercase tracking-wider">
-          What matters most to you right now?
-        </label>
-        <p className="mt-1 text-sm text-court-300">
-          The AI proposes how much each category and attribute counts toward its parent. You get the
-          final say with the sliders.
-        </p>
-        <textarea
-          id="priorities"
-          value={priorities}
-          onChange={(e) => setPriorities(e.target.value)}
-          maxLength={1000}
-          rows={3}
-          placeholder="e.g. Getting promoted this year matters most, then my health. Social life is fine as is."
-          className="mt-3 w-full rounded-lg border border-court-700 bg-court-950 p-3 text-sm outline-none focus:border-neon"
-        />
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Button onClick={runSuggest} disabled={suggest.isPending}>
-            {suggest.isPending ? "Thinking…" : "✦ Suggest weights"}
-          </Button>
-          <ErrorNote error={suggest.error} />
-        </div>
-        {rationale && (
-          <p className="mt-4 border-l-2 border-neon/60 pl-3 text-sm text-court-300">{rationale}</p>
-        )}
-      </section>
+      {premium && (
+        <section className="rounded-xl border border-court-700 bg-court-900/70 p-5">
+          <label htmlFor="priorities" className="font-display text-xl uppercase tracking-wider">
+            What matters most to you right now?
+          </label>
+          <p className="mt-1 text-sm text-court-300">
+            The AI proposes how much each category and attribute counts toward its parent. You get
+            the final say with the sliders.
+          </p>
+          <textarea
+            id="priorities"
+            value={priorities}
+            onChange={(e) => setPriorities(e.target.value)}
+            maxLength={1000}
+            rows={3}
+            placeholder="e.g. Getting promoted this year matters most, then my health. Social life is fine as is."
+            className="mt-3 w-full rounded-lg border border-court-700 bg-court-950 p-3 text-sm outline-none focus:border-neon"
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button onClick={runSuggest} disabled={suggest.isPending}>
+              {suggest.isPending ? "Thinking…" : "✦ Suggest weights"}
+            </Button>
+            <ErrorNote error={suggest.error} />
+          </div>
+          {rationale && (
+            <p className="mt-4 border-l-2 border-neon/60 pl-3 text-sm text-court-300">
+              {rationale}
+            </p>
+          )}
+        </section>
+      )}
 
       {parents.map((parent) => (
         <WeightGroup
