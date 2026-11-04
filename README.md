@@ -57,8 +57,9 @@ npm run ios
 ```
 
 After that, `npm run dev:mobile` starts just the bundler for the installed app. The app calls the API
-on port 8787 of the machine serving the bundle (`localhost` in the Simulator); set
-`EXPO_PUBLIC_API_URL` to point it elsewhere. It's iOS only; there is no Android build.
+on port 8787 of the machine serving the bundle (`localhost` in the Simulator); a release build
+calls production (`https://getovr.dev`). Set `EXPO_PUBLIC_API_URL` (and `EXPO_PUBLIC_WEB_URL` for
+email and profile links) to point either one elsewhere, such as staging. It's iOS only; there is no Android build.
 
 It also needs CocoaPods (`brew install cocoapods`). Let Expo install pods (`npm run ios`, or
 `npx expo prebuild -p ios` in `apps/mobile`); a bare `pod install` fails the Reanimated and Worklets

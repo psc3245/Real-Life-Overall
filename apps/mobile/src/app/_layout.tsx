@@ -120,7 +120,11 @@ function Unreachable() {
     <Screen>
       <Card style={{ gap: 12, marginTop: 80 }}>
         <Body>Can&apos;t reach the API.</Body>
-        <Muted>Tried {API_URL}. Start it with `npm run dev:api`, or set EXPO_PUBLIC_API_URL.</Muted>
+        <Muted>
+          {__DEV__
+            ? `Tried ${API_URL}. Start it with \`npm run dev:api\`, or set EXPO_PUBLIC_API_URL.`
+            : "Check your connection and try again."}
+        </Muted>
         <Button title="Try again" onPress={() => void queryClient.refetchQueries()} />
       </Card>
     </Screen>
