@@ -156,6 +156,22 @@ is one Worker serving the web app and the API on the same origin.
 7. **Spend limit:** set a monthly limit in the Anthropic Console. The API also caps each user's daily
    LLM spend (`LLM_USER_DAILY_BUDGET_USD`, default $1).
 
+### The first admin
+
+Admins manage accounts in the web app's `/admin` → Front office (create, delete, change type,
+resend emails). To make the first one in an environment, list your email in `ADMIN_EMAILS`:
+
+```bash
+npx wrangler secret put ADMIN_EMAILS --env production
+```
+
+Enter your email (comma-separate several). Sign up at the site with that address and confirm it;
+your next request makes the account Admin. Keep it a secret rather than a `wrangler.jsonc` var so
+the address stays out of the repo. It only promotes: to demote a listed account, remove it from the
+list first. Once you're in, grant other admins from the Front office. Alternatively, with the
+production `DATABASE_URL` in `apps/api/.env`, run `npm run set-role -w @rlo/api -- you@example.com
+admin`.
+
 To deploy by hand instead, build the web app first (`npm run build -w @rlo/web`), then in
 `apps/api`:
 

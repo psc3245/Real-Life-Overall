@@ -23,6 +23,11 @@ export const envSchema = z.object({
   EMAIL_FROM: z.string().default("Real Life Overall <onboarding@resend.dev>"),
   PASSWORD_HASH_ITERATIONS: z.coerce.number().int().min(10_000).default(100_000),
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
+  /**
+   * Comma-separated emails made Admin when they sign in with a confirmed email (DESIGN.md §8.7).
+   * Bootstraps the first admin; set it as a Worker secret so the address stays out of the repo.
+   */
+  ADMIN_EMAILS: z.string().default(""),
   /** "provider:modelId", e.g. "anthropic:claude-haiku-5-5". */
   LLM_FAST_MODEL: optionalKey,
   LLM_SMART_MODEL: optionalKey,

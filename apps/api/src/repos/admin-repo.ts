@@ -1,7 +1,29 @@
 import type { UserRole } from "@rlo/shared";
-import { and, asc, count, desc, eq, gte, isNotNull, lte, sql, type SQL } from "drizzle-orm";
-import type { Executor } from "../db/client";
-import { dayLogs, llmCalls, recaps, seasons, users } from "../db/schema";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  isNotNull,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
+import type { Database, Executor } from "../db/client";
+import {
+  authAccounts,
+  authSessions,
+  authUsers,
+  dayLogs,
+  llmCalls,
+  recaps,
+  seasons,
+  users,
+} from "../db/schema";
 
 const num = (expr: SQL) => sql<number>`coalesce(${expr}, 0)`.mapWith(Number);
 
@@ -86,8 +108,14 @@ export async function counts(db: Executor, activeSince: string) {
   return { ...u!, activeSeasons: s!.activeSeasons, activeUsers7d: a!.activeUsers };
 }
 
-/** Every account with its role, last logged day and LLM spend. */
-export async function findUsers(db: Executor) {
+export interface UserFilter {
+  q?: string;
+  role?: UserRole;
+  id?: string;
+}
+
+/** Accounts matching the search, newest first, with role, sign-in, last logged day and LLM spend. */
+export async function findUsers(db: Executor, filter: UserFilter = {}, limit = 200) {
   const lastLogged = db
     .select({ userId: dayLogs.userId, last: sql<string>`max(${dayLogs.localDate})`.as("last") })
     .from(dayLogs)
@@ -102,6 +130,17 @@ export async function findUsers(db: Executor) {
     .from(llmCalls)
     .groupBy(llmCalls.userId)
     .as("spend");
+  const providers = db
+    .select({
+      userId: authAccounts.userId,
+      list: sql<
+        string[]
+      >`array_agg(${authAccounts.providerId} order by ${authAccounts.providerId})`.as("list"),
+    })
+    .from(authAccounts)
+    .groupBy(authAccounts.userId)
+    .as("providers");
+  const pattern = filter.q ? `%${filter.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%` : undefined;
   return db
     .select({
       id: users.id,
@@ -109,6 +148,8 @@ export async function findUsers(db: Executor) {
       displayName: users.displayName,
       email: users.email,
       role: users.role,
+      emailVerified: authUsers.emailVerified,
+      signIn: sql<string[]>`coalesce(${providers.list}, '{}')`,
       timezone: users.timezone,
       createdAt: users.createdAt,
       lastLogged: lastLogged.last,
@@ -116,9 +157,75 @@ export async function findUsers(db: Executor) {
       costUsd: sql<number>`coalesce(${spend.cost}, 0)`.mapWith(Number),
     })
     .from(users)
+    .leftJoin(authUsers, eq(authUsers.id, users.authSubject))
+    .leftJoin(providers, eq(providers.userId, users.authSubject))
     .leftJoin(lastLogged, eq(lastLogged.userId, users.id))
     .leftJoin(spend, eq(spend.userId, users.id))
-    .orderBy(desc(users.createdAt));
+    .where(
+      and(
+        pattern
+          ? or(
+              ilike(users.username, pattern),
+              ilike(users.displayName, pattern),
+              ilike(users.email, pattern),
+            )
+          : undefined,
+        filter.role ? eq(users.role, filter.role) : undefined,
+        filter.id ? eq(users.id, filter.id) : undefined,
+      ),
+    )
+    .orderBy(desc(users.createdAt))
+    .limit(limit);
+}
+
+/** The app user and its auth identity (if any), for account management. */
+export async function findAccount(db: Executor, id: string) {
+  const [row] = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      email: users.email,
+      role: users.role,
+      authSubject: users.authSubject,
+      authEmail: authUsers.email,
+      emailVerified: authUsers.emailVerified,
+    })
+    .from(users)
+    .leftJoin(authUsers, eq(authUsers.id, users.authSubject))
+    .where(eq(users.id, id));
+  return row ?? null;
+}
+
+/** Whether an app user or an auth identity already has this email. */
+export async function emailTaken(db: Executor, email: string) {
+  const [app] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+  const [auth] = await db
+    .select({ id: authUsers.id })
+    .from(authUsers)
+    .where(eq(authUsers.email, email));
+  return Boolean(app ?? auth);
+}
+
+/**
+ * Deletes the app user (every table cascades from `users`; `llm_calls` keep their cost with a null
+ * user) and its auth identity (sessions and accounts cascade from `auth_users`).
+ */
+export async function deleteAccount(db: Database, id: string, authSubject: string | null) {
+  await db.transaction(async (tx) => {
+    await tx.delete(users).where(eq(users.id, id));
+    if (authSubject) await tx.delete(authUsers).where(eq(authUsers.id, authSubject));
+  });
+}
+
+export async function markEmailVerified(db: Executor, authSubject: string) {
+  await db
+    .update(authUsers)
+    .set({ emailVerified: true, updatedAt: new Date() })
+    .where(eq(authUsers.id, authSubject));
+}
+
+export async function deleteSessions(db: Executor, authSubject: string) {
+  await db.delete(authSessions).where(eq(authSessions.userId, authSubject));
 }
 
 /** Also keeps `premium_since`: set on the way up from Free, kept between paid types, cleared on Free. */

@@ -2,6 +2,7 @@ import { isPremiumRole, isTesterRole, type SeasonMode, type UserRole } from "@rl
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../context";
+import * as adminRepo from "../repos/admin-repo";
 import * as userRepo from "../repos/user-repo";
 import { createAuth, type Auth } from "../auth/auth";
 import type { Context } from "hono";
@@ -22,8 +23,13 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
     const user =
       (await userRepo.findByAuthSubject(db, session.user.id)) ??
       (await userRepo.createForAuth(db, session.user));
+    let role = user.role;
+    if (role !== "admin" && isBootstrapAdmin(env.ADMIN_EMAILS, session.user)) {
+      await adminRepo.setRole(db, user.id, "admin");
+      role = "admin";
+    }
     c.set("userId", user.id);
-    c.set("role", user.role);
+    c.set("role", role);
     await next();
     return;
   }
@@ -37,6 +43,16 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   c.set("role", user.role);
   await next();
 });
+
+/** Whether ADMIN_EMAILS names this identity. Only a confirmed email counts. */
+export function isBootstrapAdmin(
+  adminEmails: string,
+  identity: { email: string; emailVerified: boolean },
+) {
+  const email = identity.email.trim().toLowerCase();
+  if (!identity.emailVerified || !email) return false;
+  return adminEmails.split(",").some((e) => e.trim().toLowerCase() === email);
+}
 
 /**
  * Admin-only routes (DESIGN.md §8.7); runs after requireUser. Non-admins get a 404 so the routes
