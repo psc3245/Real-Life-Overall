@@ -33,6 +33,8 @@
     },
     // Deployed from main. One Worker serves the web app and the API on one origin (DESIGN.md §8.5).
     "production": {
+      // Declared here so deploys keep it: wrangler replaces the Worker's routes with this list.
+      "routes": [{ "pattern": "getovr.dev", "custom_domain": true }],
       "assets": {
         "directory": "../web/dist",
         "not_found_handling": "single-page-application",
