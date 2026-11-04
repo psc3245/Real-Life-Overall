@@ -29,6 +29,15 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # An unset PUBLIC_URL deploys a Worker that rejects every API request, so stop here instead.
+      - name: Check PUBLIC_URL
+        run: |
+          if [[ ! "$PUBLIC_URL" =~ ^https://[^/[:space:]]+$ ]]; then
+            echo "::error::PUBLIC_URL is '$PUBLIC_URL'. Set it to the site's origin (e.g. https://example.com) under Settings → Environments → $WRANGLER_ENV → Environment variables."
+            exit 1
+          fi
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       - run: npm ci
       - run: npm run build -w @rlo/web
       # Migrations run before the new code goes live, so each one must keep the running version
