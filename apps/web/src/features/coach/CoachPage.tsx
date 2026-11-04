@@ -7,7 +7,14 @@ import {
   type CoachMessageDto,
   type CoachSuggestionDto,
 } from "@rlo/shared";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Link, useSearchParams } from "react-router";
 import {
   useClearCoach,
@@ -32,6 +39,7 @@ export function CoachPage() {
   const bottom = useRef<HTMLDivElement>(null);
   const messages = coach.data?.messages ?? [];
   const remaining = coach.data?.remaining ?? 0;
+  const empty = messages.length === 0 && !send.isPending;
 
   const submit = (text: string) => {
     const message = text.trim();
@@ -58,24 +66,18 @@ export function CoachPage() {
   if (coach.isError) return <ErrorNote error={coach.error} />;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 pt-4">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-neon">{talk.coachTagline}</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">{talk.coach}</h1>
-          <p className="mt-1 max-w-xl text-court-300">
-            Ask about your ratings, what to work on, or how to fit it into your week. The{" "}
-            {talk.coach.toLowerCase()}
-            knows your habits, goals, recent days and{" "}
-            <Link to="/scouting-report" className="text-neon hover:underline">
-              {talk.scoutingReport}
-            </Link>
-            , and can suggest habits and goals you add with one tap.
-          </p>
+    <div className="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-3xl flex-col gap-6 pt-4">
+      <header className="flex items-center justify-between gap-4 border-b border-court-800 pb-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <CoachAvatar size="lg" />
+          <div className="min-w-0">
+            <h1 className="font-display text-3xl font-bold uppercase leading-none">{talk.coach}</h1>
+            <p className="mt-1 text-xs uppercase tracking-[0.3em] text-neon">{talk.coachTagline}</p>
+          </div>
         </div>
         {messages.length > 0 && (
           <Button
-            variant="danger"
+            variant="ghost"
             disabled={clear.isPending || send.isPending}
             onClick={() => {
               if (window.confirm("Clear the whole conversation?")) clear.mutate();
@@ -86,11 +88,31 @@ export function CoachPage() {
         )}
       </header>
 
-      <div className="space-y-4" aria-live="polite">
-        {messages.length === 0 && !send.isPending && (
-          <div className="space-y-3 rounded-xl border border-dashed border-court-700 p-6 text-center">
-            <p className="text-court-300">Not sure where to start? Try one of these.</p>
-            <Starters onPick={submit} disabled={remaining === 0} />
+      <div className="flex flex-1 flex-col gap-4" aria-live="polite">
+        {empty && (
+          <div className="m-auto flex max-w-xl flex-col items-center gap-3 py-8 text-center">
+            <CoachAvatar size="xl" />
+            <h2 className="font-display text-3xl font-bold uppercase">What are we working on?</h2>
+            <p className="text-court-300">
+              The {talk.coach.toLowerCase()} knows your habits, goals, recent days and{" "}
+              <Link to="/scouting-report" className="text-neon hover:underline">
+                {talk.scoutingReport}
+              </Link>
+              , and can suggest habits and goals you add with one tap.
+            </p>
+            <div className="mt-3 grid w-full gap-2 sm:grid-cols-2">
+              {COACH_STARTERS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={remaining === 0}
+                  onClick={() => submit(s)}
+                  className="rounded-xl border border-court-700 bg-court-900/60 px-4 py-3 text-left text-sm text-court-100 transition hover:border-neon hover:bg-court-900 disabled:opacity-40"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((m) => (
@@ -101,9 +123,7 @@ export function CoachPage() {
             <Bubble role="user" pending>
               {send.variables}
             </Bubble>
-            <p className="w-fit animate-pulse rounded-2xl rounded-bl-sm border border-court-700 bg-court-900 px-4 py-2.5 text-court-500">
-              Thinking…
-            </p>
+            <TypingBubble />
           </>
         )}
         <div ref={bottom} />
@@ -111,46 +131,103 @@ export function CoachPage() {
 
       <ErrorNote error={send.error ?? clear.error} />
 
-      <form
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          submit(draft);
-        }}
-        className="sticky bottom-3 space-y-1 rounded-xl border border-court-700 bg-court-950/95 p-2 backdrop-blur"
-      >
-        <div className="flex gap-2">
-          <textarea
-            aria-label="Message the coach"
-            value={draft}
-            rows={1}
-            maxLength={MAX_COACH_MESSAGE}
-            disabled={remaining === 0}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit(draft);
-              }
-            }}
-            placeholder={remaining === 0 ? "Daily limit reached" : "Ask the coach…"}
-            className="min-h-10 min-w-0 flex-1 resize-y rounded-lg bg-transparent px-3 py-2 outline-none"
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!draft.trim() || send.isPending || remaining === 0}
-          >
-            Send
-          </Button>
-        </div>
-        {remaining <= 5 && (
-          <p className="px-3 text-xs text-court-500">
-            {remaining} message{remaining === 1 ? "" : "s"} left in the last 24 hours.
-          </p>
-        )}
-      </form>
+      <Composer
+        value={draft}
+        onChange={setDraft}
+        onSubmit={() => submit(draft)}
+        busy={send.isPending}
+        remaining={remaining}
+        placeholder={`Ask the ${talk.coach.toLowerCase()}…`}
+      />
       <DebugJson label="coach" data={coach.data} />
     </div>
+  );
+}
+
+/** The message box: grows with its text, autocorrects, Enter sends and Shift+Enter breaks a line. */
+function Composer({
+  value,
+  onChange,
+  onSubmit,
+  busy,
+  remaining,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  busy: boolean;
+  remaining: number;
+  placeholder: string;
+}) {
+  const box = useRef<HTMLTextAreaElement>(null);
+  const out = remaining === 0;
+  const canSend = !!value.trim() && !busy && !out;
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [value]);
+
+  return (
+    <form
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+      className="sticky bottom-3 space-y-1.5"
+    >
+      <div className="flex items-end gap-2 rounded-2xl border border-court-700 bg-court-900/95 p-1.5 pl-4 shadow-lg shadow-black/40 backdrop-blur transition focus-within:border-neon/60">
+        <textarea
+          ref={box}
+          aria-label="Message the coach"
+          value={value}
+          rows={1}
+          maxLength={MAX_COACH_MESSAGE}
+          disabled={out}
+          spellCheck
+          autoCorrect="on"
+          autoCapitalize="sentences"
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          placeholder={out ? "Daily limit reached" : placeholder}
+          className="max-h-[200px] min-w-0 flex-1 resize-none bg-transparent py-2 leading-6 outline-none placeholder:text-court-500"
+        />
+        <button
+          type="submit"
+          aria-label="Send"
+          disabled={!canSend}
+          className="grid size-10 shrink-0 place-items-center rounded-xl bg-neon text-court-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
+            <path
+              d="M12 19V5m0 0-6 6m6-6 6 6"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+      <p className="flex justify-between gap-3 px-2 text-xs text-court-500">
+        <span className="hidden sm:inline">Enter to send · Shift + Enter for a new line</span>
+        <span className="ml-auto">
+          {remaining <= 5 &&
+            `${remaining} message${remaining === 1 ? "" : "s"} left in the last 24 hours`}
+          {remaining > 5 &&
+            value.length > MAX_COACH_MESSAGE - 200 &&
+            `${MAX_COACH_MESSAGE - value.length} characters left`}
+        </span>
+      </p>
+    </form>
   );
 }
 
@@ -178,22 +255,40 @@ export function Starters({
   );
 }
 
+/** The coach's badge: an OVR-style monogram on a neon disc. */
+function CoachAvatar({ size = "sm" }: { size?: "sm" | "lg" | "xl" }) {
+  const sizes = { sm: "size-8 text-xs", lg: "size-12 text-base", xl: "size-16 text-xl" };
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid shrink-0 place-items-center rounded-full bg-neon font-display font-bold uppercase text-court-950 shadow-[0_0_24px_-4px] shadow-neon/60 ${sizes[size]}`}
+    >
+      HC
+    </span>
+  );
+}
+
 function Bubble({
   role,
   pending = false,
+  time,
   children,
 }: {
   role: CoachMessageDto["role"];
   pending?: boolean;
+  time?: string;
   children: ReactNode;
 }) {
+  const user = role === "user";
   return (
-    <div className={role === "user" ? "flex justify-end" : "flex"}>
+    <div className={`flex items-end gap-2 ${user ? "justify-end" : ""}`}>
+      {!user && <CoachAvatar />}
       <p
-        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 ${
-          role === "user"
-            ? `rounded-br-sm ${pending ? "bg-neon/10 text-court-300" : "bg-neon/15 text-court-100"}`
-            : "rounded-bl-sm border border-court-700 bg-court-900"
+        title={time ? new Date(time).toLocaleString() : undefined}
+        className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 leading-relaxed ${
+          user
+            ? `rounded-br-md bg-neon font-medium text-court-950 ${pending ? "opacity-60" : ""}`
+            : "rounded-bl-md border border-court-700 bg-court-900 text-court-100"
         }`}
       >
         {children}
@@ -202,12 +297,32 @@ function Bubble({
   );
 }
 
+/** Three dots that bounce in turn while the coach writes a reply. */
+function TypingBubble() {
+  return (
+    <div className="flex items-end gap-2" role="status" aria-label="The coach is typing">
+      <CoachAvatar />
+      <span className="flex gap-1 rounded-2xl rounded-bl-md border border-court-700 bg-court-900 px-4 py-3.5">
+        {[0, 150, 300].map((delay) => (
+          <span
+            key={delay}
+            className="size-2 animate-bounce rounded-full bg-court-300"
+            style={{ animationDelay: `${delay}ms` }}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 function Message({ message: m }: { message: CoachMessageDto }) {
   return (
     <div className="space-y-2">
-      <Bubble role={m.role}>{m.content}</Bubble>
+      <Bubble role={m.role} time={m.createdAt}>
+        {m.content}
+      </Bubble>
       {m.suggestions.length > 0 && (
-        <ul className="space-y-2 sm:ml-6">
+        <ul className="space-y-2 pl-10">
           {m.suggestions.map((s) => (
             <Suggestion key={s.index} messageId={m.id} suggestion={s} />
           ))}
