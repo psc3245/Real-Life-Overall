@@ -17,11 +17,37 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const ROLE_DETAILS: Record<UserRole, string> = {
-  user: "Growth seasons, daily recaps and weekly reviews, template ratings.",
+  user: "Growth seasons, daily recaps and weekly reviews, and the Combine for starting ratings.",
   premium: "Everything: Rating seasons, the coach, the scout, AI write-ups and suggestions.",
   dev: "Play tester: lifetime Premium, features in testing and bug reports.",
   admin: "Premium plus the control room and debug tools.",
 };
+
+/** "3 weeks Premium": how long the account has been premium, in weeks (days in the first). */
+export function premiumTenure(since: string | null, now = new Date()): string | null {
+  if (!since) return null;
+  const days = Math.max(0, Math.floor((now.getTime() - new Date(since).getTime()) / 86_400_000));
+  if (days < 1) return "New to Premium";
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} Premium`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks} week${weeks === 1 ? "" : "s"} Premium`;
+}
+
+/** What Premium adds, for the upgrade page and the settings account card. */
+export const PREMIUM_PERKS = [
+  "Rating seasons, plus peeking at your rating in a Growth season",
+  "The coach: advice from your own data, with one-tap habits and goals",
+  "The AI scout at onboarding: an interview, a drafted tree and tailored questions",
+  "AI report write-ups and suggestions",
+  "AI suggestions for which attributes a habit builds",
+  "A bigger daily AI budget",
+] as const;
+
+/** GET /me/ai-usage: the rolling 24-hour AI budget, as a share only (never dollars). */
+export interface AiUsageDto {
+  /** 0-100, rounded up so any use shows; at 100 AI requests wait until older ones age out. */
+  usedPercent: number;
+}
 
 export const setRoleBodySchema = z.object({ role: z.enum(USER_ROLES) });
 

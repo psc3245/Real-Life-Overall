@@ -6,33 +6,50 @@ export interface Section {
 }
 
 /**
+ * The section in view, by element id: the last one whose top has passed a line near the top of
+ * the viewport, or the last section once the page is scrolled to the bottom (short last
+ * sections never reach the line). `setActive` marks a jump right away.
+ */
+export function useActiveSection(ids: string[]) {
+  const [active, setActive] = useState(ids[0]);
+  const key = ids.join(",");
+
+  useEffect(() => {
+    const list = key.split(",");
+    const update = () => {
+      const elements = list
+        .map((id) => document.getElementById(id))
+        .filter((el): el is HTMLElement => Boolean(el));
+      if (!elements.length) return;
+      const atBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      if (atBottom && window.scrollY > 0) {
+        setActive(elements.at(-1)!.id);
+        return;
+      }
+      let current = elements[0]!.id;
+      for (const el of elements) if (el.getBoundingClientRect().top <= 120) current = el.id;
+      setActive(current);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [key]);
+
+  return [active, setActive] as const;
+}
+
+/**
  * Sticky jump links for long pages, highlighting the section in view, plus a back-to-top button
  * once you've scrolled. Sections need matching element ids (give them `scroll-mt-16`).
  */
 export function SectionNav({ sections }: { sections: Section[] }) {
-  const [active, setActive] = useState(sections[0]?.id);
+  const [active, setActive] = useActiveSection(sections.map((s) => s.id));
   const [scrolled, setScrolled] = useState(false);
-  const ids = sections.map((s) => s.id).join(",");
-
-  useEffect(() => {
-    const elements = ids
-      .split(",")
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => Boolean(el));
-    if (!elements.length || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]) setActive(visible[0].target.id);
-      },
-      // A band near the top of the viewport decides which section is "current".
-      { rootMargin: "-64px 0px -60% 0px" },
-    );
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [ids]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 600);

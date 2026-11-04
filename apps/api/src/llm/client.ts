@@ -196,23 +196,37 @@ export function dbCallRecorder(db: Database) {
 }
 
 /** Caps what one user can spend: the estimated cost of their calls over the last 24 hours. */
+export interface DailyBudgets {
+  premiumUsd: number;
+  freeUsd: number;
+}
+
 /**
- * Account type plus spend over the rolling 24 hours, held to the premium or free daily budget
- * (premium covers dev and admin accounts).
+ * A user's estimated spend over the rolling 24 hours against their daily budget, premium or free
+ * (premium covers dev and admin accounts). Hourly-job calls count too; they just aren't refused.
  */
-export function dbAccessGuard(db: Database, budgets: { premiumUsd: number; freeUsd: number }) {
+export async function budgetUsage(db: Database, budgets: DailyBudgets, userId: string) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [[user], [row]] = await Promise.all([
+    db.select({ role: users.role }).from(users).where(eq(users.id, userId)),
+    db
+      .select({ spent: sql<string | null>`sum(${llmCalls.costUsd})` })
+      .from(llmCalls)
+      .where(and(eq(llmCalls.userId, userId), gte(llmCalls.createdAt, since))),
+  ]);
+  const premium = user ? isPremiumRole(user.role) : false;
+  return {
+    premium,
+    spentUsd: Number(row?.spent ?? 0),
+    budgetUsd: premium ? budgets.premiumUsd : budgets.freeUsd,
+  };
+}
+
+/** Account type plus the daily budget, for LlmClient. */
+export function dbAccessGuard(db: Database, budgets: DailyBudgets) {
   return async (userId: string): Promise<LlmAccess> => {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [[user], [row]] = await Promise.all([
-      db.select({ role: users.role }).from(users).where(eq(users.id, userId)),
-      db
-        .select({ spent: sql<string | null>`sum(${llmCalls.costUsd})` })
-        .from(llmCalls)
-        .where(and(eq(llmCalls.userId, userId), gte(llmCalls.createdAt, since))),
-    ]);
-    const premium = user ? isPremiumRole(user.role) : false;
-    const budget = premium ? budgets.premiumUsd : budgets.freeUsd;
-    return { premium, withinBudget: Number(row?.spent ?? 0) < budget };
+    const { premium, spentUsd, budgetUsd } = await budgetUsage(db, budgets, userId);
+    return { premium, withinBudget: spentUsd < budgetUsd };
   };
 }
 

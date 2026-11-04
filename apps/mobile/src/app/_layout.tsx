@@ -95,6 +95,7 @@ function RootStack() {
           <Stack.Screen name="settings" options={pushedOptions} />
           <Stack.Screen name="personalize" options={pushedOptions} />
           <Stack.Screen name="admin" options={pushedOptions} />
+          <Stack.Screen name="upgrade" options={pushedOptions} />
           <Stack.Screen name="bug-report" options={{ ...pushedOptions, presentation: "modal" }} />
         </Stack.Protected>
         <Stack.Protected guard={!auth.signedIn}>

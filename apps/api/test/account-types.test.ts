@@ -1,4 +1,4 @@
-import type { BugReportDto, MeDto, OnboardingStateDto } from "@rlo/shared";
+import type { AiUsageDto, BugReportDto, MeDto, OnboardingStateDto } from "@rlo/shared";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -19,7 +19,10 @@ async function setup() {
   const t = await createTestApp();
   const me = await body<MeDto>(await t.request("/me"));
   const setRole = (role: "user" | "premium" | "dev" | "admin") =>
-    t.db.update(users).set({ role }).where(eq(users.id, me.id));
+    t.db
+      .update(users)
+      .set({ role, premiumSince: role === "user" ? null : new Date() })
+      .where(eq(users.id, me.id));
   await setRole("user");
   return { ...t, me, setRole };
 }
@@ -41,6 +44,7 @@ describe("account types", () => {
     });
     expect(links.status).toBe(403);
 
+    expect(free.premiumSince).toBeNull();
     await setRole("dev");
     const dev = await body<MeDto>(await request("/me"));
     expect(dev.locked).toEqual({});
@@ -135,5 +139,48 @@ describe("account types", () => {
     });
     expect(resolve.status).toBe(204);
     expect(await body<BugReportDto[]>(await request("/admin/bug-reports?status=open"))).toEqual([]);
+  });
+
+  it("starts the Premium clock when an admin upgrades someone, and stops it on Free", async () => {
+    const { request, setRole } = await setup();
+    await setRole("admin");
+    await request("/me", { user: "other" });
+    const other = (
+      await body<{ id: string; username: string }[]>(await request("/admin/users"))
+    ).find((u) => u.username === "other")!;
+    const patch = (role: string) =>
+      request(`/admin/users/${other.id}`, { method: "PATCH", ...json({ role }) });
+    const since = async () =>
+      (await body<MeDto>(await request("/me", { user: "other" }))).premiumSince;
+
+    await patch("user");
+    expect(await since()).toBeNull();
+    await patch("premium");
+    const started = await since();
+    expect(started).not.toBeNull();
+    await patch("dev"); // still premium: the clock keeps running
+    expect(await since()).toBe(started);
+    await patch("user");
+    expect(await since()).toBeNull();
+  });
+
+  it("reports the share of the daily AI budget used, against the account's own budget", async () => {
+    const { request, db, me, setRole } = await setup();
+    const usage = async () => (await body<AiUsageDto>(await request("/me/ai-usage"))).usedPercent;
+    expect(await usage()).toBe(0);
+    await db.insert(llmCalls).values({
+      userId: me.id,
+      purpose: "recap.daily",
+      provider: "mock",
+      model: "mock-model",
+      promptVersion: "v1",
+      costUsd: 0.1,
+      latencyMs: 1,
+    });
+    expect(await usage()).toBe(40); // $0.10 of the free $0.25 (the default)
+    await setRole("premium");
+    expect(await usage()).toBe(10); // of the premium $1
+    const res = await request("/me/ai-usage");
+    expect(JSON.stringify(await res.json())).not.toContain("0.1"); // no dollars
   });
 });

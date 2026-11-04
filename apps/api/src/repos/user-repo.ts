@@ -22,13 +22,16 @@ export const publicUserColumns = {
   trackWeight: users.trackWeight,
   trackHeight: users.trackHeight,
   role: users.role,
+  premiumSince: users.premiumSince,
   preferences: users.preferences,
   createdAt: users.createdAt,
 };
 
 type UserRow = {
-  [K in keyof typeof publicUserColumns]: (typeof publicUserColumns)[K]["_"]["data"];
-};
+  [
+    K in Exclude<keyof typeof publicUserColumns, "premiumSince">
+  ]: (typeof publicUserColumns)[K]["_"]["data"];
+} & { premiumSince: Date | null };
 export type PublicUser = Omit<UserRow, "preferences"> & { preferences: Preferences };
 
 const toPublic = (row: UserRow): PublicUser => ({
@@ -58,7 +61,13 @@ export async function findOrCreateDevUser(db: Database, username: string): Promi
   if (existing) return toPublic(existing);
   await db
     .insert(users)
-    .values({ username, email: `${username}@dev.local`, displayName: username, role: "premium" })
+    .values({
+      username,
+      email: `${username}@dev.local`,
+      displayName: username,
+      role: "premium",
+      premiumSince: new Date(),
+    })
     .onConflictDoNothing({ target: users.username });
   const rows = await db.select(publicUserColumns).from(users).where(eq(users.username, username));
   return toPublic(rows[0]!);

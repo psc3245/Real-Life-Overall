@@ -5,6 +5,7 @@ import {
   PROFILE_VISIBILITIES,
   UNIT_SYSTEMS,
   usernameSchema,
+  type AiUsageDto,
   type Feature,
 } from "@rlo/shared";
 import { Hono } from "hono";
@@ -13,6 +14,7 @@ import { z } from "zod";
 import type { AppEnv } from "../context";
 import { conflict, isUniqueViolation } from "../errors";
 import * as userRepo from "../repos/user-repo";
+import { budgetUsage } from "../llm/client";
 import { parseJson } from "../validation";
 
 /** Adds the account's locked features and switches them off (DESIGN.md §8.9). */
@@ -40,6 +42,18 @@ const updateMeSchema = z
   .refine((v) => Object.keys(v).length > 0, "Provide at least one field");
 
 export const meRoutes = new Hono<AppEnv>()
+  .get("/ai-usage", async (c) => {
+    const env = c.get("env");
+    const { spentUsd, budgetUsd } = await budgetUsage(
+      c.get("db"),
+      { premiumUsd: env.LLM_USER_DAILY_BUDGET_USD, freeUsd: env.LLM_FREE_DAILY_BUDGET_USD },
+      c.get("userId"),
+    );
+    const usage: AiUsageDto = {
+      usedPercent: Math.min(100, Math.ceil((spentUsd / budgetUsd) * 100)),
+    };
+    return c.json(usage);
+  })
   .get("/", async (c) => {
     const user = await userRepo.findById(c.get("db"), c.get("userId"));
     if (!user) throw new HTTPException(404, { message: "User not found" });
