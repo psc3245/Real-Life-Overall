@@ -1,3 +1,4 @@
+import { useAccount } from "@/api/account";
 import { useIsAdmin } from "@/api/admin";
 import { useMe } from "@/api/hooks";
 import { usePreferences } from "@/api/preferences";
@@ -16,6 +17,7 @@ export default function MeScreen() {
   const { features } = usePreferences();
   const friends = useFriends(features.friends);
   const admin = useIsAdmin();
+  const { tester } = useAccount();
 
   if (me.isPending) return <Loading title="You" />;
   if (me.isError) {
@@ -128,11 +130,20 @@ export default function MeScreen() {
         {features.habits && (
           <NavRow icon="slider.horizontal.3" label="Manage habits" href="/habits/manage" />
         )}
+        {tester ? (
+          <NavRow
+            icon="ladybug"
+            label="Report a bug"
+            detail="Goes straight to the team"
+            href="/bug-report?from=You"
+            last={!admin}
+          />
+        ) : null}
         {admin ? (
           <NavRow
             icon="wrench.and.screwdriver"
             label="Admin"
-            detail="Admin tools"
+            detail="Admin tools, bug reports"
             href="/admin"
             last
           />

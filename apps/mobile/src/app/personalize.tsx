@@ -23,6 +23,7 @@ import { Muted, Screen } from "@/components/ui";
 import { FEATURE_GROUPS, FEATURE_INFO, WIDGET_INFO } from "@/lib/featureInfo";
 import { useTalk } from "@/lib/talk";
 import { colors, space } from "@/lib/theme";
+import { useAccount } from "@/api/account";
 
 type Tab = "behavior" | "today" | "features";
 const TABS: { value: Tab; label: string }[] = [
@@ -283,7 +284,8 @@ function Features() {
   const talk = useTalk();
   const prefs = usePreferences();
   const set = useSetPreferences();
-  const allOn = FEATURES.every((f) => prefs.features[f]);
+  const { locked } = useAccount();
+  const allOn = FEATURES.every((f) => prefs.features[f] || locked[f]);
   return (
     <>
       <Muted>
@@ -298,17 +300,20 @@ function Features() {
       )}
       {FEATURE_GROUPS.map((group) => (
         <SettingsGroup key={group.label} title={group.label}>
-          {group.features.map((f, i) => (
-            <ToggleRow
-              key={f}
-              // One feature per patch: the API merges them, so another device's toggle survives.
-              onChange={(on) => set({ features: { [f]: on } })}
-              value={prefs.features[f]}
-              label={f === "coach" ? talk.coach : FEATURE_INFO[f].label}
-              detail={FEATURE_INFO[f].detail}
-              last={i === group.features.length - 1}
-            />
-          ))}
+          {group.features
+            .filter((f) => locked[f] !== "beta")
+            .map((f, i, shown) => (
+              <ToggleRow
+                key={f}
+                // One feature per patch: the API merges them, so another device's toggle survives.
+                onChange={(on) => set({ features: { [f]: on } })}
+                value={prefs.features[f]}
+                disabled={!!locked[f]}
+                label={f === "coach" ? talk.coach : FEATURE_INFO[f].label}
+                detail={locked[f] ? `Premium · ${FEATURE_INFO[f].detail}` : FEATURE_INFO[f].detail}
+                last={i === shown.length - 1}
+              />
+            ))}
         </SettingsGroup>
       ))}
       <Muted style={{ fontSize: 12, color: colors.court500 }}>

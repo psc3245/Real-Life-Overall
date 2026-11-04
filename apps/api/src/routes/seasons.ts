@@ -1,6 +1,7 @@
 import { setSeasonModeBodySchema, treeDraftSchema } from "@rlo/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
+import { assertSeasonModeAllowed } from "../middleware/auth";
 import { getRatings } from "../services/ratings-service";
 import {
   editSeasonMode,
@@ -21,6 +22,7 @@ export const seasonRoutes = new Hono<AppEnv>()
   })
   .put("/setup/mode", async (c) => {
     const { mode } = await parseJson(c, setSeasonModeBodySchema);
+    assertSeasonModeAllowed(c.get("role"), mode);
     await editSeasonMode(c.get("db"), c.get("userId"), mode);
     return c.json(await getSeasonSetup(c.get("db"), c.get("userId")));
   })

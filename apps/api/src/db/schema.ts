@@ -1,5 +1,6 @@
 import {
   BODY_KINDS,
+  BUG_REPORT_STATUSES,
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
   OBJECTIVE_SOURCES,
@@ -873,4 +874,28 @@ export const coachMessages = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index().on(t.userId, t.createdAt)],
+);
+
+export const bugReportStatus = pgEnum("bug_report_status", BUG_REPORT_STATUSES);
+export const bugReportPlatform = pgEnum("bug_report_platform", ["web", "ios"]);
+
+/** Bug reports from dev and admin accounts, triaged in /admin (DESIGN.md §8.9). */
+export const bugReports = pgTable(
+  "bug_reports",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    message: text().notNull(),
+    page: text().notNull().default(""),
+    platform: bugReportPlatform().notNull(),
+    appVersion: text(),
+    device: text(),
+    status: bugReportStatus().notNull().default("open"),
+    resolvedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.status, t.createdAt)],
 );

@@ -1,5 +1,6 @@
 import type { ReportOptions } from "@rlo/shared";
 import { ToggleRow } from "./settings";
+import { useAccount } from "@/api/account";
 
 const FIELDS: { key: keyof ReportOptions; label: string; detail: string; ai: boolean }[] = [
   {
@@ -30,14 +31,17 @@ export function ReportOptionsRows({
   value: ReportOptions;
   onChange: (next: ReportOptions) => void;
 }) {
+  // The AI parts are premium (DESIGN.md §8.9); free runs get summaries only.
+  const { premium } = useAccount();
   return (
     <>
       {FIELDS.map((f, i) => (
         <ToggleRow
           key={f.key}
           label={f.ai ? `${f.label} · AI` : f.label}
-          detail={f.detail}
-          value={value[f.key]}
+          detail={f.ai && !premium ? `Premium · ${f.detail}` : f.detail}
+          disabled={f.ai && !premium}
+          value={value[f.key] && (premium || !f.ai)}
           onChange={(on) => onChange({ ...value, [f.key]: on })}
           last={i === FIELDS.length - 1}
         />

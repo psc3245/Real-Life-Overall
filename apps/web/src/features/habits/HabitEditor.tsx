@@ -22,6 +22,8 @@ import { AttributePicker } from "../../components/AttributePicker";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { compactFieldClass } from "../../components/form";
+import { useAccount } from "../../api/account";
+import { PremiumBadge } from "../../components/Premium";
 
 /** What "kept" means for an avoid habit, by how it's logged. */
 const AVOID_HELP: Partial<Record<HabitType, string>> = {
@@ -63,6 +65,7 @@ export function HabitEditor({
   const create = useCreateHabit();
   const update = useUpdateHabit();
   const suggest = useSuggestLinks();
+  const { premium } = useAccount();
   const saving = create.isPending || update.isPending;
 
   const avoid = config.direction === "avoid";
@@ -340,13 +343,20 @@ export function HabitEditor({
             <legend className="text-xs uppercase tracking-wider text-court-300">
               Builds these attributes ({links.length}/{MAX_HABIT_LINKS})
             </legend>
-            <Button
-              variant="ghost"
-              disabled={!name.trim() || suggest.isPending}
-              onClick={runSuggest}
-            >
-              {suggest.isPending ? "Thinking…" : "✦ Suggest"}
-            </Button>
+            {premium ? (
+              <Button
+                variant="ghost"
+                disabled={!name.trim() || suggest.isPending}
+                onClick={runSuggest}
+              >
+                {suggest.isPending ? "Thinking…" : "✦ Suggest"}
+              </Button>
+            ) : (
+              <span className="text-xs text-court-500">
+                <PremiumBadge className="mr-1.5" />
+                AI suggestions
+              </span>
+            )}
           </div>
           {reason && (
             <p className="border-l-2 border-neon/60 pl-3 text-sm text-court-300">{reason}</p>

@@ -9,6 +9,7 @@ import {
 } from "@rlo/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
+import { assertSeasonModeAllowed } from "../middleware/auth";
 import * as onboarding from "../services/onboarding-service";
 import { parseJson, parseOptionalJson } from "../validation";
 
@@ -16,6 +17,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
   .get("/", async (c) => c.json(await onboarding.getState(c.get("db"), c.get("userId"))))
   .put("/mode", async (c) => {
     const { mode } = await parseJson(c, setSeasonModeBodySchema);
+    assertSeasonModeAllowed(c.get("role"), mode);
     return c.json(await onboarding.setMode(c.get("db"), c.get("userId"), mode));
   })
   .put("/tree", async (c) => {

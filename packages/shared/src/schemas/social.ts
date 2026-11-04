@@ -2,9 +2,9 @@ import { z } from "zod";
 import { SEASON_MODES, type SeasonMode } from "../rating/growth";
 import { CATEGORY_TEMPLATES } from "../templates";
 import type { UnitSystem } from "../units";
-import type { UserRole } from "./admin";
+import type { FeatureLock, UserRole } from "./account";
 import type { BadgeTier } from "./badges";
-import type { Preferences } from "./preferences";
+import type { Feature, Preferences } from "./preferences";
 
 /**
  * Who can see a player's card (DESIGN.md §7.3). Private is the default. Journals, recaps,
@@ -53,8 +53,12 @@ export interface MeDto {
   unitSystem: UnitSystem;
   trackWeight: boolean;
   trackHeight: boolean;
+  /** The account type (DESIGN.md §8.9). */
   role: UserRole;
+  /** Locked features are also off in `preferences.features`, whatever the player picked. */
   preferences: Preferences;
+  /** Features this account can't use, and why: Premium only or still in testing. */
+  locked: Partial<Record<Feature, FeatureLock>>;
   createdAt: string;
 }
 

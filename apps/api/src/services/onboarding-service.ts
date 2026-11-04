@@ -27,6 +27,7 @@ import {
   type SeasonMode,
   type TreeDraft,
   type WeightSuggestionDto,
+  isPremiumRole,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
 import { badRequest, conflict, notFound } from "../errors";
@@ -72,7 +73,12 @@ async function loadSession(db: Database, userId: string) {
   // Roll an ended season first, so a returning player isn't sent into a fresh onboarding.
   await ensureCurrentSeason(db, userId);
   const period = seasonForDate(localDateIn(user.timezone));
-  const season = await seasonRepo.findOrCreate(db, userId, period);
+  let season = await seasonRepo.findOrCreate(db, userId, period);
+  // Free accounts play Growth seasons (DESIGN.md §8.9), including a setup started before.
+  if (!isPremiumRole(user.role) && season.status === "setup" && season.mode === "rating") {
+    await setSeasonMode(db, season.id, "growth");
+    season = { ...season, mode: "growth" };
+  }
   const session = await onboardingRepo.findOrCreate(db, userId, season.id);
   return { season, session };
 }

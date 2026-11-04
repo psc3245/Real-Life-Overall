@@ -1,10 +1,4 @@
-import { z } from "zod";
-
-/** Account roles (DESIGN.md §8.7). Admins see /admin and the debug panels. */
-export const USER_ROLES = ["user", "admin"] as const;
-export type UserRole = (typeof USER_ROLES)[number];
-
-export const setRoleBodySchema = z.object({ role: z.enum(USER_ROLES) });
+import type { UserRole } from "./account";
 
 export interface LlmCallDto {
   id: string;

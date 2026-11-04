@@ -1,11 +1,11 @@
-import { parsePreferences, type SeasonMode, type SportsTalk } from "@rlo/shared";
+import { isPremiumRole, parsePreferences, type SeasonMode, type SportsTalk } from "@rlo/shared";
 import { APICallError, generateText, Output, type ModelMessage } from "ai";
 import { and, eq, gte, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Database } from "../db/client";
 import { llmCalls, users } from "../db/schema";
 import * as seasonRepo from "../repos/season-repo";
-import { estimateCostUsd, type LlmPurpose } from "./models";
+import { estimateCostUsd, PREMIUM_PURPOSES, type LlmPurpose } from "./models";
 import { GROWTH_MODE } from "./prompts/shared";
 import { VOICE, VOICED_PURPOSES } from "./prompts/voice";
 import type { ModelResolver } from "./providers";
@@ -55,6 +55,15 @@ export class LlmError extends Error {
 /** The user has spent their daily LLM budget. Still an LlmError, so AI-optional flows degrade. */
 export class LlmBudgetError extends LlmError {}
 
+/** A premium-only purpose for a free account (DESIGN.md §8.9). Also degrades AI-optional flows. */
+export class LlmPremiumError extends LlmError {}
+
+/** What a user's account allows right now. */
+export interface LlmAccess {
+  premium: boolean;
+  withinBudget: boolean;
+}
+
 /** Attempts per call: the first try plus retries on failed or invalid output (DESIGN.md §5). */
 export const MAX_ATTEMPTS = 3;
 
@@ -67,8 +76,11 @@ export class LlmClient {
      * normal voice and rating mode.
      */
     private readonly resolveVoice?: (userId: string) => Promise<Voice>,
-    /** False once the user has spent their daily budget; without it calls are never capped. */
-    private readonly withinBudget?: (userId: string) => Promise<boolean>,
+    /**
+     * The user's account type and daily budget; without it calls are never capped or gated (the
+     * hourly job, tests).
+     */
+    private readonly access?: (userId: string) => Promise<LlmAccess>,
   ) {}
 
   /**
@@ -92,11 +104,17 @@ export class LlmClient {
   async generateStructured<T extends z.ZodType>(
     request: StructuredRequest<T>,
   ): Promise<z.infer<T>> {
-    if (request.userId && this.withinBudget && !(await this.withinBudget(request.userId))) {
-      throw new LlmBudgetError(
-        "You've reached today's AI limit. Try again tomorrow.",
-        request.purpose,
-      );
+    if (request.userId && this.access) {
+      const { premium, withinBudget } = await this.access(request.userId);
+      if (!premium && PREMIUM_PURPOSES.has(request.purpose)) {
+        throw new LlmPremiumError("This is a Premium feature.", request.purpose);
+      }
+      if (!withinBudget) {
+        throw new LlmBudgetError(
+          "You've reached today's AI limit. Try again tomorrow.",
+          request.purpose,
+        );
+      }
     }
     const req = await this.withVoice(request);
     let resolved: ReturnType<ModelResolver>;
@@ -178,14 +196,23 @@ export function dbCallRecorder(db: Database) {
 }
 
 /** Caps what one user can spend: the estimated cost of their calls over the last 24 hours. */
-export function dbBudgetGuard(db: Database, dailyBudgetUsd: number) {
-  return async (userId: string): Promise<boolean> => {
+/**
+ * Account type plus spend over the rolling 24 hours, held to the premium or free daily budget
+ * (premium covers dev and admin accounts).
+ */
+export function dbAccessGuard(db: Database, budgets: { premiumUsd: number; freeUsd: number }) {
+  return async (userId: string): Promise<LlmAccess> => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [row] = await db
-      .select({ spent: sql<string | null>`sum(${llmCalls.costUsd})` })
-      .from(llmCalls)
-      .where(and(eq(llmCalls.userId, userId), gte(llmCalls.createdAt, since)));
-    return Number(row?.spent ?? 0) < dailyBudgetUsd;
+    const [[user], [row]] = await Promise.all([
+      db.select({ role: users.role }).from(users).where(eq(users.id, userId)),
+      db
+        .select({ spent: sql<string | null>`sum(${llmCalls.costUsd})` })
+        .from(llmCalls)
+        .where(and(eq(llmCalls.userId, userId), gte(llmCalls.createdAt, since))),
+    ]);
+    const premium = user ? isPremiumRole(user.role) : false;
+    const budget = premium ? budgets.premiumUsd : budgets.freeUsd;
+    return { premium, withinBudget: Number(row?.spent ?? 0) < budget };
   };
 }
 

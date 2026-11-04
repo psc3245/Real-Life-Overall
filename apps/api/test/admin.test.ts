@@ -26,12 +26,12 @@ async function setup() {
 describe("admin", () => {
   it("hides admin routes from regular users and can't be self-granted", async () => {
     const { request, me } = await setup();
-    expect(me.role).toBe("user");
+    expect(me.role).toBe("premium"); // dev-mode users start premium
     expect((await request("/admin/overview")).status).toBe(404);
     const patched = await body<MeDto>(
       await request("/me", { method: "PATCH", ...json({ role: "admin", displayName: "X" }) }),
     );
-    expect(patched.role).toBe("user");
+    expect(patched.role).toBe("premium");
   });
 
   it("reports usage, calls and users to admins", async () => {

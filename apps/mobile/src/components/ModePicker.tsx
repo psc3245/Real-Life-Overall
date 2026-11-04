@@ -1,7 +1,9 @@
 import { SEASON_MODE_INFO, SEASON_MODES, type SeasonMode } from "@rlo/shared";
 import { Pressable, StyleSheet, Text } from "react-native";
+import { useAccount } from "@/api/account";
 import { useTalk } from "@/lib/talk";
 import { colors, fonts, space } from "@/lib/theme";
+import { PremiumBadge } from "./Premium";
 import { Muted } from "./ui";
 
 /** Rating or growth, picked at the start of each season (DESIGN.md §4.6). */
@@ -15,19 +17,23 @@ export function ModePicker({
   disabled?: boolean;
 }) {
   const talk = useTalk();
+  const { premium } = useAccount();
   return (
     <>
       {SEASON_MODES.map((mode) => {
         const active = value === mode;
+        // Rating seasons are premium (DESIGN.md §8.9).
+        const off = disabled || (mode === "rating" && !premium);
         return (
           <Pressable
             key={mode}
             accessibilityRole="radio"
-            accessibilityState={{ checked: active, disabled }}
-            disabled={disabled}
+            accessibilityState={{ checked: active, disabled: off }}
+            disabled={off}
             onPress={() => onChange(mode)}
-            style={[styles.option, active && styles.active, disabled && { opacity: 0.5 }]}
+            style={[styles.option, active && styles.active, off && { opacity: 0.5 }]}
           >
+            {mode === "rating" && !premium && <PremiumBadge />}
             <Text style={[styles.title, active && { color: colors.neon }]}>
               {mode === "growth" ? talk.growthMode : talk.ratingMode}
             </Text>

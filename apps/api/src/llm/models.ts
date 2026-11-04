@@ -16,6 +16,13 @@ export const LLM_PURPOSES = [
 ] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
+/** Purposes only premium accounts can call (DESIGN.md §8.9); free accounts get LlmPremiumError. */
+export const PREMIUM_PURPOSES: ReadonlySet<LlmPurpose> = new Set<LlmPurpose>([
+  "coach.chat",
+  "habits.suggestLinks",
+  "reports.analysis",
+]);
+
 export type ModelTier = "fast" | "smart";
 
 export const PURPOSE_TIERS: Record<LlmPurpose, ModelTier> = {
