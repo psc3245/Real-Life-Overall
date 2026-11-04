@@ -536,6 +536,9 @@ function CoachCard() {
           onChangeText={setDraft}
           onSubmitEditing={() => ask(draft)}
           returnKeyType="send"
+          autoCorrect
+          spellCheck
+          autoCapitalize="sentences"
           placeholder="What should I work on today?"
           style={{ flex: 1 }}
         />
@@ -548,7 +551,7 @@ function CoachCard() {
           <Text style={styles.askText}>Ask</Text>
         </Pressable>
       </View>
-      <Starters onPick={ask} />
+      <Starters onPick={ask} inset={space.lg} />
     </Section>
   );
 }
