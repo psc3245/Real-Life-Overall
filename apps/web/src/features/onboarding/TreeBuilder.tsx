@@ -20,6 +20,7 @@ import {
   type Draft,
 } from "./draft";
 import { ErrorNote } from "./ErrorNote";
+import { useAccount } from "../../api/account";
 
 const LEVEL_NAMES = ["", "category", "attribute", "sub-attribute"];
 
@@ -132,6 +133,7 @@ function NodeEditor({
   const children = childrenOf(draft, node.key);
   const canNest = depth < MAX_RATING_DEPTH;
   const suggest = useSuggestAttributes();
+  const { premium } = useAccount();
   const [showDescription, setShowDescription] = useState(Boolean(node.description));
   const level = LEVEL_NAMES[depth] ?? "attribute";
   const childLevel = LEVEL_NAMES[depth + 1] ?? "attribute";
@@ -169,7 +171,7 @@ function NodeEditor({
               + {childLevel}
             </Button>
           )}
-          {canNest && (
+          {canNest && premium && (
             <Button
               variant="ghost"
               disabled={!node.name.trim() || suggest.isPending}

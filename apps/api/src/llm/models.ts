@@ -18,6 +18,14 @@ export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
 /** Purposes only premium accounts can call (DESIGN.md §8.9); free accounts get LlmPremiumError. */
 export const PREMIUM_PURPOSES: ReadonlySet<LlmPurpose> = new Set<LlmPurpose>([
+  "onboarding.discovery",
+  "onboarding.template",
+  "onboarding.suggestAttributes",
+  "onboarding.weights",
+  "onboarding.questionnaire",
+  "onboarding.followup",
+  "onboarding.initialRatings",
+  "season.newLeaves",
   "coach.chat",
   "habits.suggestLinks",
   "reports.analysis",

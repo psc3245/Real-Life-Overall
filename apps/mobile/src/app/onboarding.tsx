@@ -18,6 +18,7 @@ import { WeightsStep } from "@/components/onboarding/WeightsStep";
 import { Button, Card, ErrorNote, Loading, Muted, Screen } from "@/components/ui";
 import { nodesToDraft } from "@/lib/draft";
 import { colors, fonts, space } from "@/lib/theme";
+import { useAccount } from "@/api/account";
 
 const STEPS = [
   { key: "discover", label: "Discover" },
@@ -128,8 +129,34 @@ const DRAFTING = [
   "Weighing what matters…",
 ];
 
-/** Step 1: get to know the player, then let the scout draft their rating tree. */
+/**
+ * Step 1: get to know the player, then let the scout draft their rating tree. The scout is
+ * Premium (DESIGN.md §8.9); free accounts build from templates.
+ */
 function DiscoveryStep({ state }: { state: OnboardingStateDto }) {
+  const { premium } = useAccount();
+  return premium ? <ScoutDiscovery state={state} /> : <BuildYourself />;
+}
+
+function BuildYourself() {
+  const skip = useSkipDiscovery();
+  return (
+    <Card style={{ gap: space.md }}>
+      <Text style={styles.big}>Build your roster</Text>
+      <Muted>
+        Pick the parts of life you want rated from the starter categories, or add your own. Then the
+        Combine, a set of quick standard questions, sets your starting ratings.
+      </Muted>
+      <Muted style={{ color: colors.court500, fontSize: 13 }}>
+        Premium: the AI scout can also interview you and draft a tree for you.
+      </Muted>
+      <Button title="Start building" disabled={skip.isPending} onPress={() => skip.mutate()} />
+      <ErrorNote error={skip.error} />
+    </Card>
+  );
+}
+
+function ScoutDiscovery({ state }: { state: OnboardingStateDto }) {
   const talk = useTalk();
   const chat = useDiscovery();
   const draft = useDraftTemplate();
@@ -206,6 +233,13 @@ function DiscoveryStep({ state }: { state: OnboardingStateDto }) {
 }
 
 const styles = StyleSheet.create({
+  big: {
+    color: colors.neon,
+    fontFamily: fonts.heavy,
+    fontSize: 28,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
   steps: { gap: space.sm },
   drafted: { borderColor: "rgba(60,242,200,0.3)", backgroundColor: "rgba(60,242,200,0.05)" },
   draftedLabel: {

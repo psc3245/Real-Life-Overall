@@ -1,6 +1,7 @@
 import type {
   AnswerValue,
   AttributeSuggestionDto,
+  OnboardingMethod,
   OnboardingStateDto,
   SeasonMode,
   TreeDraftNode,
@@ -70,8 +71,11 @@ const post = (path: string, body?: unknown) => () =>
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
+/** The scout's questions (Premium) or the Combine's standard ones (DESIGN.md §5.1). */
 export function useGenerateQuestionnaire() {
-  return useStateMutation(() => post("/onboarding/questionnaire")());
+  return useStateMutation((method: OnboardingMethod) =>
+    post("/onboarding/questionnaire", { method })(),
+  );
 }
 
 export function useSaveAnswers() {

@@ -23,6 +23,7 @@ import {
 import { colors, fonts, space } from "@/lib/theme";
 import { Chip } from "../controls";
 import { Button, Card, ErrorNote, Label, Muted } from "../ui";
+import { useAccount } from "@/api/account";
 
 const LEVEL_NAMES = ["", "category", "attribute", "sub-attribute"];
 
@@ -121,6 +122,7 @@ function NodeEditor({
   const children = childrenOf(draft, node.key);
   const canNest = depth < MAX_RATING_DEPTH;
   const suggest = useSuggestAttributes();
+  const { premium } = useAccount();
   const [showDescription, setShowDescription] = useState(Boolean(node.description));
   const level = LEVEL_NAMES[depth] ?? "attribute";
   const childLevel = LEVEL_NAMES[depth + 1] ?? "attribute";
@@ -173,7 +175,7 @@ function NodeEditor({
         {canNest && (
           <Action label={`+ ${childLevel}`} onPress={() => setDraft((d) => addNode(d, node.key))} />
         )}
-        {canNest && (
+        {canNest && premium && (
           <Action
             label={suggest.isPending ? "Thinking…" : "✦ Suggest"}
             disabled={!node.name.trim() || suggest.isPending}

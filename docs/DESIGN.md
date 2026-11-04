@@ -185,6 +185,13 @@ All LLM work lives behind one internal module, `apps/api/src/llm/`, with a **pro
 7. **Reveal.** The OVR reveal screen animates the card, Overall, categories and attributes, with an expandable rationale.
    *Open: can the user dispute a rating at reveal? (§13)*
 
+**The Combine** (added 2026-11-04): starting ratings without the AI, for Free accounts (the only path they get) and any Premium player who'd rather skip the scout. Step 3 offers both: the scout or the Combine (`POST /onboarding/questionnaire` with `method`; `onboarding_sessions.method` remembers it).
+- **Questions** (`packages/shared/src/combine.ts`): two hand-written, behavior-anchored `single_choice` questions for every template attribute, each option carrying a fixed score on the calibration rubric below; custom attributes get three generic ones ("days you worked on it in the last two weeks", "compared with a typical adult", a half-weight trend question). Ids are `c1…cN`; a leaf's questions line up with its bank entries by order.
+- **Scoring:** a leaf's rating is the weighted mean of its answers (50 with none), confidence `medium` for template attributes and `low` for custom ones, and the rationale lists the answers. No follow-up chat: submitting goes straight to rating.
+- **Decay** comes from per-category defaults (e.g. Fitness: 3 grace days, 0.25/day; Finance: 14 days, 0.05/day), floored 15 below the start; weekly reviews revise them like the scout's. **Archetype** is rule-based: the top category's noun with the runner-up's modifier ("Cerebral Athlete"), "Two-Way" when they're within 2 points, "Balanced All-Rounder" when three or more are within 4.
+- The scout's AI steps (discovery, the drafted template, attribute and weight suggestions, its questionnaire, follow-up and ratings) are Premium (§8.9). Free accounts start at "Build your roster" instead of the discovery chat.
+- **New attributes later** (season setup, accepted tree proposals) are rated by the model for Premium; for Free they start at their parent's current rating (50 without one), with Combine decay.
+
 **Calibration guidance for the prompt.** The prompt must define what the numbers mean, or ratings will cluster at 70–85. For example: 50 = typical adult, 70 = clearly above average, 85 = top ~5% among peers, 95+ = elite or professional. Store this rubric as a versioned prompt asset and test it with evals.
 
 ### 5.2 Daily recap (Phase 2)
@@ -512,7 +519,7 @@ Four types, stored as `users.role` (the enum gained `premium` and `dev`; `user` 
 
 | Type | Gets |
 |---|---|
-| **Free** (`user`) | Growth seasons only, daily recaps and weekly reviews, template ratings at onboarding. A smaller daily AI budget (`LLM_FREE_DAILY_BUDGET_USD`, default $0.25). |
+| **Free** (`user`) | Growth seasons only, daily recaps and weekly reviews, the Combine at onboarding (§5.1). A smaller daily AI budget (`LLM_FREE_DAILY_BUDGET_USD`, default $0.25). |
 | **Premium** | Everything: Rating seasons and peeking at the hidden rating in a Growth season, the coach, the AI scout at onboarding, AI report write-ups and suggestions, habit link suggestions. The full budget (`LLM_USER_DAILY_BUDGET_USD`). |
 | **Dev** | Play testers: lifetime Premium, plus features in testing and bug reports. |
 | **Admin** | Premium plus `/admin` and the debug tools (§8.7). |
@@ -537,7 +544,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `rating_events` | `node_id` (leaf), `season_id`, `delta` numeric(6,2), `source` (`onboarding`/`daily_recap`/`weekly_review`/`decay`/`recalibration`), `recap_id` (nullable), `reason`, `evidence` (jsonb), `voided_at` (nullable) | Append-only ledger; re-runs set `voided_at` |
 | `decay_rules` | `node_id`, `grace_days`, `per_day`, `floor`, `notes`, `version`, `active`, `authored_by` (`llm`/`user`) | |
 | `pauses` | `user_id`, `starts_on`, `ends_on`, `reason` | Vacation / illness |
-| `onboarding_sessions` | `user_id`, `season_id`, `stage`, `questionnaire` jsonb, `answers` jsonb, `chat` jsonb, `result` jsonb | Resumable |
+| `onboarding_sessions` | `user_id`, `season_id`, `stage`, `method` (`scout`/`combine`), `questionnaire` jsonb, `answers` jsonb, `chat` jsonb, `result` jsonb | Resumable |
 | `day_logs` | `user_id`, `local_date`, `journal` text, `prompts` jsonb (guided questions and answers), `status` (`open`/`recapped`/`stale`) | Unique `(user_id, local_date)` |
 | `habits` | `user_id`, `name`, `type` (8 types + `group`), `config` jsonb (target, slider min/max, group rule…), `days` (weekdays), `starts_on`, `sort_order`, `parent_id`, `archived_at` | Ported from Habit Tracker, with the type-specific columns folded into `config`. **Groups** (`type = group`) hold sub-habits (`parent_id`): done by a rule (all / any / at least N), no entries of their own, sub-habits share the group's schedule and carry the links. One level for now; the parent link leaves room for richer habits later. |
 | `habit_links` | `habit_id`, `node_lineage_id` | Confirmed links only (suggestions live in the editor); by lineage so links survive seasons |
@@ -671,6 +678,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - [x] Chunk 6, onboarding and season setup: discovery chat, tree builder, weights, scouting questionnaire and follow-up, the OVR reveal
   - [ ] Google sign-in, push notifications (recap ready, streaks)
   - [ ] EAS builds and TestFlight
+- [x] The Combine: template ratings with fixed-score questions and no AI, the Free onboarding path (§5.1)
 - [x] Account types: Free, Premium, Dev (play testers: lifetime Premium, beta features, bug reports) and Admin; premium gating on the server and both clients, a smaller Free AI budget (§8.9)
 - [ ] Monetization model (checkout); plan-based model tiers
 - [ ] Integrations (Strava, Health, etc.), if pursued

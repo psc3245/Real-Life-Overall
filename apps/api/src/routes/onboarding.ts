@@ -1,5 +1,6 @@
 import {
   followupMessageBodySchema,
+  generateQuestionnaireBodySchema,
   saveAnswersBodySchema,
   saveWeightsBodySchema,
   setSeasonModeBodySchema,
@@ -9,7 +10,7 @@ import {
 } from "@rlo/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
-import { assertSeasonModeAllowed } from "../middleware/auth";
+import { assertSeasonModeAllowed, requirePremium } from "../middleware/auth";
 import * as onboarding from "../services/onboarding-service";
 import { parseJson, parseOptionalJson } from "../validation";
 
@@ -24,11 +25,11 @@ export const onboardingRoutes = new Hono<AppEnv>()
     const draft = await parseJson(c, treeDraftSchema);
     return c.json(await onboarding.saveTree(c.get("db"), c.get("userId"), draft));
   })
-  .post("/attributes/suggest", async (c) => {
+  .post("/attributes/suggest", requirePremium, async (c) => {
     const body = await parseJson(c, suggestAttributesBodySchema);
     return c.json(await onboarding.suggestAttributes(c.get("llm"), c.get("userId"), body));
   })
-  .post("/weights/suggest", async (c) => {
+  .post("/weights/suggest", requirePremium, async (c) => {
     const { priorities } = await parseJson(c, suggestWeightsBodySchema);
     return c.json(
       await onboarding.suggestWeights(c.get("db"), c.get("llm"), c.get("userId"), priorities),
@@ -38,9 +39,17 @@ export const onboardingRoutes = new Hono<AppEnv>()
     const { weights } = await parseJson(c, saveWeightsBodySchema);
     return c.json(await onboarding.saveWeights(c.get("db"), c.get("userId"), weights));
   })
-  .post("/questionnaire", async (c) =>
-    c.json(await onboarding.generateQuestionnaire(c.get("db"), c.get("llm"), c.get("userId"))),
-  )
+  .post("/questionnaire", async (c) => {
+    const body = await parseOptionalJson(c, generateQuestionnaireBodySchema);
+    return c.json(
+      await onboarding.generateQuestionnaire(
+        c.get("db"),
+        c.get("llm"),
+        c.get("userId"),
+        body?.method,
+      ),
+    );
+  })
   .put("/answers", async (c) => {
     const { answers } = await parseJson(c, saveAnswersBodySchema);
     return c.json(await onboarding.saveAnswers(c.get("db"), c.get("userId"), answers));
@@ -48,7 +57,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
   .post("/questionnaire/submit", async (c) =>
     c.json(await onboarding.submitQuestionnaire(c.get("db"), c.get("userId"))),
   )
-  .post("/followup", async (c) => {
+  .post("/followup", requirePremium, async (c) => {
     // The opening turn has no body; later turns carry the user's reply.
     const message = await parseOptionalJson(c, followupMessageBodySchema);
     return c.json(
@@ -66,7 +75,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
   .post("/rate", async (c) =>
     c.json(await onboarding.rateInitial(c.get("db"), c.get("llm"), c.get("userId"))),
   )
-  .post("/discovery", async (c) => {
+  .post("/discovery", requirePremium, async (c) => {
     const body = await parseOptionalJson(c, followupMessageBodySchema);
     return c.json(
       await onboarding.continueDiscovery(c.get("db"), c.get("llm"), c.get("userId"), body?.message),
@@ -75,6 +84,6 @@ export const onboardingRoutes = new Hono<AppEnv>()
   .post("/discovery/skip", async (c) =>
     c.json(await onboarding.skipDiscovery(c.get("db"), c.get("userId"))),
   )
-  .post("/template", async (c) =>
+  .post("/template", requirePremium, async (c) =>
     c.json(await onboarding.draftTemplate(c.get("db"), c.get("llm"), c.get("userId"))),
   );

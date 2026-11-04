@@ -10,6 +10,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSaveWeights, useSuggestWeights } from "@/api/onboarding";
 import { colors, fonts, space } from "@/lib/theme";
 import { Body, Button, Card, ErrorNote, Field, Label, Muted } from "../ui";
+import { useAccount } from "@/api/account";
 
 const clampImportance = (w: number) =>
   Math.min(IMPORTANCE_MAX, Math.max(IMPORTANCE_MIN, Math.round(w)));
@@ -36,6 +37,7 @@ export function WeightsStep({
       new Map(state.nodes.filter((n) => n.parentId).map((n) => [n.id, clampImportance(n.weight)])),
   );
   const suggest = useSuggestWeights();
+  const { premium } = useAccount();
   const save = useSaveWeights();
 
   const parents = state.nodes.filter((p) => state.nodes.some((n) => n.parentId === p.id));
@@ -51,29 +53,31 @@ export function WeightsStep({
 
   return (
     <View style={{ gap: space.xl }}>
-      <Card style={{ gap: space.md }}>
-        <Text style={styles.title}>What matters most to you right now?</Text>
-        <Muted>
-          The AI proposes how much each category and attribute counts toward its parent. You get the
-          final say.
-        </Muted>
-        <Field
-          value={priorities}
-          onChangeText={setPriorities}
-          maxLength={1000}
-          multiline
-          placeholder="e.g. Getting promoted this year matters most, then my health. Social life is fine as is."
-          style={{ minHeight: 90 }}
-        />
-        <Button
-          title={suggest.isPending ? "Thinking…" : "✦ Suggest weights"}
-          variant="ghost"
-          disabled={suggest.isPending}
-          onPress={runSuggest}
-        />
-        <ErrorNote error={suggest.error} />
-        {rationale && <Muted style={styles.rationale}>{rationale}</Muted>}
-      </Card>
+      {premium && (
+        <Card style={{ gap: space.md }}>
+          <Text style={styles.title}>What matters most to you right now?</Text>
+          <Muted>
+            The AI proposes how much each category and attribute counts toward its parent. You get
+            the final say.
+          </Muted>
+          <Field
+            value={priorities}
+            onChangeText={setPriorities}
+            maxLength={1000}
+            multiline
+            placeholder="e.g. Getting promoted this year matters most, then my health. Social life is fine as is."
+            style={{ minHeight: 90 }}
+          />
+          <Button
+            title={suggest.isPending ? "Thinking…" : "✦ Suggest weights"}
+            variant="ghost"
+            disabled={suggest.isPending}
+            onPress={runSuggest}
+          />
+          <ErrorNote error={suggest.error} />
+          {rationale && <Muted style={styles.rationale}>{rationale}</Muted>}
+        </Card>
+      )}
 
       {parents.map((parent) => (
         <WeightGroup
