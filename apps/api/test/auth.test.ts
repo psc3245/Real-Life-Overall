@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authAccounts, users } from "../src/db/schema";
+import { authAccounts, authRateLimits, users } from "../src/db/schema";
 import { createApp } from "../src/app";
 import type { Email } from "../src/auth/email";
 import { passwordHasher } from "../src/auth/password";
@@ -223,6 +223,43 @@ describe("better-auth mode", () => {
     const { app } = await createAuthApp();
     const res = await app.request("/api/health", {}, { ...authBindings, APP_ENV: "production" });
     expect(res.status).toBe(500);
+  });
+
+  const production = {
+    ...authBindings,
+    APP_ENV: "production",
+    RESEND_API_KEY: "re_test",
+    PUBLIC_URL: "https://rlo.example",
+  };
+
+  it("refuses to start in production without an https PUBLIC_URL", async () => {
+    const { app } = await createAuthApp();
+    const res = await app.request("/api/health", {}, { ...production, PUBLIC_URL: ORIGIN });
+    expect(res.status).toBe(500);
+    expect((await app.request("/api/health", {}, production)).status).toBe(200);
+  });
+
+  it("rate-limits sign-in per client IP in production", async () => {
+    const { app, db } = await createAuthApp();
+    const signIn = (ip: string) =>
+      app.request(
+        "/api/auth/sign-in/email",
+        {
+          method: "POST",
+          headers: {
+            origin: "https://rlo.example",
+            "content-type": "application/json",
+            "cf-connecting-ip": ip,
+          },
+          body: JSON.stringify({ email: "nobody@example.com", password: "wrong-password" }),
+        },
+        production,
+      );
+    for (let i = 0; i < 3; i++) expect((await signIn("203.0.113.7")).status).toBe(401);
+    expect((await signIn("203.0.113.7")).status).toBe(429);
+    expect((await signIn("198.51.100.2")).status).toBe(401);
+    // Counted in the database, which every Worker isolate shares.
+    expect(await db.select().from(authRateLimits)).toHaveLength(2);
   });
 
   it("refuses to start without a secret", async () => {

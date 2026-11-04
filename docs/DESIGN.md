@@ -164,6 +164,7 @@ The tree should measure what the player actually cares about, weighted the way t
 All LLM work lives behind one internal module, `apps/api/src/llm/`, with a **provider-agnostic interface** (§8.4). Every call:
 - uses **structured output validated by Zod** (shared schemas) and retries on validation failure (max 2), then fails visibly;
 - is **logged to `llm_calls`** with purpose, provider, model, tokens, estimated cost, latency and error;
+- is **capped per user** (added 2026-11-03): once a user's estimated spend over the last 24 hours reaches `LLM_USER_DAILY_BUDGET_USD` (default $1), their requests get a 429 ("today's AI limit"). Reports still save without the write-up. The hourly job is exempt, so auto-recaps and weekly reviews always run;
 - uses a **cheap model by default**. Which model each purpose uses is config, not code.
 - uses a **neutral tone** for every user-facing text.
 
@@ -401,8 +402,8 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 | ORM / migrations | **Drizzle** + drizzle-kit migrations | Decided |
 | LLM layer | **Vercel AI SDK** (`ai` package) behind our own `llm/` module | Provider-agnostic, Zod structured output, runs on Workers |
 | Object storage (Phase 5) | **Cloudflare R2** (free tier) | Photos and voice |
-| Hosting: web | **Cloudflare Pages** (or Vercel) | Free |
-| Hosting: API | **Cloudflare Workers** (free tier) | Free, with built-in **Cron Triggers** |
+| Hosting: web | **Cloudflare Workers static assets**, in the API's Worker (decided 2026-11-03) | Free; one origin for web and API, so auth cookies stay first-party (§8.5) |
+| Hosting: API | **Cloudflare Workers** (free tier to start; Workers Paid, $5/month, if CPU limits bite) | Free, with built-in **Cron Triggers**. Vercel was ruled out: Hobby cron runs at most daily and the API is a Worker |
 | Tests | **Vitest** (+ Testing Library for web) | Unit and integration |
 | CI | **GitHub Actions** | Lint, typecheck, test on PR |
 
@@ -472,6 +473,7 @@ embed(texts: string[], ctx): Promise<number[][]>
 - **Password reset**: `/forgot-password` emails a one-time link (valid 1h, same reply whether or not the email has an account) to `/reset-password?token=…`. Resetting revokes every existing session. The iOS app requests the email and the link opens on the website.
 - `/settings` → Sign-in & security: change password (needs the current one; signs out other devices), "Set a password" by email for Google-only accounts, and sign out other devices.
 - Emails go through Resend's HTTP API (`RESEND_API_KEY`, sender `EMAIL_FROM` on a verified domain). Without a key the email, link included, is printed to the wrangler console; production refuses to boot without one.
+- **Rate limiting** (added 2026-11-03), production only: Better Auth's defaults (3 sign-in, sign-up or password-change attempts per 10s, and 3 emails per minute, per IP; 100 requests per 10s otherwise). Counters live in `auth_rate_limits`, because each Worker isolate has its own memory. The client IP comes from `cf-connecting-ip`, which Cloudflare sets; the default `x-forwarded-for` can be spoofed.
 
 ### 8.6 Scheduled jobs (Cloudflare Cron Triggers)
 One hourly Cron Trigger (`runHourly` in `services/scheduler.ts`) visits every user with an active season and, in order:
@@ -496,6 +498,13 @@ Jobs must be **idempotent**: unique constraints on `(user_id, local_date, kind)`
 - **Web:** `/admin` ("Control room") plus debug info for admins all over the app: a floating DBG panel (recent API calls with status, timing and size; the TanStack Query cache; route and viewport; session and env; run the 4am job in dev), orange dashed raw-JSON blocks at the bottom of the main pages, id chips next to habits, goals, workouts, exercises and attributes, and model details under each recap. Ctrl+Shift+D (or the panel's checkbox) hides the inline blocks; the choice is remembered per browser.
 
 ---
+
+### 8.8 Deployment (added 2026-11-03)
+- **Branches:** work branches merge into `development`, which deploys to **staging**. `development` merges into `main` (protected: PR plus the `check` status), which deploys to **production**.
+- **One Worker per environment** (`wrangler.jsonc` `env.staging` / `env.production`) serves the built web app as static assets (SPA fallback) and runs the API for `/api/*`. The top level of `wrangler.jsonc` is local dev only.
+- **Staging has no cron**, so test accounts don't run up nightly LLM spend. It runs with `APP_ENV=production`, so it behaves like production.
+- **`.github/workflows/deploy.yml`:** runs CI, builds the web app, applies migrations, then deploys. Migrations run before the new code is live, so each one must keep the running version working.
+- **Config:** `PUBLIC_URL` is a GitHub environment variable passed with `--var`; production refuses to boot unless it's `https://`. Database and Cloudflare credentials are GitHub environment secrets. The Worker's own secrets are set with `wrangler secret put`.
 
 ## 9. Data Model
 
@@ -531,7 +540,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `objective_links` / `objective_entries` | `objective_id` + `node_lineage_id`; `objective_id`, `local_date`, `value` | Links by lineage; one manual entry per goal per day |
 | `decay_runs` | `user_id`, `season_id`, `local_date`, `paused`, `voided_at` | One active run per day; backfills void later runs |
 | (memory) | `day_logs.journal_search`, `recaps.narrative_search` (generated `tsvector`, GIN) | Full-text search; no embeddings table (§5.5) |
-| `llm_calls` | `user_id`, `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`, `error` | **From day one** |
+| `llm_calls` | `user_id`, `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`, `error` | **From day one**; also the per-user daily budget (§5) |
+| `auth_rate_limits` | `key` (IP + path), `count`, `last_request` | Better Auth rate limiting (§8.5) |
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
 | `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
 | `friendships` | `requester_id`, `addressee_id`, `status` (`pending`/`accepted`), `responded_at` | One row per pair (unique on least/greatest), Phase 4 |
@@ -584,7 +594,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Hono API skeleton with env config, error handling, the `userId` middleware (dev auth mode) and health route
 - [x] LLM module: provider-agnostic client, per-purpose model config, Zod structured output, retries, `llm_calls` logging
 - [x] Web skeleton: Vite + React Router + TanStack Query + Tailwind; dark 2K theme tokens (shadcn added when the first complex component needs it)
-- [ ] Deploy pipeline: Pages + Workers (free), preview deploys (needs a Neon project + Cloudflare account)
+- [x] Deploy pipeline: one Worker per environment (staging from `development`, production from `main`), migrations then deploy in GitHub Actions (§8.8)
+- [ ] First deploy: Cloudflare account, production Neon project, domain, secrets; verify sign-in and cron CPU time on the free plan
 
 ### Phase 1: MVP: Categories + Onboarding → Initial Ratings
 - [x] Category templates (data in `packages/shared`) and the custom tree builder (depth ≤ 3)

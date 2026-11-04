@@ -1,6 +1,6 @@
 import { parsePreferences, type SeasonMode, type SportsTalk } from "@rlo/shared";
 import { APICallError, generateText, Output, type ModelMessage } from "ai";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Database } from "../db/client";
 import { llmCalls, users } from "../db/schema";
@@ -52,6 +52,9 @@ export class LlmError extends Error {
   }
 }
 
+/** The user has spent their daily LLM budget. Still an LlmError, so AI-optional flows degrade. */
+export class LlmBudgetError extends LlmError {}
+
 /** Attempts per call: the first try plus retries on failed or invalid output (DESIGN.md §5). */
 export const MAX_ATTEMPTS = 3;
 
@@ -64,6 +67,8 @@ export class LlmClient {
      * normal voice and rating mode.
      */
     private readonly resolveVoice?: (userId: string) => Promise<Voice>,
+    /** False once the user has spent their daily budget; without it calls are never capped. */
+    private readonly withinBudget?: (userId: string) => Promise<boolean>,
   ) {}
 
   /**
@@ -87,6 +92,12 @@ export class LlmClient {
   async generateStructured<T extends z.ZodType>(
     request: StructuredRequest<T>,
   ): Promise<z.infer<T>> {
+    if (request.userId && this.withinBudget && !(await this.withinBudget(request.userId))) {
+      throw new LlmBudgetError(
+        "You've reached today's AI limit. Try again tomorrow.",
+        request.purpose,
+      );
+    }
     const req = await this.withVoice(request);
     let resolved: ReturnType<ModelResolver>;
     try {
@@ -163,6 +174,18 @@ export function dbCallRecorder(db: Database) {
       // Cost logging must never break the user-facing request.
       console.error("Failed to record LLM call", error);
     }
+  };
+}
+
+/** Caps what one user can spend: the estimated cost of their calls over the last 24 hours. */
+export function dbBudgetGuard(db: Database, dailyBudgetUsd: number) {
+  return async (userId: string): Promise<boolean> => {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [row] = await db
+      .select({ spent: sql<string | null>`sum(${llmCalls.costUsd})` })
+      .from(llmCalls)
+      .where(and(eq(llmCalls.userId, userId), gte(llmCalls.createdAt, since)));
+    return Number(row?.spent ?? 0) < dailyBudgetUsd;
   };
 }
 

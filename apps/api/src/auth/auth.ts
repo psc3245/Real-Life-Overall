@@ -2,7 +2,13 @@ import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { Database } from "../db/client";
-import { authAccounts, authSessions, authUsers, authVerifications } from "../db/schema";
+import {
+  authAccounts,
+  authRateLimits,
+  authSessions,
+  authUsers,
+  authVerifications,
+} from "../db/schema";
 import type { Env } from "../env";
 import { createMailer, passwordResetEmail, verificationEmail, type Mailer } from "./email";
 import { passwordHasher } from "./password";
@@ -25,8 +31,14 @@ export function createAuth(env: Env, db: Database, mailer: Mailer = createMailer
         session: authSessions,
         account: authAccounts,
         verification: authVerifications,
+        rateLimit: authRateLimits,
       },
     }),
+    // Better Auth's defaults (3 sign-ins per 10s, 3 emails per minute, per IP), counted in the
+    // database because each Worker isolate has its own memory.
+    rateLimit: { enabled: env.APP_ENV === "production", storage: "database" },
+    // Set by Cloudflare at the edge; x-forwarded-for (the default) can be set by the client.
+    advanced: { ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.PUBLIC_URL,
     basePath: "/api/auth",

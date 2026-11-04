@@ -10,6 +10,7 @@ import {
 } from "@rlo/shared";
 import { sql, type SQL } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   customType,
@@ -556,6 +557,14 @@ export const authVerifications = pgTable(
   },
   (t) => [index().on(t.identifier)],
 );
+
+/** Better Auth's rate-limit counters. In the database because Worker memory isn't shared. */
+export const authRateLimits = pgTable("auth_rate_limits", {
+  id: text().primaryKey(),
+  key: text().notNull().unique(),
+  count: integer().notNull(),
+  lastRequest: bigint({ mode: "number" }).notNull(),
+});
 
 export const badgeKind = pgEnum("badge_kind", ["catalog", "personal"]);
 export const badgeTier = pgEnum("badge_tier", ["bronze", "silver", "gold", "hof"]);
