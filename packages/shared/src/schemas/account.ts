@@ -43,6 +43,12 @@ export const PREMIUM_PERKS = [
   "A bigger daily AI budget",
 ] as const;
 
+/** GET /me/ai-usage: the rolling 24-hour AI budget, as a share only (never dollars). */
+export interface AiUsageDto {
+  /** 0-100, rounded up so any use shows; at 100 AI requests wait until older ones age out. */
+  usedPercent: number;
+}
+
 export const setRoleBodySchema = z.object({ role: z.enum(USER_ROLES) });
 
 export const isPremiumRole = (role: UserRole) => role !== "user";

@@ -1,4 +1,4 @@
-import type { BugReportDto, MeDto, OnboardingStateDto } from "@rlo/shared";
+import type { AiUsageDto, BugReportDto, MeDto, OnboardingStateDto } from "@rlo/shared";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -162,5 +162,25 @@ describe("account types", () => {
     expect(await since()).toBe(started);
     await patch("user");
     expect(await since()).toBeNull();
+  });
+
+  it("reports the share of the daily AI budget used, against the account's own budget", async () => {
+    const { request, db, me, setRole } = await setup();
+    const usage = async () => (await body<AiUsageDto>(await request("/me/ai-usage"))).usedPercent;
+    expect(await usage()).toBe(0);
+    await db.insert(llmCalls).values({
+      userId: me.id,
+      purpose: "recap.daily",
+      provider: "mock",
+      model: "mock-model",
+      promptVersion: "v1",
+      costUsd: 0.1,
+      latencyMs: 1,
+    });
+    expect(await usage()).toBe(40); // $0.10 of the free $0.25 (the default)
+    await setRole("premium");
+    expect(await usage()).toBe(10); // of the premium $1
+    const res = await request("/me/ai-usage");
+    expect(JSON.stringify(await res.json())).not.toContain("0.1"); // no dollars
   });
 });

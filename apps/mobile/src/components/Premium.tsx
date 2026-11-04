@@ -7,6 +7,7 @@ import {
   type UserRole,
 } from "@rlo/shared";
 import { router } from "expo-router";
+import { useAiUsage } from "@/api/account";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
 import { Body, Button, Card, Muted, Screen } from "./ui";
@@ -78,6 +79,7 @@ export function AccountCard({
 }: {
   role: UserRole;
   premiumSince: string | null;
+  /** Settings: also what Premium includes and today's AI use. */
   perks?: boolean;
 }) {
   const premium = isPremiumRole(role);
@@ -94,6 +96,7 @@ export function AccountCard({
         {tenure ? <Muted style={{ fontSize: 13 }}>{tenure}</Muted> : null}
       </View>
       <Muted style={{ fontSize: 14 }}>{ROLE_DETAILS[role]}</Muted>
+      {perks && <AiUsageMeter premium={premium} />}
       {perks &&
         PREMIUM_PERKS.map((perk) => (
           <Text
@@ -113,7 +116,42 @@ export function AccountCard({
   );
 }
 
+/** How much of today's AI budget is used, as a share only. */
+function AiUsageMeter({ premium }: { premium: boolean }) {
+  const usage = useAiUsage();
+  if (!usage.data) return null;
+  const used = usage.data.usedPercent;
+  const color = used >= 100 ? colors.flare : used >= 75 ? tierColor(65) : colors.neon;
+  return (
+    <View
+      style={{ gap: 6, paddingVertical: space.xs }}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="AI budget used today"
+      accessibilityValue={{ min: 0, max: 100, now: used }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Body style={{ fontWeight: "600" }}>AI used today</Body>
+        <Text style={{ color: colors.court100, fontFamily: fonts.display, fontSize: 18 }}>
+          {used}%
+        </Text>
+      </View>
+      <View style={styles.track}>
+        <View style={[styles.fill, { width: `${used}%`, backgroundColor: color }]} />
+      </View>
+      <Muted style={{ fontSize: 12 }}>
+        {used >= 100
+          ? "Limit reached. AI features free up as the last 24 hours roll over; recaps still run."
+          : "Over the last 24 hours. Recaps and weekly reviews always run, even at the limit."}
+        {premium ? "" : " Premium has a bigger budget."}
+      </Muted>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  track: { height: 8, borderRadius: 4, backgroundColor: colors.court700, overflow: "hidden" },
+  fill: { height: "100%", borderRadius: 4 },
   badge: {
     alignSelf: "flex-start",
     borderWidth: 1,

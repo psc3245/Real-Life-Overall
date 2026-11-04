@@ -6,6 +6,7 @@ import {
   ROLE_LABELS,
 } from "@rlo/shared";
 import { Link } from "react-router";
+import { useAiUsage } from "../../api/account";
 import type { Me } from "../../api/hooks";
 import { AccountBadge } from "../../components/Premium";
 import { SettingsCard } from "./controls";
@@ -41,6 +42,7 @@ export function AccountSettings({ me, id }: { me: Me; id: string }) {
           </Link>
         )}
       </div>
+      <AiUsageMeter premium={premium} />
       <ul className="grid gap-x-6 gap-y-1.5 border-t border-court-800 p-4 text-sm sm:grid-cols-2">
         {PREMIUM_PERKS.map((perk) => (
           <li key={perk} className={`flex gap-2 ${premium ? "text-court-100" : "text-court-500"}`}>
@@ -53,5 +55,40 @@ export function AccountSettings({ me, id }: { me: Me; id: string }) {
       </ul>
       <p className="sr-only">Account type: {ROLE_LABELS[me.role]}</p>
     </SettingsCard>
+  );
+}
+
+/** How much of today's AI budget is used, as a share only. */
+function AiUsageMeter({ premium }: { premium: boolean }) {
+  const usage = useAiUsage();
+  if (!usage.data) return null;
+  const used = usage.data.usedPercent;
+  const bar = used >= 100 ? "bg-flare" : used >= 75 ? "bg-tier-orange" : "bg-neon";
+  return (
+    <div className="space-y-1.5 border-t border-court-800 p-4">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-medium">AI used today</span>
+        <span className="font-display text-lg tabular-nums">{used}%</span>
+      </div>
+      <div
+        role="meter"
+        aria-label="AI budget used today"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={used}
+        className="h-2 overflow-hidden rounded-full bg-court-800"
+      >
+        <div
+          className={`h-full rounded-full ${bar} transition-[width]`}
+          style={{ width: `${used}%` }}
+        />
+      </div>
+      <p className="text-xs text-court-500">
+        {used >= 100
+          ? "Limit reached. AI features free up as the last 24 hours roll over; recaps still run."
+          : "Over the last 24 hours. Recaps and weekly reviews always run, even at the limit."}
+        {!premium && " Premium has a bigger budget."}
+      </p>
+    </div>
   );
 }
