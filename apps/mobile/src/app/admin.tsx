@@ -1,15 +1,26 @@
 import {
   ROLE_LABELS,
+  SEASON_MODE_LABELS,
+  SEASON_MODES,
+  seasonModeAllowed,
   USER_ROLES,
+  type AdminUserDto,
   type LlmCallDto,
   type UsageRowDto,
   type UserRole,
 } from "@rlo/shared";
 import { Redirect } from "expo-router";
 import { useState } from "react";
-import { ActionSheetIOS, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActionSheetIOS, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useBugReports, useSetBugReportStatus } from "@/api/bugReports";
-import { useAdminOverview, useAdminUsers, useIsAdmin, useLlmCalls, useSetRole } from "@/api/admin";
+import {
+  useAdminOverview,
+  useAdminUsers,
+  useIsAdmin,
+  useLlmCalls,
+  useSetRole,
+  useSetSeasonMode,
+} from "@/api/admin";
 import { useMe } from "@/api/hooks";
 import { Segmented } from "@/components/controls";
 import { StatGrid, StatTile } from "@/components/StatTile";
@@ -266,11 +277,38 @@ function BugReports() {
 function Users({ myId }: { myId: string }) {
   const users = useAdminUsers();
   const setRole = useSetRole();
+  const setMode = useSetSeasonMode();
   if (users.isPending) return <Loading />;
+
+  /** Picks another mode for the account's running season, then confirms (goals are cleared). */
+  const pickMode = (u: AdminUserDto) => {
+    const modes = SEASON_MODES.filter((m) => m !== u.seasonMode && seasonModeAllowed(u.role, m));
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: `Season mode for @${u.username}`,
+        message: "Players can only change it during setup. Switching clears the season's goals.",
+        options: [...modes.map((m) => SEASON_MODE_LABELS[m]), "Cancel"],
+        cancelButtonIndex: modes.length,
+        userInterfaceStyle: "dark",
+      },
+      (idx) => {
+        const mode = modes[idx];
+        if (!mode) return;
+        Alert.alert(
+          `Switch to ${SEASON_MODE_LABELS[mode]}?`,
+          `@${u.username}'s goals this season are cleared, and they move to that mode's leaderboard.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Switch", onPress: () => setMode.mutate({ id: u.id, mode }) },
+          ],
+        );
+      },
+    );
+  };
   return (
     <View style={{ gap: space.sm }}>
       <Label>Users {users.data ? `(${users.data.length})` : ""}</Label>
-      <ErrorNote error={users.error ?? setRole.error} />
+      <ErrorNote error={users.error ?? setRole.error ?? setMode.error} />
       <Card style={{ padding: 0 }}>
         {users.data?.map((u, i) => (
           <View key={u.id} style={[styles.row, i > 0 && styles.border]}>
@@ -284,39 +322,52 @@ function Users({ myId }: { myId: string }) {
                 {u.lastLogged ?? "—"} · {u.llmCalls} calls · {usd(u.costUsd)}
               </Muted>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Account type for ${u.username}`}
-              disabled={u.id === myId || setRole.isPending}
-              onPress={() =>
-                ActionSheetIOS.showActionSheetWithOptions(
-                  {
-                    title: `Account type for @${u.username}`,
-                    options: [...USER_ROLES.map((r) => ROLE_LABELS[r]), "Cancel"],
-                    cancelButtonIndex: USER_ROLES.length,
-                    userInterfaceStyle: "dark",
-                  },
-                  (idx) => {
-                    const role = USER_ROLES[idx];
-                    if (role && role !== u.role) setRole.mutate({ id: u.id, role });
-                  },
-                )
-              }
-              style={[
-                styles.role,
-                u.role !== "user" && { borderColor: roleColor(u.role) },
-                u.id === myId && { opacity: 0.5 },
-              ]}
-            >
-              <Text
-                style={{
-                  color: u.role !== "user" ? roleColor(u.role) : colors.court300,
-                  fontSize: 12,
-                }}
+            <View style={{ alignItems: "flex-end", gap: space.xs }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Account type for ${u.username}`}
+                disabled={u.id === myId || setRole.isPending}
+                onPress={() =>
+                  ActionSheetIOS.showActionSheetWithOptions(
+                    {
+                      title: `Account type for @${u.username}`,
+                      options: [...USER_ROLES.map((r) => ROLE_LABELS[r]), "Cancel"],
+                      cancelButtonIndex: USER_ROLES.length,
+                      userInterfaceStyle: "dark",
+                    },
+                    (idx) => {
+                      const role = USER_ROLES[idx];
+                      if (role && role !== u.role) setRole.mutate({ id: u.id, role });
+                    },
+                  )
+                }
+                style={[
+                  styles.role,
+                  u.role !== "user" && { borderColor: roleColor(u.role) },
+                  u.id === myId && { opacity: 0.5 },
+                ]}
               >
-                {ROLE_LABELS[u.role]}
-              </Text>
-            </Pressable>
+                <Text
+                  style={{
+                    color: u.role !== "user" ? roleColor(u.role) : colors.court300,
+                    fontSize: 12,
+                  }}
+                >
+                  {ROLE_LABELS[u.role]}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Season mode for ${u.username}`}
+                disabled={!u.seasonMode || setMode.isPending}
+                onPress={() => pickMode(u)}
+                style={[styles.role, !u.seasonMode && { opacity: 0.5 }]}
+              >
+                <Text style={{ color: colors.court300, fontSize: 12 }}>
+                  {u.seasonMode ? SEASON_MODE_LABELS[u.seasonMode] : "No season"}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         ))}
       </Card>

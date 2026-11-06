@@ -11,6 +11,13 @@ import { roundRating } from "./math";
 export const SEASON_MODES = ["rating", "growth", "souls"] as const;
 export type SeasonMode = (typeof SEASON_MODES)[number];
 
+/** Plain names, for the Front Office. */
+export const SEASON_MODE_LABELS: Record<SeasonMode, string> = {
+  rating: "Rating",
+  growth: "Growth",
+  souls: "Souls",
+};
+
 /** What each mode means, for the pickers (the names come from sports talk). */
 export const SEASON_MODE_INFO: Record<SeasonMode, string> = {
   rating:

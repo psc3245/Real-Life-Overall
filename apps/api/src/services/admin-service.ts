@@ -6,14 +6,18 @@ import {
   type LlmCallDto,
   type RecapDebugDto,
   type createAccountBodySchema,
+  type SeasonMode,
   type UserRole,
 } from "@rlo/shared";
 import type { z } from "zod";
 import type { Auth } from "../auth/auth";
 import type { Database } from "../db/client";
 import { badRequest, conflict, notFound } from "../errors";
+import { assertSeasonModeAllowed } from "../middleware/auth";
 import * as adminRepo from "../repos/admin-repo";
+import * as seasonRepo from "../repos/season-repo";
 import * as userRepo from "../repos/user-repo";
+import * as seasonService from "./season-service";
 
 const DAY_MS = 86_400_000;
 const round = (n: number, places = 4) => Math.round(n * 10 ** places) / 10 ** places;
@@ -82,6 +86,20 @@ export async function setRole(db: Database, actorId: string, userId: string, rol
     throw badRequest("You can't remove your own admin role");
   }
   if (!(await adminRepo.setRole(db, userId, role))) throw notFound("User not found");
+}
+
+/**
+ * Switches the mode of an account's running season, past the setup window players are held to
+ * (DESIGN.md §4.6). The account's own role still has to allow the mode, or rollover would only
+ * switch it back. Like a player's switch, it clears the season's goals.
+ */
+export async function setSeasonMode(db: Database, userId: string, mode: SeasonMode) {
+  const user = await userRepo.findById(db, userId);
+  if (!user) throw notFound("User not found");
+  assertSeasonModeAllowed(user.role, mode);
+  const season = await seasonRepo.findLatestActive(db, userId);
+  if (!season) throw conflict("This account has no season running yet");
+  await seasonService.setSeasonMode(db, season.id, mode);
 }
 
 /** Where links in admin-triggered emails land: the same pages the sign-in screens use. */

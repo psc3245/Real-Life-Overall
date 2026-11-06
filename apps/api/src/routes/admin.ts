@@ -4,6 +4,7 @@ import {
   BUG_REPORT_STATUSES,
   createAccountBodySchema,
   deleteAccountBodySchema,
+  setAccountSeasonModeBodySchema,
   setRoleBodySchema,
   updateBugReportBodySchema,
 } from "@rlo/shared";
@@ -68,6 +69,11 @@ export const adminRoutes = new Hono<AppEnv>()
   .patch("/users/:id", async (c) => {
     const { role } = await parseJson(c, setRoleBodySchema);
     await admin.setRole(c.get("db"), c.get("userId"), idParam(c, "id", "User"), role);
+    return c.body(null, 204);
+  })
+  .put("/users/:id/season-mode", async (c) => {
+    const { mode } = await parseJson(c, setAccountSeasonModeBodySchema);
+    await admin.setSeasonMode(c.get("db"), idParam(c, "id", "User"), mode);
     return c.body(null, 204);
   })
   .get("/recaps/:id", async (c) =>

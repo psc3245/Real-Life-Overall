@@ -5,6 +5,7 @@ import type {
   CreateAccountBody,
   LlmCallDto,
   RecapDebugDto,
+  SeasonMode,
   UserRole,
 } from "@rlo/shared";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -90,6 +91,20 @@ export function useSetRole() {
     mutationFn: ({ id, role }: { id: string; role: UserRole }) =>
       api<null>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ role }) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [...adminKey, "users"] }),
+  });
+}
+
+/** Switches an account's running season to another mode (clears its goals). */
+export function useSetSeasonMode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, mode }: { id: string; mode: SeasonMode }) =>
+      api<null>(`/admin/users/${id}/season-mode`, {
+        method: "PUT",
+        body: JSON.stringify({ mode }),
+      }),
+    // Your own season may have changed too.
+    onSuccess: () => queryClient.invalidateQueries(),
   });
 }
 

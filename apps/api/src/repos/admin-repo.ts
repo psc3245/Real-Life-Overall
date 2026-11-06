@@ -1,4 +1,4 @@
-import type { UserRole } from "@rlo/shared";
+import type { SeasonMode, UserRole } from "@rlo/shared";
 import {
   and,
   asc,
@@ -148,6 +148,11 @@ export async function findUsers(db: Executor, filter: UserFilter = {}, limit = 2
       displayName: users.displayName,
       email: users.email,
       role: users.role,
+      seasonMode: sql<SeasonMode | null>`(
+        select ${seasons.mode} from ${seasons}
+        where ${seasons.userId} = ${users.id} and ${seasons.status} = 'active'
+        order by ${seasons.startsOn} desc limit 1
+      )`,
       emailVerified: authUsers.emailVerified,
       signIn: sql<string[]>`coalesce(${providers.list}, '{}')`,
       timezone: users.timezone,

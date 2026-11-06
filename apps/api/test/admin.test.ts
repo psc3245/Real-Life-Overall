@@ -72,6 +72,30 @@ describe("admin", () => {
     expect(self.status).toBe(400);
   });
 
+  it("switches an account's season mode mid-season, within what its role allows", async () => {
+    const { request, promote, me } = await setup();
+    await promote();
+    const put = (id: string, mode: string) =>
+      request(`/admin/users/${id}/season-mode`, { method: "PUT", ...json({ mode }) });
+    const mine = async () =>
+      (await body<AdminUserDto[]>(await request("/admin/users"))).find((u) => u.id === me.id)!;
+
+    expect((await mine()).seasonMode).toBe("rating");
+    expect((await put(me.id, "growth")).status).toBe(204);
+    expect((await mine()).seasonMode).toBe("growth");
+    expect((await put(me.id, "souls")).status).toBe(204); // admins can test Souls
+
+    // A free account with no tester access can't be put in Souls or Rating.
+    await request("/me", { user: "other" });
+    const other = (await body<AdminUserDto[]>(await request("/admin/users"))).find(
+      (u) => u.username === "other",
+    )!;
+    await request(`/admin/users/${other.id}`, { method: "PATCH", ...json({ role: "user" }) });
+    expect((await put(other.id, "souls")).status).toBe(403);
+    // "other" never onboarded, so there's no season to switch.
+    expect((await put(other.id, "growth")).status).toBe(409);
+  });
+
   it("shows a recap's raw output and the call behind it", async () => {
     const { request, promote } = await setup();
     await promote();

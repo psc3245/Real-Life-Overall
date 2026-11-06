@@ -2,9 +2,13 @@ import {
   ADMIN_MIN_PASSWORD,
   ROLE_DETAILS,
   ROLE_LABELS,
+  SEASON_MODE_LABELS,
+  SEASON_MODES,
+  seasonModeAllowed,
   USER_ROLES,
   type AccountAction,
   type AdminUserDto,
+  type SeasonMode,
   type UserRole,
 } from "@rlo/shared";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
@@ -14,6 +18,7 @@ import {
   useCreateAccount,
   useDeleteAccount,
   useSetRole,
+  useSetSeasonMode,
 } from "../../api/admin";
 import { Button } from "../../components/Button";
 import { compactFieldClass } from "../../components/form";
@@ -45,6 +50,7 @@ export function FrontOffice({ myId }: { myId: string }) {
   const search = useDebounced(q.trim());
   const users = useAdminUsers({ q: search || undefined, role: role || undefined });
   const setRole = useSetRole();
+  const setMode = useSetSeasonMode();
   const [signing, setSigning] = useState(false);
   const [managing, setManaging] = useState<string | null>(null);
   const filtered = Boolean(search || role);
@@ -92,7 +98,7 @@ export function FrontOffice({ myId }: { myId: string }) {
         </select>
       </div>
 
-      <ErrorNote error={users.error ?? setRole.error} />
+      <ErrorNote error={users.error ?? setRole.error ?? setMode.error} />
       <div className="overflow-x-auto rounded-xl border border-court-700 bg-court-900/70">
         <table className="w-full text-sm tabular-nums">
           <thead className="text-left text-[11px] uppercase tracking-wider text-court-500">
@@ -102,6 +108,7 @@ export function FrontOffice({ myId }: { myId: string }) {
               <th className="pr-3 font-semibold">Last logged</th>
               <th className="pr-3 text-right font-semibold">LLM</th>
               <th className="pr-3 font-semibold">Account</th>
+              <th className="pr-3 font-semibold">Season</th>
               <th className="pr-3" />
             </tr>
           </thead>
@@ -115,11 +122,13 @@ export function FrontOffice({ myId }: { myId: string }) {
                 onManage={() => setManaging(managing === u.id ? null : u.id)}
                 onRole={(r) => setRole.mutate({ id: u.id, role: r })}
                 roleBusy={setRole.isPending}
+                onMode={(mode) => setMode.mutate({ id: u.id, mode })}
+                modeBusy={setMode.isPending}
               />
             ))}
             {users.data?.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-4 text-center text-court-500">
+                <td colSpan={7} className="py-4 text-center text-court-500">
                   {filtered ? "No accounts match." : "No accounts yet."}
                 </td>
               </tr>
@@ -138,6 +147,8 @@ function UserRow({
   onManage,
   onRole,
   roleBusy,
+  onMode,
+  modeBusy,
 }: {
   user: AdminUserDto;
   isMe: boolean;
@@ -145,7 +156,17 @@ function UserRow({
   onManage: () => void;
   onRole: (role: UserRole) => void;
   roleBusy: boolean;
+  onMode: (mode: SeasonMode) => void;
+  modeBusy: boolean;
 }) {
+  const switchMode = (mode: SeasonMode) => {
+    const whose = isMe ? "your" : `@${u.username}'s`;
+    const ok = window.confirm(
+      `Switch ${whose} running season to ${SEASON_MODE_LABELS[mode]}? Its goals are cleared, ` +
+        "and the account moves to that mode's leaderboard.",
+    );
+    if (ok) onMode(mode);
+  };
   return (
     <>
       <tr className="border-t border-court-800">
@@ -182,6 +203,26 @@ function UserRow({
             ))}
           </select>
         </td>
+        <td className="pr-3">
+          {u.seasonMode ? (
+            <select
+              aria-label={`Season mode for ${u.username}`}
+              value={u.seasonMode}
+              disabled={modeBusy}
+              title="The running season's mode. Players can only change it during setup."
+              onChange={(e) => switchMode(e.target.value as SeasonMode)}
+              className="rounded border border-court-700 bg-court-950 px-2 py-1 text-xs disabled:opacity-60"
+            >
+              {SEASON_MODES.map((m) => (
+                <option key={m} value={m} disabled={!seasonModeAllowed(u.role, m)}>
+                  {SEASON_MODE_LABELS[m]}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs text-court-500">Not started</span>
+          )}
+        </td>
         <td className="pr-3 text-right">
           {!isMe && (
             <button
@@ -197,7 +238,7 @@ function UserRow({
       </tr>
       {managing && (
         <tr className="bg-court-950/60">
-          <td colSpan={6} className="px-3 py-3">
+          <td colSpan={7} className="px-3 py-3">
             <ManageAccount user={u} />
           </td>
         </tr>
