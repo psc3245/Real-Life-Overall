@@ -906,3 +906,38 @@ export const bugReports = pgTable(
   },
   (t) => [index().on(t.status, t.createdAt)],
 );
+
+export const soulLevelKind = pgEnum("soul_level_kind", ["start", "level_up"]);
+
+/**
+ * Souls mode stat levels (DESIGN.md §4.7): one `start` row per leaf (its starting level) plus a
+ * `level_up` row per level bought. A leaf's level is their sum; souls come from the day-by-day
+ * replay, minus the costs here.
+ */
+export const soulLevels = pgTable(
+  "soul_levels",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: uuid()
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    nodeId: uuid()
+      .notNull()
+      .references(() => ratingNodes.id, { onDelete: "cascade" }),
+    kind: soulLevelKind().notNull(),
+    levels: smallint().notNull(),
+    cost: integer().notNull().default(0),
+    /** The day whose souls paid for it (the player's local date when they bought it). */
+    afterDate: date().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index().on(t.seasonId),
+    uniqueIndex("soul_levels_one_start")
+      .on(t.nodeId)
+      .where(sql`${t.kind} = 'start'`),
+  ],
+);

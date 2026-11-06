@@ -5,9 +5,10 @@ import { roundRating } from "./math";
 
 /**
  * How a season is scored (DESIGN.md §4.6). "rating" is the 0-100 OVR; "growth" (Most Improved)
- * scores the points gained this season instead, with the rating kept underneath.
+ * scores the points gained this season instead, with the rating kept underneath; "souls" levels
+ * stats with souls earned from each day (§4.7), the rating again kept underneath.
  */
-export const SEASON_MODES = ["rating", "growth"] as const;
+export const SEASON_MODES = ["rating", "growth", "souls"] as const;
 export type SeasonMode = (typeof SEASON_MODES)[number];
 
 /** What each mode means, for the pickers (the names come from sports talk). */
@@ -19,6 +20,10 @@ export const SEASON_MODE_INFO: Record<SeasonMode, string> = {
     "Scored on points gained this season, starting from 0. Gains add up and setbacks or decay " +
     "never take them away. You rank on growth boards; your rating keeps running underneath, " +
     "visible only to you.",
+  souls:
+    "Every day earns souls; you spend them to level the stats you choose, 1 to 99, and levels " +
+    "never fade. Miss a day, slip, or have a setback and you drop your unspent souls: log the " +
+    "next day to pick them back up, or lose them for good.",
 };
 
 export interface SourcedLedgerEvent extends LedgerEvent {

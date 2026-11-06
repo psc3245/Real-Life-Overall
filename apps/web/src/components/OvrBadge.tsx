@@ -37,7 +37,7 @@ export function OvrBadge({
         {growth ? formatScore(mode, shown, shown >= 10 ? 0 : 1) : Math.round(shown)}
       </span>
       <span className="mt-1 text-xs font-semibold tracking-[0.3em] text-court-300">
-        {growth ? talk.growthLabel : talk.ovr}
+        {growth ? talk.growthLabel : mode === "souls" ? talk.souls.level : talk.ovr}
       </span>
     </div>
   );

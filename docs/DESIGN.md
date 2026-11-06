@@ -2,7 +2,7 @@
 
 > **Working title.** The brand name is undecided; "Real Life Overall" / "OVR" are placeholders.
 > **Status:** In development: Phases 0–4 built, web refinements done, iOS app started. This document is the source of truth for scope, architecture and decisions. Update it when a decision changes.
-> **Last updated:** 2026-11-04
+> **Last updated:** 2026-11-06
 
 ---
 
@@ -45,6 +45,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Editing a past day after its recap | **Re-run that day's recap.** |
 | Onboarding | **Structured form, then a chat follow-up** with the LLM, then initial ratings. |
 | Recalibration | **Season reset** each **calendar quarter**. |
+| Souls mode | **A third season mode, in testing** (decided 2026-11-06, §4.7): Souls-style progression. Days earn souls, the player spends them on the stats they choose (their own attributes, levels 1-99 that never fade), and a missed day, a slip or a setback day drops unspent souls as a bloodstain. Dev and Admin only until it ships. Wording follows sports talk: Souls words by default, plain at None. |
 | Season mode | **Rating or Growth, picked at the start of each season** (decided 2026-10-26, §4.6). Growth ("Most Improved") scores points gained this season: gains only, weekly corrections take back over-credit, decay never subtracts, rolled up by weight. The rating keeps running underneath, revealable only by its owner. Separate boards per mode; the mode locks after setup. |
 | Potential | **Both**: user-set goal ratings plus an LLM-projected end-of-season rating. |
 | Badges | **Hybrid**: a core catalog with a deterministic rule engine, plus LLM-generated personal badges. |
@@ -156,6 +157,17 @@ The tree should measure what the player actually cares about, weighted the way t
 - **The model:** voiced calls for a growth player get a growth note (`GROWTH_MODE`, prompt version `+growth`): talk about gains, don't quote ratings, keep deltas honest. Weekly reviews also see the growth tree and project season growth; projections store their mode so old rating projections don't show as growth.
 - Rating-only parts stay as they are: decay rules, archetypes, the rails (§5.6), badges' rule engine and the Scouting Report.
 - iOS doesn't know about modes yet: in a growth season it shows growth numbers as if they were ratings.
+
+### 4.7 Souls mode (added 2026-11-06, in testing)
+The progression flips from "the model sets your ratings" to "the model decides what you earn, you decide what to level". A third `seasons.mode`, `souls`, picked like the others (§4.6) and locked after setup. Only dev and admin accounts can pick it (`assertSeasonModeAllowed`; the picker hides it from everyone else), and rollover turns a Souls season into Rating (or Growth for Free) for an account that's lost tester access. The rating ledger keeps running underneath, untouched.
+- **Stats are the player's own leaves**, levels 1-99 (`STAT_LEVEL_MAX`). Each leaf gets a starting level when the stat sheet is first read: 0.4 × its rating (50 → 20, 100 → 40, so everyone starts below the first soft cap), or, in New Game+ (the previous season was Souls too), last season's level by lineage. New leaves get theirs the same way. Levels only go up and never decay. Parents and Overall roll up by weight like ratings, so `RatedNodeDto.value` is the level and Overall is the **Soul Level** (bigger trees don't score higher). Souls seasons show no 7-day trends.
+- **Souls are earned per day**, derived like growth: 100 per rating point of daily-recap gains (`SOULS_PER_POINT`; setbacks don't subtract), weekly-review corrections both ways on the week's last day, 25 per habit done (build done or avoid explicitly kept; groups don't count), 100 per finished workout, and a **boss soul** when a goal with a deadline is completed (250 + 20 per day of the goal's window, max 3,000).
+- **Leveling** costs `levelCost(level)`: 10 × level^1.4, ×1.5 from level 40 and ×3 from 60 (the **soft caps**), rounded to 10, at least 100 (level 20 → 660). `POST /souls/level-up` (`nodeId`, `levels` 1-10) buys them from held souls; each level is a `soul_levels` row with its cost and `after_date` (the player's today).
+- **Dying:** a day dies on a slip on an avoid habit, a recapped day whose daily changes net ≤ -1 (`BAD_DAY_NET`), or, once settled, nothing recapped (a missed day). A day settles once it's past and, for yesterday, after 05:00 local (the auto-recap runs at 04:00). The run's first day can't be missed, and paused days can't die. A death drops everything held as a **bloodstain**; a later recapped day that doesn't die picks it back up, and dying again first loses it for good. Unrecapped and paused days leave it waiting.
+- **The fold** (`foldSouls` in `packages/shared/src/rating/souls.ts`) replays the run from its first day (the earliest starting level) each read, so backfills and re-run recaps change the past. Per day: earnings in, bloodstain recovery, that day's spends, then the death check. Spends that a later change can't cover leave `held` negative ("you owe"), so dying right after buying never refunds souls.
+- **Screens:** `/bonfire` (`GET /souls`): Soul Level, souls held, the bloodstain, every stat with its level, next cost and a Level up button, the last 14 days of the run (earnings by source, deaths, pickups, losses) and the rules. The nav shows a Bonfire link in Souls seasons; the score display uses level tiers (`SOULS_TIERS`) on a 99 scale and labels Overall "SL".
+- **Words:** `TALK.*.souls` holds them: souls, bonfire, bloodstain, SL, "You died", boss at normal and extra; points, Level up, Dropped points, Level, Streak broken, Goal at none.
+- **Not yet** (next chunks): the model isn't told about Souls mode (recaps and reviews are written as in a rating season); charts, history, season cards and the change feed still show ratings; leaderboards and shared cards carry the level without a Souls board of their own; unspent souls don't carry into New Game+; iOS.
 
 ---
 
@@ -567,6 +579,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `users.unit_system`, `users.track_weight`, `users.track_height` | | Units and opt-in body tracking |
 | `users.role`, `users.premium_since` | `user` (Free) / `premium` / `dev` / `admin`; when it last left Free | §8.7, §8.9 |
 | `bug_reports` | `user_id`, `message`, `page`, `platform` (`web`/`ios`), `app_version`, `device`, `status` (`open`/`resolved`), `resolved_at` | From dev and admin accounts (§8.9) |
+| `soul_levels` | `season_id`, `node_id`, `kind` (`start`/`level_up`), `levels`, `cost`, `after_date` | Souls mode stat levels (§4.7); one `start` row per leaf |
 | `chart_views` | `user_id`, `name`, `config` jsonb (ChartConfig), `pinned` | §7.7 |
 | `reports` / `report_runs` | `name`, `description`, `charts` jsonb, `options` jsonb, `default_range`; `report_id`, `from`, `to`, `used_ai`, `result` jsonb | §7.8 |
 | `objective_links` / `objective_entries` | `objective_id` + `node_lineage_id`; `objective_id`, `local_date`, `value` | Links by lineage; one manual entry per goal per day |
@@ -703,6 +716,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Sports talk: none / normal / extra for the app's wording and every AI-written text (§7.10)
 - [x] Season modes: Rating or Growth ("Most Improved") picked each season, growth boards, the rating hidden but revealable by its owner (§4.6)
 - [x] iOS: season modes (picker, growth display, growth boards)
+- [ ] Souls mode (§4.7, in testing): chunk 1 done (levels, souls, deaths and bloodstains, the Bonfire page, the mode for testers); next, the model's Souls voice, charts and history in levels, a Souls board, souls carried into New Game+, then iOS
 - [x] iOS: Scouting Report, evolving tree, coach and sports talk
 - [x] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 - [x] iOS parity for charts, reports, settings (password, devices), Personalize (behavior, Today page, features) and admin. Tabs: Today, Playbook (Habits / Goals / Train), Week, Rating, You; Coach opens from Today and You. The web's look options (themes, fonts, density) and its admin debug panel stay web-only.

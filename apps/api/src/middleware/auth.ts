@@ -84,8 +84,14 @@ export class PremiumRequiredError extends HTTPException {
 }
 const premiumRequired = () => new PremiumRequiredError();
 
-/** Rating seasons are premium; free accounts play Growth seasons (DESIGN.md §8.9). */
+/**
+ * Rating seasons are premium; free accounts play Growth seasons (DESIGN.md §8.9). Souls seasons
+ * are still in testing: dev and admin accounts only, until they move out of beta.
+ */
 export function assertSeasonModeAllowed(role: UserRole | undefined, mode: SeasonMode) {
+  if (mode === "souls" && !isTesterRole(role ?? "user")) {
+    throw new HTTPException(403, { message: "Souls seasons are still in testing." });
+  }
   if (mode === "rating" && !isPremiumRole(role ?? "user")) {
     throw new PremiumRequiredError(
       "Rating seasons are a Premium feature. Free seasons score growth.",

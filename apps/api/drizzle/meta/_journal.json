@@ -225,6 +225,13 @@
       "when": 1793813213076,
       "tag": "0031_premium_since",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793994783797,
+      "tag": "0032_souls_mode",
+      "breakpoints": true
     }
   ]
 }

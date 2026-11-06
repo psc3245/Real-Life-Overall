@@ -37,6 +37,22 @@ export interface TalkTerms {
   growthLabel: string;
   /** Rating mode's name. */
   ratingMode: string;
+  /** Souls mode (DESIGN.md §4.7): Souls words at normal and extra, plain words at none. */
+  souls: {
+    mode: string;
+    /** The currency, and its singular. */
+    souls: string;
+    soul: string;
+    /** The level-up screen. */
+    bonfire: string;
+    bonfireTagline: string;
+    /** Overall's level, short. */
+    level: string;
+    levelUp: string;
+    bloodstain: string;
+    died: string;
+    boss: string;
+  };
   playerCard: string;
   profileHeading: string;
   archetype: string;
@@ -75,6 +91,18 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     growthMode: "Growth",
     growthLabel: "Gained",
     ratingMode: "Rating",
+    souls: {
+      mode: "Levels",
+      souls: "points",
+      soul: "point",
+      bonfire: "Level up",
+      bonfireTagline: "Spend points on the stats you choose",
+      level: "Level",
+      levelUp: "Level up",
+      bloodstain: "Dropped points",
+      died: "Streak broken",
+      boss: "Goal",
+    },
     playerCard: "Summary card",
     profileHeading: "Profile",
     archetype: "Profile type",
@@ -108,6 +136,18 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     growthMode: "Most Improved",
     growthLabel: "Growth",
     ratingMode: "OVR",
+    souls: {
+      mode: "Souls",
+      souls: "souls",
+      soul: "soul",
+      bonfire: "Bonfire",
+      bonfireTagline: "Rest, spend your souls, level up",
+      level: "SL",
+      levelUp: "Level up",
+      bloodstain: "Bloodstain",
+      died: "You died",
+      boss: "Boss",
+    },
     playerCard: "Player card",
     profileHeading: "Player profile",
     archetype: "Archetype",
@@ -141,6 +181,18 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     growthMode: "MIP race",
     growthLabel: "MIP",
     ratingMode: "OVR race",
+    souls: {
+      mode: "Souls",
+      souls: "souls",
+      soul: "soul",
+      bonfire: "Bonfire",
+      bonfireTagline: "Rest, spend your souls, level up",
+      level: "SL",
+      levelUp: "Level up",
+      bloodstain: "Bloodstain",
+      died: "You died",
+      boss: "Boss",
+    },
     playerCard: "Player card",
     profileHeading: "Player profile",
     archetype: "Build",
