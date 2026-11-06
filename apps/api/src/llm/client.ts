@@ -6,7 +6,7 @@ import type { Database } from "../db/client";
 import { llmCalls, users } from "../db/schema";
 import * as seasonRepo from "../repos/season-repo";
 import { estimateCostUsd, PREMIUM_PURPOSES, type LlmPurpose } from "./models";
-import { GROWTH_MODE } from "./prompts/shared";
+import { GROWTH_MODE, soulsMode } from "./prompts/shared";
 import { VOICE, VOICED_PURPOSES } from "./prompts/voice";
 import type { ModelResolver } from "./providers";
 
@@ -84,8 +84,8 @@ export class LlmClient {
   ) {}
 
   /**
-   * Appends the player's voice (DESIGN.md §7.10), and the growth-mode note in a growth season
-   * (§4.6), to calls that write text they read.
+   * Appends the player's voice (DESIGN.md §7.10), and the season mode's note in a growth (§4.6)
+   * or souls (§4.7) season, to calls that write text they read.
    */
   private async withVoice<T extends z.ZodType>(req: StructuredRequest<T>) {
     if (!VOICED_PURPOSES.has(req.purpose)) return req;
@@ -93,11 +93,11 @@ export class LlmClient {
       req.userId && this.resolveVoice
         ? await this.resolveVoice(req.userId).catch(() => DEFAULT_VOICE)
         : DEFAULT_VOICE;
-    const growth = mode === "growth";
+    const note = mode === "growth" ? GROWTH_MODE : mode === "souls" ? soulsMode(talk) : null;
     return {
       ...req,
-      system: [req.system, ...(growth ? [GROWTH_MODE] : []), VOICE[talk]].join("\n\n"),
-      promptVersion: `${req.promptVersion}+talk-${talk}${growth ? "+growth" : ""}`,
+      system: [req.system, ...(note ? [note] : []), VOICE[talk]].join("\n\n"),
+      promptVersion: `${req.promptVersion}+talk-${talk}${note ? `+${mode}` : ""}`,
     };
   }
 

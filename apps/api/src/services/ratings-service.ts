@@ -24,7 +24,7 @@ import { applyDecay } from "./decay-service";
 import { datedEvents } from "./event-dates";
 import { trends } from "./history-service";
 import { ensureCurrentSeason } from "./season-service";
-import { soulLevels } from "./souls-service";
+import { levelTrends, soulLevels } from "./souls-service";
 import type { OnboardingResult } from "./onboarding-service";
 
 /**
@@ -46,9 +46,14 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
     userRepo.findById(db, userId),
   ]);
   const today = localDateIn(user?.timezone ?? "UTC");
-  // Levels only move when bought, so Souls seasons show no rating trends.
-  const trend =
-    season.mode === "souls" ? new Map<string, number>() : trends(nodes, dated, today, season.mode);
+  const souls =
+    season.mode === "souls"
+      ? await soulLevels(db, userId, season, nodes, leafValuesFromEvents(events), today)
+      : null;
+  // Souls seasons trend by levels bought in the last 7 days (DESIGN.md §4.7).
+  const trend = souls
+    ? levelTrends(nodes, souls.rows, today)
+    : trends(nodes, dated, today, season.mode);
   const leaves = new Set(leafIds(nodes));
   const ratings = computeNodeValues(nodes, leafValuesFromEvents(events));
   const growth = computeNodeValues(nodes, leafGrowthFromEvents(events));

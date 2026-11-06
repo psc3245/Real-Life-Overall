@@ -3,6 +3,7 @@ import {
   bossSouls,
   emptyEarnings,
   foldSouls,
+  leafLevelsAsOf,
   levelCost,
   levelFromRating,
   type DeathCause,
@@ -114,5 +115,23 @@ describe("foldSouls", () => {
     );
     // The recovery the spend counted on never happened.
     expect(owed.held).toBe(-300);
+  });
+});
+
+describe("leafLevelsAsOf", () => {
+  it("adds levels bought by the date to the start, skipping leaves not started yet", () => {
+    const rows = [
+      { nodeId: "a", kind: "start" as const, levels: 20, afterDate: "2026-11-01" },
+      { nodeId: "a", kind: "level_up" as const, levels: 1, afterDate: "2026-11-02" },
+      { nodeId: "a", kind: "level_up" as const, levels: 1, afterDate: "2026-11-04" },
+      { nodeId: "b", kind: "start" as const, levels: 30, afterDate: "2026-11-03" },
+    ];
+    expect([...leafLevelsAsOf(rows, "2026-11-02")]).toEqual([["a", 21]]);
+    expect(leafLevelsAsOf(rows, "2026-11-04")).toEqual(
+      new Map([
+        ["a", 22],
+        ["b", 30],
+      ]),
+    );
   });
 });

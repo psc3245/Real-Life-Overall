@@ -72,7 +72,7 @@ export async function getProfile(
     await getRatings(db, owner.id).catch(() => null); // no rating yet: stays without a card
     card = await cardRepo.findByUser(db, owner.id);
   }
-  const badges = await publicBadges(db, owner.id, !isSelf && card?.mode === "growth");
+  const badges = await publicBadges(db, owner.id, !isSelf && !!card && card.mode !== "rating");
   return {
     username: owner.username,
     displayName: owner.displayName,

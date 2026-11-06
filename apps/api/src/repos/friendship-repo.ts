@@ -82,6 +82,7 @@ export async function findAllFor(db: Executor, userId: string) {
         mode: playerCards.mode,
         overall: playerCards.overall,
         growth: playerCards.growth,
+        level: playerCards.level,
         archetype: playerCards.archetype,
       })
       .from(friendships)

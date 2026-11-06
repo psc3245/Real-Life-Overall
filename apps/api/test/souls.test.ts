@@ -1,7 +1,17 @@
-import type { DayDto, HabitDto, RatingsDto, SoulsDto } from "@rlo/shared";
+import {
+  addDays,
+  seasonForDate,
+  type DayDto,
+  type HabitDto,
+  type HistoryDto,
+  type LeaderboardDto,
+  type RatingsDto,
+  type SeasonCardDto,
+  type SoulsDto,
+} from "@rlo/shared";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { seasons, users } from "../src/db/schema";
+import { llmCalls, ratingEvents, recaps, seasons, soulLevels, users } from "../src/db/schema";
 import { createRatedApp, json } from "./flows";
 import { jsonResult } from "./helpers";
 
@@ -91,5 +101,69 @@ describe("souls mode", () => {
     expect((await t.request("/souls")).status).toBe(404);
     await t.db.update(seasons).set({ mode: "souls" }).where(eq(seasons.status, "active"));
     expect((await t.request("/souls")).status).toBe(200);
+  });
+
+  it("tells the model about Souls mode, and charts, boards and cards use levels", async () => {
+    const t = await setup([recap([{ ref: "n4", delta: 3 }])]);
+    await t.souls();
+    await t.request(`/days/${t.today}/journal`, { method: "PUT", ...json({ journal: "Lifted." }) });
+    await t.request(`/days/${t.today}/recap`, { method: "POST" });
+    const system = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
+    expect(system).toContain("picked Souls mode");
+    const [call] = await t.db.select().from(llmCalls).where(eq(llmCalls.purpose, "recap.daily"));
+    expect(call!.promptVersion).toMatch(/\+souls$/);
+
+    // 300 souls can't buy level 20 → 21 (660); give the run a boss-sized day instead.
+    await t.db.update(ratingEvents).set({ delta: 9 }).where(eq(ratingEvents.source, "daily_recap"));
+    await t.levelUp(t.nodeId("Strength"));
+    const history = await body<HistoryDto>(await t.request("/ratings/history?days=7"));
+    const strength = history.series.find((s) => s.nodeId === t.nodeId("Strength"))!;
+    expect(strength.values.at(-1)).toBe(21);
+    const ratings = await body<RatingsDto>(await t.request("/ratings"));
+    expect(ratings.nodes.find((n) => n.name === "Strength")!.trend).toBe(1);
+
+    const board = await body<LeaderboardDto>(
+      await t.request("/leaderboards?scope=friends&board=overall"),
+    );
+    const overall = ratings.nodes.find((n) => n.parentId === null)!.value!;
+    expect(board).toMatchObject({ mode: "souls", myMode: "souls" });
+    expect(board.me!.value).toBeCloseTo(overall, 2);
+  });
+
+  it("carries levels and unspent souls into New Game+", async () => {
+    const t = await setup([
+      recap([
+        { ref: "n2", delta: 3 },
+        { ref: "n3", delta: 3 },
+        { ref: "n4", delta: 3 },
+      ]),
+    ]);
+    await t.souls();
+    await t.request(`/days/${t.today}/journal`, {
+      method: "PUT",
+      ...json({ journal: "Big day." }),
+    });
+    await t.request(`/days/${t.today}/recap`, { method: "POST" });
+    await t.levelUp(t.nodeId("Strength")); // 900 - 660 = 240 left
+
+    // Move the whole run to the last day of last quarter, so the next request rolls over.
+    const prev = seasonForDate(addDays(seasonForDate(t.today).startsOn, -1));
+    await t.db
+      .update(seasons)
+      .set({ label: prev.label, startsOn: prev.startsOn, endsOn: prev.endsOn });
+    await t.db.update(recaps).set({ periodStart: prev.endsOn, periodEnd: prev.endsOn });
+    await t.db.update(soulLevels).set({ afterDate: prev.endsOn });
+    await t.db
+      .update(ratingEvents)
+      .set({ createdAt: new Date(`${addDays(prev.endsOn, -1)}T12:00:00Z`) });
+
+    const ngp = await t.souls();
+    expect(ngp).toMatchObject({ carried: 240, held: 240, cycle: 1 });
+    expect(ngp.season.label).not.toBe(prev.label);
+    expect(ngp.stats.find((s) => s.name === "Strength")).toMatchObject({ level: 21, gained: 0 });
+    const [card] = await body<SeasonCardDto[]>(await t.request("/seasons"));
+    expect(card).toMatchObject({ mode: "souls", label: prev.label });
+    expect(card!.level).toBeCloseTo(ngp.soulLevel!, 2);
+    expect(card!.nodes.find((n) => n.name === "Strength")!.level).toBe(21);
   });
 });

@@ -56,7 +56,19 @@ export function BonfirePage() {
           {data.soulLevel !== null && <OvrBadge value={data.soulLevel} mode="souls" />}
           <div className="min-w-0 flex-1 space-y-1">
             <h1 className="font-display text-4xl font-bold uppercase">{talk.souls.bonfire}</h1>
-            <p className="text-court-300">{talk.souls.bonfireTagline}.</p>
+            <p className="text-court-300">
+              {talk.souls.bonfireTagline}.
+              {data.cycle > 0 && (
+                <span className="ml-2 font-display uppercase tracking-wider text-neon">
+                  NG+{data.cycle > 1 ? data.cycle : ""}
+                </span>
+              )}
+            </p>
+            {data.carried > 0 && (
+              <p className="text-sm text-court-500">
+                {formatSouls(data.carried)} {talk.souls.souls} carried over from last season.
+              </p>
+            )}
             {root && <HiddenRating rating={root.rating} />}
           </div>
           <div className="text-right">

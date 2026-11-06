@@ -8,6 +8,7 @@ import {
   isHabitDone,
   isSlip,
   leafIds,
+  leafLevelsAsOf,
   leafValuesFromEvents,
   levelCost,
   levelFromRating,
@@ -21,6 +22,7 @@ import {
   type HabitConfig,
   type LevelUpBody,
   type RatingNodeDto,
+  type SeasonCardDto,
   type SeasonDto,
   type SoulDayInput,
   type SoulEarnings,
@@ -66,7 +68,7 @@ export async function soulLevels(
     const lineages = new Map(
       (await nodeRepo.findLineages(db, season.id)).map((n) => [n.id, n.lineageId]),
     );
-    const previous = (await seasonRepo.findArchived(db, userId))[0];
+    const { previous } = await earlierSeasons(db, userId, season);
     const carried =
       previous?.mode === "souls"
         ? await soulRepo.findLevelsByLineage(
@@ -105,15 +107,54 @@ export async function soulLevels(
   return { rows, levels, gained, startedOn };
 }
 
-/** The season's run, day by day: what each day earned and whether it was a death. */
+/** Each node's change in level over the last 7 days (leaves started since count from 0 change). */
+export function levelTrends(
+  nodes: RatingNodeDto[],
+  rows: soulRepo.SoulLevelRow[],
+  today: string,
+): Map<string, number> {
+  const now = computeNodeValues(nodes, leafLevelsAsOf(rows, today));
+  const weekAgo = leafLevelsAsOf(rows, addDays(today, -7));
+  // A leaf started this week trends from its starting level, not from nothing.
+  for (const r of rows)
+    if (r.kind === "start" && !weekAgo.has(r.nodeId)) weekAgo.set(r.nodeId, r.levels);
+  const before = computeNodeValues(nodes, weekAgo);
+  const out = new Map<string, number>();
+  for (const [id, value] of now) {
+    const prior = before.get(id);
+    if (prior !== undefined) out.set(id, Math.round((value - prior) * 100) / 100);
+  }
+  return out;
+}
+
+/**
+ * The archived season straight before `season`, and its New Game+ cycle: how many Souls seasons
+ * in a row lead up to it.
+ */
+async function earlierSeasons(db: Database, userId: string, season: SeasonDto) {
+  const before = (await seasonRepo.findArchived(db, userId)).filter(
+    (s) => s.startsOn < season.startsOn,
+  );
+  let cycle = 0;
+  while (before[cycle]?.mode === "souls") cycle++;
+  return { previous: before[0], cycle };
+}
+
+/**
+ * The season's run, day by day through `through`: what each day earned and whether it was a
+ * death. `settled` closes every day (a finished season); otherwise today and early-morning
+ * yesterday stay in play.
+ */
 async function buildRun(
   db: Database,
   userId: string,
   season: SeasonDto,
   from: string,
-  today: string,
+  through: string,
   timezone: string,
+  settled = false,
 ) {
+  const today = through;
   const [recaps, dated, habits, workouts, objectives, pauses] = await Promise.all([
     recapRepo.findDailyBetween(db, userId, from, today),
     eventRepo.findActiveWithDates(db, season.id).then(datedEvents),
@@ -139,7 +180,7 @@ async function buildRun(
       logged: false,
       paused: pauses.some((p) => p.startsOn <= d && (p.endsOn === null || p.endsOn >= d)),
       deaths: [],
-      open: d === today || (d === yesterday && !lateEnough),
+      open: !settled && (d === today || (d === yesterday && !lateEnough)),
     });
   }
   const earn = (date: string | null, kind: keyof SoulEarnings, souls: number) => {
@@ -192,31 +233,83 @@ async function buildRun(
   return [...days.values()];
 }
 
-async function loadSouls(db: Database, userId: string) {
-  const season = await ensureCurrentSeason(db, userId);
-  if (!season) throw notFound("No season yet. Finish onboarding first.");
-  if (season.mode !== "souls") throw notFound("This season isn't a Souls season");
-  const user = await userRepo.findById(db, userId);
-  const timezone = user?.timezone ?? "UTC";
-  const today = localDateIn(timezone);
+/**
+ * One Souls season's run replayed: levels, every day, and the souls state. A finished season
+ * (`through` its end) settles every day.
+ */
+async function replaySeason(
+  db: Database,
+  userId: string,
+  season: SeasonDto,
+  timezone: string,
+  today: string,
+  through = today,
+) {
   const [nodes, events] = await Promise.all([
     nodeRepo.findActiveBySeason(db, season.id),
     eventRepo.findActiveBySeason(db, season.id),
   ]);
   const ratings = leafValuesFromEvents(events);
   const levels = await soulLevels(db, userId, season, nodes, ratings, today);
-  const days = await buildRun(db, userId, season, levels.startedOn, today, timezone);
+  const ngp = await earlierSeasons(db, userId, season);
+  const snapshot = ngp.previous?.finalSnapshot as Partial<SeasonCardDto> | null | undefined;
+  const carried = ngp.previous?.mode === "souls" ? Math.max(0, snapshot?.soulsHeld ?? 0) : 0;
+  const days =
+    levels.startedOn <= through
+      ? await buildRun(db, userId, season, levels.startedOn, through, timezone, through < today)
+      : [];
   const state = foldSouls(
     days,
     levels.rows
       .filter((r) => r.kind === "level_up")
       .map((r) => ({ afterDate: r.afterDate, cost: r.cost })),
+    carried,
   );
-  return { season, today, nodes, ratings, levels, days, state };
+  return { season, today, nodes, ratings, levels, days, state, carried, cycle: ngp.cycle };
+}
+
+async function loadSouls(db: Database, userId: string) {
+  const season = await ensureCurrentSeason(db, userId);
+  if (!season) throw notFound("No season yet. Finish onboarding first.");
+  if (season.mode !== "souls") throw notFound("This season isn't a Souls season");
+  const user = await userRepo.findById(db, userId);
+  const timezone = user?.timezone ?? "UTC";
+  return replaySeason(db, userId, season, timezone, localDateIn(timezone));
+}
+
+/**
+ * A finished Souls season's final state, for its season card at rollover: each node's level,
+ * the Soul Level, and the unspent souls New Game+ carries in (DESIGN.md §4.7).
+ */
+export async function finalSouls(
+  db: Database,
+  userId: string,
+  season: SeasonDto,
+  timezone: string,
+  today: string,
+) {
+  const { nodes, levels, state } = await replaySeason(
+    db,
+    userId,
+    season,
+    timezone,
+    today,
+    season.endsOn < today ? season.endsOn : today,
+  );
+  const rolled = computeNodeValues(nodes, levels.levels);
+  const root = nodes.find((n) => n.parentId === null);
+  return {
+    levels: rolled,
+    soulLevel: root ? (rolled.get(root.id) ?? null) : null,
+    held: Math.max(0, state.held),
+  };
 }
 
 export async function getSouls(db: Database, userId: string): Promise<SoulsDto> {
-  const { season, today, nodes, ratings, levels, days, state } = await loadSouls(db, userId);
+  const { season, today, nodes, ratings, levels, days, state, carried, cycle } = await loadSouls(
+    db,
+    userId,
+  );
   const leaves = new Set(leafIds(nodes));
   const rolledLevels = computeNodeValues(nodes, levels.levels);
   const rolledRatings = computeNodeValues(nodes, ratings);
@@ -228,6 +321,8 @@ export async function getSouls(db: Database, userId: string): Promise<SoulsDto> 
     startedOn: levels.startedOn,
     held: state.held,
     bloodstain: state.bloodstain,
+    carried,
+    cycle,
     earned: state.earned,
     spent: state.spent,
     lost: state.lost,

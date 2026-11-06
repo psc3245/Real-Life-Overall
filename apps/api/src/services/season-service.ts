@@ -32,6 +32,7 @@ import * as eventRepo from "../repos/rating-event-repo";
 import * as nodeRepo from "../repos/rating-node-repo";
 import * as seasonRepo from "../repos/season-repo";
 import * as userRepo from "../repos/user-repo";
+import { finalSouls } from "./souls-service";
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
@@ -46,6 +47,7 @@ function toCard(row: Awaited<ReturnType<typeof seasonRepo.findArchived>>[number]
     mode: row.mode,
     overall: snap.overall ?? null,
     growth: snap.growth ?? null,
+    level: snap.level ?? null,
     archetype: snap.archetype ?? row.archetype,
     nodes: snap.nodes ?? [],
   };
@@ -74,10 +76,14 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
   const values = computeNodeValues(nodes, leafValues);
   const growth = computeNodeValues(nodes, leafGrowthFromEvents(events));
   const root = nodes.find((n) => n.parentId === null);
+  // Souls seasons freeze their levels and the souls New Game+ carries (DESIGN.md §4.7).
+  const souls =
+    active.mode === "souls" ? await finalSouls(db, userId, active, user.timezone, today) : null;
   const snapshot: Omit<SeasonCardDto, "id" | "label" | "startsOn" | "endsOn"> = {
     mode: active.mode,
     overall: root ? (values.get(root.id) ?? null) : null,
     growth: root ? (growth.get(root.id) ?? null) : null,
+    ...(souls ? { level: souls.soulLevel, soulsHeld: souls.held } : {}),
     archetype: old?.archetype ?? null,
     nodes: nodes.map((n) => ({
       id: n.id,
@@ -87,6 +93,7 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
       depth: n.depth,
       value: values.get(n.id) ?? null,
       growth: growth.get(n.id) ?? null,
+      ...(souls ? { level: souls.levels.get(n.id) ?? null } : {}),
     })),
   };
   const leaves = new Set(leafIds(nodes));

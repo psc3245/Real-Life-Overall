@@ -112,7 +112,12 @@ export async function catalog(db: Database, userId: string): Promise<MetricDto[]
       id: `rating:${node.id}`,
       group: "ratings",
       ...nodeLabel(node, ctx!.nodes),
-      unit: ctx!.season.mode === "growth" ? "gained" : "rating",
+      unit:
+        ctx!.season.mode === "growth"
+          ? "gained"
+          : ctx!.season.mode === "souls"
+            ? "level"
+            : "rating",
       kind: "level",
       target: null,
     });

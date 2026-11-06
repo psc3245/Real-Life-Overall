@@ -624,8 +624,10 @@ export const playerCards = pgTable(
     mode: seasonMode().notNull().default("rating"),
     /** Overall points gained this season, kept for every player. */
     growth: numeric({ precision: 7, scale: 2, mode: "number" }).notNull().default(0),
+    /** Souls seasons: Overall's stat level (DESIGN.md §4.7); null in other modes. */
+    level: numeric({ precision: 5, scale: 2, mode: "number" }),
     archetype: text(),
-    /** CardCategory[]: each top-level category's rating and growth. */
+    /** CardCategory[]: each top-level category's rating and growth (and level, Souls). */
     categories: jsonb().notNull(),
     recappedDays: integer().notNull().default(0),
     /** Recapped days where the model flagged implausible or ambiguous claims. Owner-only. */

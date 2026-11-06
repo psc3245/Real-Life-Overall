@@ -91,10 +91,10 @@ describe("NodePage", () => {
       </QueryClientProvider>,
     );
     expect(await screen.findByRole("heading", { name: "Fitness" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Cardio/ })).toHaveAttribute(
-      "href",
-      "/ratings/node/cardio",
-    );
+    // The child list links Cardio, and so may the change feed once it loads.
+    for (const link of screen.getAllByRole("link", { name: /Cardio/ })) {
+      expect(link).toHaveAttribute("href", "/ratings/node/cardio");
+    }
     expect(await screen.findByText("Morning run")).toBeInTheDocument(); // linked to Cardio
     expect(await screen.findByText("Ran 5k.")).toBeInTheDocument();
     expect(mockedApi).toHaveBeenCalledWith("/ratings/changes?limit=50&offset=0&nodeId=fit");

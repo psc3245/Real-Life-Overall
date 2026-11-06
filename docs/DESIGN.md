@@ -167,7 +167,11 @@ The progression flips from "the model sets your ratings" to "the model decides w
 - **The fold** (`foldSouls` in `packages/shared/src/rating/souls.ts`) replays the run from its first day (the earliest starting level) each read, so backfills and re-run recaps change the past. Per day: earnings in, bloodstain recovery, that day's spends, then the death check. Spends that a later change can't cover leave `held` negative ("you owe"), so dying right after buying never refunds souls.
 - **Screens:** `/bonfire` (`GET /souls`): Soul Level, souls held, the bloodstain, every stat with its level, next cost and a Level up button, the last 14 days of the run (earnings by source, deaths, pickups, losses) and the rules. The nav shows a Bonfire link in Souls seasons; the score display uses level tiers (`SOULS_TIERS`) on a 99 scale and labels Overall "SL".
 - **Words:** `TALK.*.souls` holds them: souls, bonfire, bloodstain, SL, "You died", boss at normal and extra; points, Level up, Dropped points, Level, Streak broken, Goal at none.
-- **Not yet** (next chunks): the model isn't told about Souls mode (recaps and reviews are written as in a rating season); charts, history, season cards and the change feed still show ratings; leaderboards and shared cards carry the level without a Souls board of their own; unspent souls don't carry into New Game+; iOS.
+- **The model** gets a Souls note on every voiced call (`soulsMode(talk)` in `llm/prompts/shared.ts`, prompt version `+souls`): souls come from its rating gains, what kills a run, talk about souls earned and what's worth leveling, don't quote ratings, and never shade a change to pay out more or to cause or spare a death. Weekly reviews still project ratings and store them as rating projections, so they never show as levels; node goals are level targets.
+- **Charts, history and cards in levels:** `historyBetween` replays `soul_levels` per day (`leafLevelsAsOf`), so rating charts (`rating:<id>` metrics, unit "level"), season detail and the History page show levels from the day the stat sheet started; the heatmap counts levels bought; hot/cold trends are levels bought in 7 days. The rollover snapshot freezes each node's `level`, the Soul Level and `soulsHeld` (`finalSouls`); archived Souls cards show levels.
+- **Boards and shared cards:** `player_cards.level` (and each category's `level`) carries the Soul Level; Souls cards show levels and never the rating, and leave rating-level catalog badges off the public profile, like growth. Leaderboards get a Souls board (`?mode=souls`), shown to testers and anyone playing Souls; friends lists show the level.
+- **New Game+:** the next Souls season starts each stat at last season's level and holds last season's unspent souls (`carried`; a bloodstain doesn't carry). `cycle` counts Souls seasons in a row (NG+1, NG+2…).
+- **Not yet:** iOS (it shows levels as ratings, like growth before it had modes); the change feed still lists rating changes.
 
 ---
 
@@ -590,7 +594,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `badges` / `user_badges` | catalog and awards (personal badges have `user_id` set on the catalog row) | Phase 3 |
 | `users.profile_visibility` | `private` / `friends` / `public` | Phase 4 (§7.3) |
 | `friendships` | `requester_id`, `addressee_id`, `status` (`pending`/`accepted`), `responded_at` | One row per pair (unique on least/greatest), Phase 4 |
-| `player_cards` | `user_id` pk, `season_id`, `season_label`, `mode`, `overall`, `growth`, `archetype`, `categories` jsonb (rating `value` and `growth` each), `recapped_days`, `flagged_days` | Shareable card cache, Phase 4 |
+| `player_cards` | `user_id` pk, `season_id`, `season_label`, `mode`, `overall`, `growth`, `level` (Souls), `archetype`, `categories` jsonb (rating `value` and `growth` each), `recapped_days`, `flagged_days` | Shareable card cache, Phase 4 |
 | `users.leaderboard_opt_in` | boolean | Global boards (needs a public profile) |
 
 ---
@@ -716,7 +720,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Sports talk: none / normal / extra for the app's wording and every AI-written text (§7.10)
 - [x] Season modes: Rating or Growth ("Most Improved") picked each season, growth boards, the rating hidden but revealable by its owner (§4.6)
 - [x] iOS: season modes (picker, growth display, growth boards)
-- [ ] Souls mode (§4.7, in testing): chunk 1 done (levels, souls, deaths and bloodstains, the Bonfire page, the mode for testers); next, the model's Souls voice, charts and history in levels, a Souls board, souls carried into New Game+, then iOS
+- [x] Souls mode (§4.7, in testing): levels, souls, deaths and bloodstains, the Bonfire page, the mode for testers; the model's Souls note, charts, history and season cards in levels, a Souls board, levels and souls carried into New Game+
+- [ ] iOS: Souls mode
 - [x] iOS: Scouting Report, evolving tree, coach and sports talk
 - [x] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 - [x] iOS parity for charts, reports, settings (password, devices), Personalize (behavior, Today page, features) and admin. Tabs: Today, Playbook (Habits / Goals / Train), Week, Rating, You; Coach opens from Today and You. The web's look options (themes, fonts, density) and its admin debug panel stay web-only.
