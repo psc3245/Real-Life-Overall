@@ -156,16 +156,21 @@ function StatRow({ stat, held }: { stat: SoulStatDto; held: number }) {
             : `Next ${formatSouls(stat.cost)} ${talk.souls.souls}`}
           {capped ? ` · past the ${capped.level} soft cap` : ""}
         </Muted>
-        {stat.cost !== null && (
+        {affordable ? (
           <View style={{ minWidth: 120 }}>
             <Button
               title={talk.souls.levelUp}
-              variant={affordable ? "primary" : "ghost"}
-              disabled={!affordable}
               busy={levelUp.isPending}
               onPress={() => levelUp.mutate({ nodeId: stat.id })}
             />
           </View>
+        ) : (
+          stat.cost !== null && (
+            // A disabled button reads as tappable here, so say what's missing instead.
+            <Muted style={{ fontSize: 12 }}>
+              Need {formatSouls(stat.cost - Math.max(0, held))} more
+            </Muted>
+          )
         )}
       </View>
       <ErrorNote error={levelUp.error} />
