@@ -2,6 +2,7 @@ import {
   addDays,
   computeNodeValues,
   growthDelta,
+  leafLevelsAsOf,
   leafScoresFromEvents,
   localDateIn,
   MAX_HISTORY_DAYS,
@@ -15,6 +16,7 @@ import * as decayRepo from "../repos/decay-repo";
 import * as habitRepo from "../repos/habit-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
+import * as soulRepo from "../repos/soul-repo";
 import * as userRepo from "../repos/user-repo";
 import { applyDecay } from "./decay-service";
 import { asOf, datedEvents } from "./event-dates";
@@ -48,7 +50,10 @@ export async function getHistory(db: Database, userId: string, days: number): Pr
   return historyBetween(db, ctx.season.id, ctx.nodes, from, today, ctx.season.mode);
 }
 
-/** Every node's end-of-day score (rating or growth) over [from, to], from one season's ledger. */
+/**
+ * Every node's end-of-day score over [from, to]: rating or growth from one season's ledger, or in
+ * a Souls season the stat levels bought by then (DESIGN.md §4.7).
+ */
 export async function historyBetween(
   db: Database,
   seasonId: string,
@@ -57,11 +62,15 @@ export async function historyBetween(
   to: string,
   mode: SeasonMode,
 ): Promise<HistoryDto> {
-  const events = datedEvents(await eventRepo.findActiveWithDates(db, seasonId));
   const dates = datesBetween(from, to);
-  const daily = dates.map((d) =>
-    computeNodeValues(nodes, leafScoresFromEvents(mode, asOf(events, d))),
-  );
+  let daily: Map<string, number>[];
+  if (mode === "souls") {
+    const rows = await soulRepo.findBySeason(db, seasonId);
+    daily = dates.map((d) => computeNodeValues(nodes, leafLevelsAsOf(rows, d)));
+  } else {
+    const events = datedEvents(await eventRepo.findActiveWithDates(db, seasonId));
+    daily = dates.map((d) => computeNodeValues(nodes, leafScoresFromEvents(mode, asOf(events, d))));
+  }
   return {
     dates,
     series: nodes.map((n) => ({
@@ -95,7 +104,7 @@ export async function getActivity(
 
 /**
  * Per-day logging, recaps and rating movement over [from, to] within one season. Growth
- * seasons count only what moves growth (DESIGN.md §4.6).
+ * seasons count only what moves growth (DESIGN.md §4.6); Souls seasons count levels bought (§4.7).
  */
 export async function activityBetween(
   db: Database,
@@ -105,11 +114,12 @@ export async function activityBetween(
   today: string,
   mode: SeasonMode,
 ): Promise<ActivityDayDto[]> {
-  const [events, logs, recaps, habits] = await Promise.all([
+  const [events, logs, recaps, habits, levels] = await Promise.all([
     eventRepo.findActiveWithDates(db, seasonId).then(datedEvents),
     dayRepo.findWithPromptsBetween(db, userId, from, today),
     recapRepo.findDailyBetween(db, userId, from, today),
     habitRepo.findAllByUser(db, userId),
+    mode === "souls" ? soulRepo.findBySeason(db, seasonId) : [],
   ]);
   const entries = await habitRepo.findEntriesBetween(
     db,
@@ -131,9 +141,14 @@ export async function activityBetween(
   const summaries = new Map(recaps.map((r) => [r.periodStart, firstSentence(r.narrative)]));
   const round = (n: number) => Math.round(n * 100) / 100;
   return datesBetween(from, today).map((date) => {
-    const day = events
-      .filter((e) => e.date === date)
-      .map((e) => (mode === "growth" ? { delta: growthDelta(e) } : e));
+    const day =
+      mode === "souls"
+        ? levels
+            .filter((l) => l.kind === "level_up" && l.afterDate === date)
+            .map((l) => ({ delta: l.levels }))
+        : events
+            .filter((e) => e.date === date)
+            .map((e) => (mode === "growth" ? { delta: growthDelta(e) } : e));
     return {
       date,
       logged: logged.has(date),

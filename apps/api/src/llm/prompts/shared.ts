@@ -1,3 +1,5 @@
+import { BAD_DAY_NET, SOULS_PER_POINT, TALK, type SportsTalk } from "@rlo/shared";
+
 /** Fragments reused across prompts (DESIGN.md §5.7). */
 export const NEUTRAL_TONE =
   "Write in a neutral, informative tone. No hype, no emojis. A Voice section may follow; " +
@@ -35,6 +37,25 @@ export const GROWTH_MODE =
   "subtract, and weekly corrections take back over-credited gains. In text they read, talk about " +
   "gains, momentum and where the next points can come from; don't quote their ratings or tiers. " +
   "Keep rating changes as honest as ever: gains are the score now, so never inflate them.";
+
+/**
+ * Souls mode (DESIGN.md §4.7), appended like GROWTH_MODE. Rating changes still drive every
+ * number the model returns; they're what the player earns now. Plain sports talk says points.
+ */
+export function soulsMode(talk: SportsTalk): string {
+  const souls = TALK[talk].souls.souls;
+  return (
+    `Scoring: this player picked ${TALK[talk].souls.mode} mode for the season. They see stat ` +
+    `levels (1-99) that they buy with ${souls} earned each day: ${SOULS_PER_POINT} ${souls} per ` +
+    `point of rating gain you give in a daily recap, plus ${souls} for habits done, workouts and ` +
+    "goals completed. Levels never fade; the player chooses what to level. A day with nothing " +
+    "logged, a slip on an avoid habit, or a daily recap whose changes net " +
+    `${BAD_DAY_NET} or worse drops their unspent ${souls}; the next clean day picks them back ` +
+    `up. In text they read, talk about ${souls} earned and what's worth leveling; don't quote ` +
+    "their ratings. Keep rating changes as honest as ever: never inflate gains to pay out more, " +
+    "and never soften a real setback to spare them a loss, or shade one to cause it."
+  );
+}
 
 export const GROWTH_PROJECTIONS_NOTE =
   "Growth mode: this player is scored on points gained this season, shown below. Projections " +

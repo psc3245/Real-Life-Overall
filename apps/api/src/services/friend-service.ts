@@ -73,12 +73,17 @@ export async function listFriends(db: Database, userId: string): Promise<Friends
   const toDto = (r: (typeof rows)[number]): FriendDto => ({
     username: r.username,
     displayName: r.displayName,
-    // Friends see each other's card unless it's private; growth cards show growth only.
+    // Friends see each other's card unless it's private; growth and Souls cards show their own numbers.
     card:
       r.status === "accepted" && r.visibility !== "private" && r.mode && r.overall != null
         ? {
             mode: r.mode,
-            overall: r.mode === "growth" ? (r.growth ?? 0) : r.overall,
+            overall:
+              r.mode === "growth"
+                ? (r.growth ?? 0)
+                : r.mode === "souls"
+                  ? (r.level ?? 0)
+                  : r.overall,
             archetype: r.archetype,
           }
         : null,

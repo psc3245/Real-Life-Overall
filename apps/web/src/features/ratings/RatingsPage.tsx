@@ -87,10 +87,29 @@ export function RatingsPage() {
               {root && <HiddenRating rating={root.rating} className="mt-1" />}
             </div>
           )}
+          {mode === "souls" && (
+            <div className="rounded-lg border border-neon/40 bg-neon/5 p-3 text-sm text-court-300">
+              <p>
+                <span className="font-display uppercase tracking-wider text-neon">
+                  {talk.souls.mode}.
+                </span>{" "}
+                Every number this season is a stat level you bought with {talk.souls.souls}. Levels
+                never fade; your rating keeps running underneath.
+              </p>
+              <Link to="/bonfire" className="mt-1 inline-block text-neon hover:underline">
+                {talk.souls.bonfire} →
+              </Link>
+              {root && <HiddenRating rating={root.rating} className="ml-3" />}
+            </div>
+          )}
           {root && (
             <div className="rounded-lg border border-court-800 p-3">
               <p className="mb-1 text-xs uppercase tracking-wider text-court-300">
-                {mode === "growth" ? "Overall growth target" : "Overall potential"}
+                {mode === "growth"
+                  ? "Overall growth target"
+                  : mode === "souls"
+                    ? "Overall level target"
+                    : "Overall potential"}
               </p>
               <GoalEditor node={root} />
             </div>

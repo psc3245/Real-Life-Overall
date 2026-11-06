@@ -8,17 +8,29 @@ export type CardRow = typeof playerCards.$inferSelect;
 /** A stored card category: its rating (`value`) and growth (absent on cards from before). */
 export interface CardCategory extends PublicCategoryDto {
   growth?: number;
+  level?: number;
 }
 
 /**
- * The card's numbers in `mode`: ratings, or points gained. Growth cards always show growth,
- * so a growth player's ratings never leave the server (DESIGN.md §4.6).
+ * The card's numbers in `mode`: ratings, points gained or stat levels. Growth and Souls cards
+ * always show their own numbers, so those players' ratings never leave the server (DESIGN.md
+ * §4.6, §4.7).
  */
 export function cardScores(
-  row: { overall: number; growth: number; categories: unknown },
+  row: { overall: number; growth: number; level?: number | null; categories: unknown },
   mode: SeasonMode,
 ): { overall: number; categories: PublicCategoryDto[] } {
   const categories = row.categories as CardCategory[];
+  if (mode === "souls") {
+    return {
+      overall: row.level ?? 0,
+      categories: categories.map((c) => ({
+        name: c.name,
+        templateKey: c.templateKey,
+        value: c.level ?? 0,
+      })),
+    };
+  }
   return mode === "growth"
     ? {
         overall: row.growth,
@@ -67,6 +79,7 @@ const boardColumns = {
   mode: playerCards.mode,
   overall: playerCards.overall,
   growth: playerCards.growth,
+  level: playerCards.level,
   archetype: playerCards.archetype,
   categories: playerCards.categories,
   recappedDays: playerCards.recappedDays,

@@ -124,10 +124,15 @@ export interface SoulsState {
  * Replays the run day by day, in date order. Each day: earnings come in; a logged day that didn't
  * die picks up the bloodstain; levels bought that day are paid; a death loses any older
  * bloodstain for good and drops what's held as a new one. Derived like ratings, so backfills and
- * re-run recaps change the past. A spend a later change can't cover leaves `held` negative, so
+ * re-run recaps change the past. Souls carried from last season start out held. A spend a later change can't cover leaves `held` negative, so
  * dying right after buying never refunds the souls.
  */
-export function foldSouls(days: readonly SoulDayInput[], spends: readonly SoulSpend[]): SoulsState {
+export function foldSouls(
+  days: readonly SoulDayInput[],
+  spends: readonly SoulSpend[],
+  /** Unspent souls carried in from last season (New Game+). */
+  carried = 0,
+): SoulsState {
   const spentOn = new Map<string, number>();
   for (const s of spends) spentOn.set(s.afterDate, (spentOn.get(s.afterDate) ?? 0) + s.cost);
   const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
@@ -144,7 +149,7 @@ export function foldSouls(days: readonly SoulDayInput[], spends: readonly SoulSp
   }
 
   const state: SoulsState = {
-    held: 0,
+    held: carried,
     bloodstain: null,
     earned: 0,
     spent: 0,
@@ -214,4 +219,24 @@ export function soulsTier(level: number): RatingTierKey {
 /** "12,340": souls are whole numbers with separators. */
 export function formatSouls(souls: number): string {
   return Math.round(souls).toLocaleString("en-US");
+}
+
+/**
+ * Each leaf's level at the end of `date`, from its starting level and the levels bought by then.
+ * Leaves whose stat sheet didn't exist yet are absent.
+ */
+export function leafLevelsAsOf(
+  rows: Iterable<{ nodeId: string; kind: "start" | "level_up"; levels: number; afterDate: string }>,
+  date: string,
+): Map<string, number> {
+  const levels = new Map<string, number>();
+  const started = new Set<string>();
+  for (const r of rows) {
+    if (r.afterDate > date) continue;
+    if (r.kind === "start") started.add(r.nodeId);
+    levels.set(r.nodeId, (levels.get(r.nodeId) ?? 0) + r.levels);
+  }
+  for (const id of levels.keys()) if (!started.has(id)) levels.delete(id);
+  for (const [id, l] of levels) levels.set(id, Math.min(STAT_LEVEL_MAX, l));
+  return levels;
 }

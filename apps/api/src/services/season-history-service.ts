@@ -84,7 +84,12 @@ export async function getSeasonDetail(
         name: n.name,
         depth: n.depth,
         start: null,
-        end: season.mode === "growth" ? (n.growth ?? null) : n.value,
+        end:
+          season.mode === "growth"
+            ? (n.growth ?? null)
+            : season.mode === "souls"
+              ? (n.level ?? null)
+              : n.value,
       }));
 
   const logged = activity.filter((a) => a.logged).map((a) => a.date);

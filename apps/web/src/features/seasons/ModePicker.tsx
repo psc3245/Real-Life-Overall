@@ -1,7 +1,7 @@
 import { SEASON_MODE_INFO, SEASON_MODES, type SeasonMode } from "@rlo/shared";
 import { useAccount } from "../../api/account";
 import { PremiumBadge } from "../../components/Premium";
-import { useTalk } from "../../lib/talk";
+import { modeName, useTalk } from "../../lib/talk";
 
 /**
  * Rating, growth or souls, picked at the start of each season (DESIGN.md §4.6, §4.7). Souls is
@@ -42,11 +42,7 @@ export function ModePicker({
             <span
               className={`block font-display text-xl uppercase tracking-wider ${active ? "text-neon" : "text-court-100"}`}
             >
-              {mode === "growth"
-                ? talk.growthMode
-                : mode === "souls"
-                  ? talk.souls.mode
-                  : talk.ratingMode}
+              {modeName(talk, mode)}
               {locked && <PremiumBadge className="ml-2" />}
               {mode === "souls" && (
                 <span className="ml-2 inline-block rounded bg-court-700 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wider text-court-300">

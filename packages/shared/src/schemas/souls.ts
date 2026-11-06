@@ -41,6 +41,10 @@ export interface SoulsDto {
   /** Unspent souls; negative when a death took back souls a level was bought with. */
   held: number;
   bloodstain: { amount: number; date: string } | null;
+  /** Unspent souls brought in from last season's run (New Game+). */
+  carried: number;
+  /** New Game+ cycle: 0 on a first Souls season, +1 per Souls season straight before it. */
+  cycle: number;
   earned: number;
   spent: number;
   lost: number;

@@ -84,13 +84,18 @@ export function formatScore(mode: SeasonMode, value: number, digits = 1): string
 
 /** An archived season's numbers in its own mode. */
 export function seasonCardScores(card: SeasonCardDto) {
-  const growth = card.mode === "growth";
+  const pick = (n: { value: number | null; growth?: number | null; level?: number | null }) =>
+    card.mode === "growth"
+      ? (n.growth ?? null)
+      : card.mode === "souls"
+        ? (n.level ?? null)
+        : n.value;
   return {
     mode: card.mode,
-    overall: growth ? card.growth : card.overall,
+    overall: pick({ value: card.overall, growth: card.growth, level: card.level }),
     categories: card.nodes
       .filter((n) => n.depth === 1)
-      .map((n) => ({ name: n.name, value: growth ? (n.growth ?? null) : n.value })),
+      .map((n) => ({ name: n.name, value: pick(n) })),
   };
 }
 

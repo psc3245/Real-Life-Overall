@@ -10,7 +10,8 @@ import {
 import { Link, useSearchParams } from "react-router";
 import { useLeaderboard } from "../../api/social";
 import { formatScore, scoreColor } from "../../components/score";
-import { useTalk } from "../../lib/talk";
+import { modeName, useTalk } from "../../lib/talk";
+import { useAccount } from "../../api/account";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { DebugJson } from "../../components/debug/Debug";
 
@@ -19,6 +20,7 @@ const chip = (active: boolean) =>
 
 export function LeaderboardsPage() {
   const talk = useTalk();
+  const { tester } = useAccount();
   const [params, setParams] = useSearchParams();
   const scope: LeaderboardScope = params.get("scope") === "global" ? "global" : "friends";
   const board = LEADERBOARD_BOARDS.some((b) => b.key === params.get("board"))
@@ -63,7 +65,10 @@ export function LeaderboardsPage() {
       </div>
 
       <div role="tablist" aria-label="Mode" className="flex gap-2">
-        {SEASON_MODES.map((m) => (
+        {SEASON_MODES.filter(
+          // Souls is in testing: its board shows to testers and to anyone already playing it.
+          (m) => m !== "souls" || tester || leaderboard.data?.myMode === "souls",
+        ).map((m) => (
           <button
             key={m}
             type="button"
@@ -72,7 +77,7 @@ export function LeaderboardsPage() {
             onClick={() => set({ mode: m })}
             className={`flex-1 rounded-lg border py-1.5 text-sm uppercase tracking-wider ${mode === m ? "border-neon text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`}
           >
-            {m === "growth" ? talk.growthMode : talk.ratingMode}
+            {modeName(talk, m)}
           </button>
         ))}
       </div>
@@ -97,15 +102,14 @@ export function LeaderboardsPage() {
         <>
           {leaderboard.data.myMode && leaderboard.data.myMode !== leaderboard.data.mode ? (
             <p className="rounded-xl border border-court-700 bg-court-900/60 p-4 text-sm text-court-300">
-              You're playing{" "}
-              {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} this
-              season, so you rank on the{" "}
+              You're playing {modeName(talk, leaderboard.data.myMode)} this season, so you rank on
+              the{" "}
               <button
                 type="button"
                 onClick={() => set({ mode: leaderboard.data.myMode! })}
                 className="text-neon hover:underline"
               >
-                {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} board
+                {modeName(talk, leaderboard.data.myMode)} board
               </button>
               .
             </p>

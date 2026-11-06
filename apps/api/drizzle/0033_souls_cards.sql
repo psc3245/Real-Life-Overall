@@ -1,0 +1,1 @@
+ALTER TABLE "player_cards" ADD COLUMN "level" numeric(5, 2);

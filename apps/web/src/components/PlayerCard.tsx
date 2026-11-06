@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { OvrBadge } from "./OvrBadge";
 import { formatScore, ScoreProvider, useScore } from "./score";
 import { StatBar } from "./StatBar";
-import { useTalk } from "../lib/talk";
+import { modeName, useTalk } from "../lib/talk";
 
 interface CardCategory {
   key: string;
@@ -71,7 +71,7 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
     <CardView
       name={name}
       overall={root?.value ?? 0}
-      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}${mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
+      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}${mode !== "rating" ? ` · ${modeName(talk, mode)}` : ""}`}
       note={
         root?.projection != null && (
           <>
@@ -104,7 +104,7 @@ export function PublicCard({ card, name }: { card: PublicCardDto; name: string }
       <CardView
         name={name}
         overall={card.overall}
-        subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}${card.mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
+        subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}${card.mode !== "rating" ? ` · ${modeName(talk, card.mode)}` : ""}`}
         note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
         categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
       />

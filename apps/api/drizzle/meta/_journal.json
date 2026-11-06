@@ -232,6 +232,13 @@
       "when": 1793994783797,
       "tag": "0032_souls_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793995854578,
+      "tag": "0033_souls_cards",
+      "breakpoints": true
     }
   ]
 }

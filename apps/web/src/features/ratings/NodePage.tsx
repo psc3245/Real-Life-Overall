@@ -14,6 +14,7 @@ import { CONFIDENCE_LABEL } from "./labels";
 import { DebugJson } from "../../components/debug/Debug";
 import { DebugId } from "../../components/debug/Debug";
 import { ChartLink } from "../charts/ChartLink";
+import { useTalk } from "../../lib/talk";
 
 /** Everything about one attribute or category: value, history, why it moved, what feeds it. */
 export function NodePage() {
@@ -56,6 +57,7 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
   }
   const linked = (habits.data?.habits ?? []).filter((h) => h.habit.links.some((l) => below.has(l)));
   const { mode } = useScore();
+  const talk = useTalk();
   const color = scoreColor(mode, node.value ?? 0);
   const changes = feed.data?.pages.flat() ?? [];
 
@@ -96,6 +98,14 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
             </p>
             {mode === "growth" && (
               <p className="text-xs uppercase tracking-wider text-court-500">gained this season</p>
+            )}
+            {mode === "souls" && (
+              <Link
+                to="/bonfire"
+                className="text-xs uppercase tracking-wider text-court-500 hover:text-neon"
+              >
+                Level · {talk.souls.bonfire} →
+              </Link>
             )}
             {node.trend != null && (
               <p className="text-sm text-court-300">

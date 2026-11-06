@@ -16,6 +16,8 @@ export interface SeasonSnapshotNode {
   value: number | null;
   /** Points gained that season (absent on seasons archived before growth mode). */
   growth?: number | null;
+  /** Souls seasons: the final stat level (DESIGN.md §4.7). */
+  level?: number | null;
 }
 
 /** A finished season, frozen at rollover (the "season card"). */
@@ -28,6 +30,9 @@ export interface SeasonCardDto {
   /** The final rating. Growth seasons show `growth` instead. */
   overall: number | null;
   growth: number | null;
+  /** Souls seasons: the final Soul Level, and the unspent souls carried into New Game+. */
+  level?: number | null;
+  soulsHeld?: number;
   archetype: string | null;
   nodes: SeasonSnapshotNode[];
 }

@@ -540,7 +540,7 @@ export async function runWeeklyReview(
         : []),
       await renderWeek(db, userId, ctx, week, refById, events),
       `Last week's focus goals:\n${lastFocus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
-      `The user's ${growthMode ? "growth targets (points to gain by season end)" : "goal ratings"}:\n${goalLines.join("\n") || "(none set)"}`,
+      `The user's ${growthMode ? "growth targets (points to gain by season end)" : ctx.season.mode === "souls" ? "level targets (stat levels 1-99, not ratings)" : "goal ratings"}:\n${goalLines.join("\n") || "(none set)"}`,
       `Season: ${ctx.season.label}, ends ${ctx.season.endsOn} (${daysBetween(week.end, ctx.season.endsOn)} days after this week).`,
       `Current archetype: ${archetype ? `${archetype.name}: ${archetype.description}` : "(none)"}`,
       `Related older days:\n${renderMemories(memories) || "(none)"}`,
@@ -586,7 +586,8 @@ export async function runWeeklyReview(
           habitProposals: normalized.habitProposals,
           decayRevisions: normalized.decayRevisions,
           projections: normalized.projections,
-          mode: ctx.season.mode,
+          // Souls seasons get rating projections, which never show as levels.
+          mode: ctx.season.mode === "souls" ? "rating" : ctx.season.mode,
           archetypeChange:
             normalized.archetype && normalized.archetype.name !== archetype?.name
               ? {
