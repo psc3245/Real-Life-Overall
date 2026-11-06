@@ -39,6 +39,8 @@ export const SET_KIND_TAGS: Record<Exclude<SetKind, "normal">, string> = {
 export const MAX_WORKOUT_EXERCISES = 40;
 export const MAX_SETS_PER_EXERCISE = 30;
 export const MAX_WORKOUT_NOTES = 2000;
+export const MIN_REST_S = 15;
+export const MAX_REST_S = 600;
 
 export interface WorkoutSetDto {
   kind: SetKind;
@@ -56,6 +58,8 @@ export interface WorkoutExerciseDto {
   exerciseId: string;
   notes: string;
   sets: WorkoutSetDto[];
+  /** Rest countdown after checking off a set, in seconds; null (or missing on older rows) is off. */
+  restS?: number | null;
 }
 
 export interface ExerciseDto {
@@ -321,6 +325,7 @@ export const workoutExerciseSchema = z.object({
   exerciseId: z.string().min(1).max(64),
   notes: z.string().max(500).default(""),
   sets: z.array(workoutSetSchema).max(MAX_SETS_PER_EXERCISE).default([]),
+  restS: z.number().int().min(MIN_REST_S).max(MAX_REST_S).nullable().default(null),
 });
 
 const exercisesSchema = z.array(workoutExerciseSchema).max(MAX_WORKOUT_EXERCISES);

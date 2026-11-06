@@ -190,7 +190,7 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
           units={units}
           mode="live"
           onChange={(exercises) => update({ exercises })}
-          onSetDone={timer.start}
+          onSetDone={(restS) => restS && timer.start(restS)}
         />
 
         <Button title="Cancel workout" variant="danger" onPress={confirmCancel} />

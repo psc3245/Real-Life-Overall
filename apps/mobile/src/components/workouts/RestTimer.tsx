@@ -1,39 +1,41 @@
-import { formatDuration } from "@rlo/shared";
-import * as SecureStore from "expo-secure-store";
+import { formatDuration, MIN_REST_S } from "@rlo/shared";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeyboardHeight } from "@/lib/keyboard";
 import { colors, fonts, space } from "@/lib/theme";
 
-const STORAGE_KEY = "rlo.restSeconds";
-const DEFAULT_REST = 120;
+/** Rest lengths offered in an exercise's menu. */
+export const REST_CHOICES = [30, 60, 90, 120, 150, 180, 240, 300];
 
-function storedRest(): number {
-  const n = Number(SecureStore.getItem(STORAGE_KEY));
-  return Number.isFinite(n) && n >= 15 ? n : DEFAULT_REST;
-}
-
-/** A rest countdown started by checking off a set. Its length is remembered on this device. */
+/**
+ * A rest countdown started by checking off a set of an exercise that has one (each exercise sets
+ * its own length; off by default). ±15s changes only the countdown running now.
+ */
 export function useRestTimer() {
   const [endsAt, setEndsAt] = useState<number | null>(null);
-  const [length, setLength] = useState(storedRest);
+  const [length, setLength] = useState(0);
   return {
     endsAt,
     length,
-    start: () => setEndsAt(Date.now() + length * 1000),
+    start: (seconds: number) => {
+      setLength(seconds);
+      setEndsAt(Date.now() + seconds * 1000);
+    },
     stop: () => setEndsAt(null),
     adjust: (delta: number) => {
-      const next = Math.max(15, length + delta);
-      setLength(next);
-      SecureStore.setItem(STORAGE_KEY, String(next));
-      setEndsAt((at) => (at ? at + delta * 1000 : at));
+      if (!endsAt) return;
+      const left = Math.max(MIN_REST_S, Math.ceil((endsAt - Date.now()) / 1000) + delta);
+      setLength((n) => Math.max(MIN_REST_S, n + delta));
+      setEndsAt(Date.now() + left * 1000);
     },
   };
 }
 
-/** Floats above the bottom edge while resting. */
+/** Floats above the bottom edge (or the keyboard) while resting. */
 export function RestTimerBar({ timer }: { timer: ReturnType<typeof useRestTimer> }) {
   const insets = useSafeAreaInsets();
+  const keyboard = useKeyboardHeight();
   const [now, setNow] = useState(() => Date.now());
   const { endsAt, stop } = timer;
   useEffect(() => {
@@ -47,12 +49,12 @@ export function RestTimerBar({ timer }: { timer: ReturnType<typeof useRestTimer>
   if (!endsAt) return null;
 
   const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
-  const pct = Math.min(100, (100 * left) / timer.length);
+  const pct = Math.min(100, (100 * left) / Math.max(1, timer.length));
   return (
     <View
       accessibilityRole="timer"
       accessibilityLabel={`Rest timer, ${left} seconds left`}
-      style={[styles.bar, { bottom: insets.bottom + space.md }]}
+      style={[styles.bar, { bottom: (keyboard || insets.bottom) + space.md }]}
     >
       <View style={styles.track}>
         <View style={[styles.fill, { width: `${pct}%` }]} />
