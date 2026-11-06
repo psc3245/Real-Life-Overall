@@ -3,6 +3,8 @@ import {
   growthTier,
   ratingTier,
   RATING_MAX,
+  soulsTier,
+  STAT_LEVEL_MAX,
   type SeasonCardDto,
   type SeasonMode,
 } from "@rlo/shared";
@@ -32,9 +34,10 @@ const ScoreContext = createContext<Score>(RATING_SCORE);
 /** The score in effect: the signed-in player's season, or a card's own mode. */
 export const useScore = () => useContext(ScoreContext);
 
-/** A growth scale that fits every value (rounded up to a tidy number); 100 for ratings. */
+/** A growth scale that fits every value (rounded up to a tidy number); 100 for ratings, 99 for levels. */
 export function scaleFor(mode: SeasonMode, values: (number | null | undefined)[]): number {
   if (mode === "rating") return RATING_MAX;
+  if (mode === "souls") return STAT_LEVEL_MAX;
   const top = Math.max(GROWTH_SCALE_MIN, ...values.filter((v): v is number => v != null));
   const step = top <= 20 ? 5 : top <= 50 ? 10 : 25;
   return Math.ceil(top / step) * step;
@@ -70,23 +73,31 @@ export function OwnScoreProvider({ enabled, children }: { enabled: boolean; chil
 }
 
 export function scoreColor(mode: SeasonMode, value: number): string {
-  return tierKeyColor(mode === "growth" ? growthTier(value) : ratingTier(value));
+  return tierKeyColor(
+    mode === "growth" ? growthTier(value) : mode === "souls" ? soulsTier(value) : ratingTier(value),
+  );
 }
 
-/** "74.3" for a rating, "+3.4" for growth. */
+/** "74.3" for a rating, "+3.4" for growth, "24" for a stat level (categories "24.3"). */
 export function formatScore(mode: SeasonMode, value: number, digits = 1): string {
+  if (mode === "souls") return Number.isInteger(value) ? String(value) : value.toFixed(digits);
   return mode === "growth" ? formatGrowth(value, digits) : value.toFixed(digits);
 }
 
 /** An archived season's numbers in its own mode. */
 export function seasonCardScores(card: SeasonCardDto) {
-  const growth = card.mode === "growth";
+  const pick = (n: { value: number | null; growth?: number | null; level?: number | null }) =>
+    card.mode === "growth"
+      ? (n.growth ?? null)
+      : card.mode === "souls"
+        ? (n.level ?? null)
+        : n.value;
   return {
     mode: card.mode,
-    overall: growth ? card.growth : card.overall,
+    overall: pick({ value: card.overall, growth: card.growth, level: card.level }),
     categories: card.nodes
       .filter((n) => n.depth === 1)
-      .map((n) => ({ name: n.name, value: growth ? (n.growth ?? null) : n.value })),
+      .map((n) => ({ name: n.name, value: pick(n) })),
   };
 }
 
@@ -115,14 +126,14 @@ export function useShowRatings(): [boolean, (show: boolean) => void] {
 }
 
 /**
- * In a growth season, the rating under a growth number: hidden behind a tap, and only ever on
+ * In a growth or souls season, the rating under a growth number or level: hidden behind a tap, and only ever on
  * the owner's own screens (other players never receive it).
  */
 export function HiddenRating({ rating }: { rating: number | null }) {
   const { mode } = useScore();
   const [show, setShow] = useShowRatings();
   const { premium } = useAccount();
-  if (mode !== "growth" || rating === null || !premium) return null;
+  if (mode === "rating" || rating === null || !premium) return null;
   return (
     <Pressable
       accessibilityRole="button"

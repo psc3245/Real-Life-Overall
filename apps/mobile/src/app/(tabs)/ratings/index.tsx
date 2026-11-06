@@ -77,6 +77,19 @@ export default function RatingsScreen() {
             {root && <HiddenRating rating={root.rating} />}
           </Card>
         )}
+        {mode === "souls" && (
+          <Pressable onPress={() => router.push("/bonfire")}>
+            <Card style={{ gap: space.xs, borderColor: colors.neonDim }}>
+              <Muted>
+                <Text style={{ color: colors.neon, fontWeight: "700" }}>{talk.souls.mode}. </Text>
+                Every number this season is a stat level you bought with {talk.souls.souls}. Levels
+                never fade; your rating keeps running underneath.
+              </Muted>
+              <Text style={{ color: colors.neon }}>{talk.souls.bonfire} →</Text>
+              {root && <HiddenRating rating={root.rating} />}
+            </Card>
+          </Pressable>
+        )}
         {data.archetype && (
           <Body>
             <Text style={{ color: colors.neon, fontWeight: "700" }}>{data.archetype.name}. </Text>
@@ -86,7 +99,13 @@ export default function RatingsScreen() {
         {data.summary && <Muted>{data.summary}</Muted>}
         {root && (
           <View style={styles.potential}>
-            <Label>{mode === "growth" ? "Overall growth target" : "Overall potential"}</Label>
+            <Label>
+              {mode === "growth"
+                ? "Overall growth target"
+                : mode === "souls"
+                  ? "Overall level target"
+                  : "Overall potential"}
+            </Label>
             <GoalEditor node={root} />
           </View>
         )}

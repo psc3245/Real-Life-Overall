@@ -2,6 +2,7 @@ import { useAccount } from "@/api/account";
 import { useIsAdmin } from "@/api/admin";
 import { useMe } from "@/api/hooks";
 import { usePreferences } from "@/api/preferences";
+import { useRatings } from "@/api/ratings";
 import { useFriends } from "@/api/social";
 import { AccountCard } from "@/components/Premium";
 import { NavRow, SettingsGroup } from "@/components/settings";
@@ -14,6 +15,7 @@ import { useTalk } from "@/lib/talk";
  */
 export default function MeScreen() {
   const talk = useTalk();
+  const souls = useRatings().data?.season.mode === "souls";
   const me = useMe();
   const { features } = usePreferences();
   const friends = useFriends(features.friends);
@@ -85,6 +87,14 @@ export default function MeScreen() {
           detail="How other players see your card"
           href={{ pathname: "/u/[username]", params: { username: me.data.username } }}
         />
+        {souls && (
+          <NavRow
+            icon="flame"
+            label={talk.souls.bonfire}
+            detail={talk.souls.bonfireTagline}
+            href="/bonfire"
+          />
+        )}
         <NavRow
           icon="scope"
           label={talk.scoutingReport}

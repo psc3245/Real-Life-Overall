@@ -171,7 +171,8 @@ The progression flips from "the model sets your ratings" to "the model decides w
 - **Charts, history and cards in levels:** `historyBetween` replays `soul_levels` per day (`leafLevelsAsOf`), so rating charts (`rating:<id>` metrics, unit "level"), season detail and the History page show levels from the day the stat sheet started; the heatmap counts levels bought; hot/cold trends are levels bought in 7 days. The rollover snapshot freezes each node's `level`, the Soul Level and `soulsHeld` (`finalSouls`); archived Souls cards show levels.
 - **Boards and shared cards:** `player_cards.level` (and each category's `level`) carries the Soul Level; Souls cards show levels and never the rating, and leave rating-level catalog badges off the public profile, like growth. Leaderboards get a Souls board (`?mode=souls`), shown to testers and anyone playing Souls; friends lists show the level.
 - **New Game+:** the next Souls season starts each stat at last season's level and holds last season's unspent souls (`carried`; a bloodstain doesn't carry). `cycle` counts Souls seasons in a row (NG+1, NG+2…).
-- **Not yet:** iOS (it shows levels as ratings, like growth before it had modes); the change feed still lists rating changes.
+- **iOS** (added 2026-11-06): the Bonfire screen (`/bonfire`, pushed over the tabs; opened from the Rating tab's Souls card, the You tab and attribute screens) with the same stats, Level up buttons, run log and rules; level colors, the 99 scale and "SL" on the badge; Souls in the mode picker for testers; the Souls board; Souls and NG+ labels on cards and season cards.
+- **Not yet:** the change feed still lists rating changes.
 
 ---
 
@@ -721,7 +722,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Season modes: Rating or Growth ("Most Improved") picked each season, growth boards, the rating hidden but revealable by its owner (§4.6)
 - [x] iOS: season modes (picker, growth display, growth boards)
 - [x] Souls mode (§4.7, in testing): levels, souls, deaths and bloodstains, the Bonfire page, the mode for testers; the model's Souls note, charts, history and season cards in levels, a Souls board, levels and souls carried into New Game+
-- [ ] iOS: Souls mode
+- [x] iOS: Souls mode (the Bonfire screen, level display, picker, board)
 - [x] iOS: Scouting Report, evolving tree, coach and sports talk
 - [x] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 - [x] iOS parity for charts, reports, settings (password, devices), Personalize (behavior, Today page, features) and admin. Tabs: Today, Playbook (Habits / Goals / Train), Week, Rating, You; Coach opens from Today and You. The web's look options (themes, fonts, density) and its admin debug panel stay web-only.

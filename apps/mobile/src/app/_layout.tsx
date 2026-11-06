@@ -92,6 +92,7 @@ function RootStack() {
           <Stack.Screen name="reports/edit" options={{ ...pushedOptions, presentation: "modal" }} />
           <Stack.Screen name="coach" options={pushedOptions} />
           <Stack.Screen name="scouting-report" options={pushedOptions} />
+          <Stack.Screen name="bonfire" options={pushedOptions} />
           <Stack.Screen name="settings" options={pushedOptions} />
           <Stack.Screen name="personalize" options={pushedOptions} />
           <Stack.Screen name="admin" options={pushedOptions} />
