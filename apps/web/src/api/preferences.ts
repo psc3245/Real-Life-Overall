@@ -10,6 +10,7 @@ import {
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useLayoutEffect, useSyncExternalStore } from "react";
 import { applyAppearance } from "../lib/appearance";
+import { useSeasonMode } from "../lib/seasonMode";
 import { useAuthState } from "./auth";
 import { api } from "./client";
 import { queryKeys, useMe, type Me } from "./hooks";
@@ -50,11 +51,13 @@ export function useApplyPreferences() {
   const auth = useAuthState();
   const me = useMe(auth.signedIn);
   const prefs = me.data?.preferences;
+  // A Souls season takes over the look (DESIGN.md §4.7).
+  const souls = useSeasonMode() === "souls" && auth.signedIn;
   useLayoutEffect(() => {
     if (!prefs) return;
-    applyAppearance(prefs);
+    applyAppearance(prefs, document.documentElement, souls);
     cachePreferences(prefs);
-  }, [prefs]);
+  }, [prefs, souls]);
 }
 
 export function useFeature(feature: Feature): boolean {

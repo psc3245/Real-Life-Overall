@@ -1,9 +1,13 @@
-import { TALK, type SeasonMode, type TalkTerms } from "@rlo/shared";
+import { talkFor, type SeasonMode, type TalkTerms } from "@rlo/shared";
 import { usePreferences } from "../api/preferences";
+import { useSeasonMode } from "./seasonMode";
 
-/** The app's words for the player's sports-talk setting (DESIGN.md §7.10). */
+/**
+ * The app's words for the player's sports-talk setting (DESIGN.md §7.10); a Souls season swaps
+ * in its own vocabulary (§4.7).
+ */
 export function useTalk(): TalkTerms {
-  return TALK[usePreferences().sportsTalk];
+  return talkFor(usePreferences().sportsTalk, useSeasonMode());
 }
 
 /** "the scout" → "The scout", for the start of a sentence. */

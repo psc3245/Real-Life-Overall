@@ -110,6 +110,8 @@ describe("souls mode", () => {
     await t.request(`/days/${t.today}/recap`, { method: "POST" });
     const system = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
     expect(system).toContain("picked Souls mode");
+    expect(system).toContain("You are the Firekeeper");
+    expect(system).not.toContain("light sports framing");
     const [call] = await t.db.select().from(llmCalls).where(eq(llmCalls.purpose, "recap.daily"));
     expect(call!.promptVersion).toMatch(/\+souls$/);
 

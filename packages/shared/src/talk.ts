@@ -1,3 +1,5 @@
+import type { SeasonMode } from "./rating/growth";
+
 /**
  * Sports talk (DESIGN.md §7.10): how much sports framing the app uses, in its own words and in
  * everything the model writes. "normal" is the app's default voice; "none" is plain and
@@ -61,9 +63,18 @@ export interface TalkTerms {
   /** Main menu links, plus the names of its dropdown groups (plan, social, stats). */
   nav: {
     today: string;
+    log: string;
     week: string;
+    habits: string;
+    goals: string;
     workouts: string;
+    friends: string;
     leaderboards: string;
+    charts: string;
+    reports: string;
+    history: string;
+    /** The big centered button: the rating page. */
+    rating: string;
     plan: string;
     social: string;
     stats: string;
@@ -109,9 +120,17 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     unranked: "No profile type yet",
     nav: {
       today: "Today",
+      log: "Log",
       week: "Week",
+      habits: "Habits",
+      goals: "Goals",
       workouts: "Workouts",
+      friends: "Friends",
       leaderboards: "Rankings",
+      charts: "Charts",
+      reports: "Reports",
+      history: "History",
+      rating: "Rating",
       plan: "Plan",
       social: "Social",
       stats: "Insights",
@@ -154,9 +173,17 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     unranked: "Unranked",
     nav: {
       today: "Today",
+      log: "Log",
       week: "Week",
+      habits: "Habits",
+      goals: "Goals",
       workouts: "Train",
+      friends: "Friends",
       leaderboards: "Leaders",
+      charts: "Charts",
+      reports: "Reports",
+      history: "History",
+      rating: "Rating",
       plan: "Playbook",
       social: "League",
       stats: "Stats",
@@ -199,9 +226,17 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     unranked: "Undrafted",
     nav: {
       today: "Game day",
+      log: "Log",
       week: "Film room",
+      habits: "Habits",
+      goals: "Goals",
       workouts: "Practice",
+      friends: "Friends",
       leaderboards: "Standings",
+      charts: "Charts",
+      reports: "Reports",
+      history: "History",
+      rating: "Rating",
       plan: "Playbook",
       social: "Clubhouse",
       stats: "Stat sheet",
@@ -216,3 +251,67 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     revealButton: "Reveal my rating",
   },
 };
+
+/**
+ * A Souls season's words (DESIGN.md §4.7): the game's own vocabulary where it has one (Status,
+ * Level Up, Rest, Equipment, Covenant, Phantoms, Class, Hollow, Firekeeper) and grim plain words
+ * where it doesn't. Replaces normal and extra sports talk for the season; none stays plain.
+ */
+export const SOULS_TALK: TalkTerms = {
+  scout: "the Firekeeper",
+  Scout: "Firekeeper",
+  scoutingReport: "Oath",
+  scoutingReportTagline: "What you've sworn to pursue",
+  coach: "Firekeeper",
+  coachTagline: "Rest a while, and ask",
+  ovr: "SL",
+  growthMode: "Most Improved",
+  growthLabel: "Growth",
+  ratingMode: "OVR",
+  souls: {
+    mode: "Souls",
+    souls: "souls",
+    soul: "soul",
+    bonfire: "Level Up",
+    bonfireTagline: "Spend your souls on the stats you choose",
+    level: "SL",
+    levelUp: "Level up",
+    bloodstain: "Bloodstain",
+    died: "You died",
+    boss: "Boss",
+  },
+  playerCard: "Status",
+  profileHeading: "Status",
+  archetype: "Class",
+  unranked: "Hollow",
+  nav: {
+    today: "Bonfire",
+    log: "Chronicle",
+    week: "Journey",
+    habits: "Vows",
+    goals: "Bosses",
+    workouts: "Training",
+    friends: "Phantoms",
+    leaderboards: "Ranks",
+    charts: "Charts",
+    reports: "Tomes",
+    history: "Cycles",
+    rating: "Status",
+    plan: "Equipment",
+    social: "Covenant",
+    stats: "Archives",
+  },
+  todayEyebrow: "Bonfire",
+  weeklyReview: "The week's reckoning",
+  runWeekly: "Reckon the week",
+  endDay: "Rest",
+  scouting: "Character creation",
+  startScouting: "Create your character",
+  reveal: "Awakening",
+  revealButton: "Awaken",
+};
+
+/** The app's words for a sports-talk level in a season of `mode`. */
+export function talkFor(talk: SportsTalk, mode: SeasonMode | null | undefined): TalkTerms {
+  return mode === "souls" && talk !== "none" ? SOULS_TALK : TALK[talk];
+}

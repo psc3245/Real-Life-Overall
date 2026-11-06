@@ -18,6 +18,7 @@ import {
 } from "./ObjectiveProgress";
 import { DebugId, DebugJson } from "../../components/debug/Debug";
 import { ChartLink } from "../charts/ChartLink";
+import { useTalk } from "../../lib/talk";
 
 const TERM_DETAIL: Record<ObjectiveTerm, string> = {
   short: "A month or less",
@@ -26,6 +27,7 @@ const TERM_DETAIL: Record<ObjectiveTerm, string> = {
 
 /** Goals with a deadline: short and long term, then finished ones. */
 export function GoalsPage() {
+  const talk = useTalk();
   const objectives = useObjectives();
   const habits = useHabits();
   const ratings = useRatings();
@@ -76,7 +78,9 @@ export function GoalsPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-neon">Targets with a deadline</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Goals</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+            {talk.nav.goals}
+          </h1>
         </div>
         <Button variant="primary" disabled={editing !== null} onClick={() => setEditing("new")}>
           + New goal

@@ -1,7 +1,7 @@
 import { NativeTabs } from "expo-router/native-tabs";
 import { usePreferences } from "@/api/preferences";
 import { useFriends } from "@/api/social";
-import { useTalk } from "@/lib/talk";
+import { useSeasonMode, useTalk } from "@/lib/talk";
 import { colors } from "@/lib/theme";
 
 /**
@@ -10,6 +10,7 @@ import { colors } from "@/lib/theme";
  */
 export default function TabsLayout() {
   const talk = useTalk();
+  const soulsSeason = useSeasonMode() === "souls";
   const { features } = usePreferences();
   // Pending friend requests badge the You tab (the web shows them on its League menu).
   const requests = useFriends(features.friends).data?.incoming.length ?? 0;
@@ -18,7 +19,13 @@ export default function TabsLayout() {
     <NativeTabs tintColor={colors.neon}>
       <NativeTabs.Trigger name="today">
         <NativeTabs.Trigger.Label>{talk.nav.today}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: "sun.max", selected: "sun.max.fill" }} />
+        <NativeTabs.Trigger.Icon
+          sf={
+            soulsSeason
+              ? { default: "flame", selected: "flame.fill" }
+              : { default: "sun.max", selected: "sun.max.fill" }
+          }
+        />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="habits" hidden={!playbook}>
         <NativeTabs.Trigger.Label>{talk.nav.plan}</NativeTabs.Trigger.Label>
@@ -29,7 +36,7 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Icon sf={{ default: "calendar", selected: "calendar" }} />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="ratings">
-        <NativeTabs.Trigger.Label>Rating</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{talk.nav.rating}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="chart.bar.fill" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="me">
