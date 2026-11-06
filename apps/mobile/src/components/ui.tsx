@@ -20,6 +20,9 @@ import { colors, fonts, space } from "@/lib/theme";
 /** True inside a tab's own stack, where screens have no header to cover the status bar. */
 export const TabRootContext = createContext(false);
 
+/** Lets a drag inside a Screen (reordering exercises) stop the page from scrolling under it. */
+export const ScrollLockContext = createContext<(locked: boolean) => void>(() => undefined);
+
 /** A scrolling page with a big 2K-style title and pull to refresh. Insets come from the tab bar. */
 export function Screen({
   title,
@@ -47,12 +50,18 @@ export function Screen({
     }
   };
   const insets = useSafeAreaInsets();
+  const [locked, setLocked] = useState(false);
   return (
     <View style={styles.screen}>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.screenContent}
         contentInsetAdjustmentBehavior="automatic"
+        scrollEnabled={!locked}
+        // Fields stay above the keyboard, a drag puts it away, and taps on buttons go through.
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           onRefresh ? (
             <RefreshControl refreshing={pulling} onRefresh={pull} tintColor={colors.neon} />
@@ -68,7 +77,7 @@ export function Screen({
             {subtitle && <Label>{subtitle}</Label>}
           </View>
         )}
-        {children}
+        <ScrollLockContext.Provider value={setLocked}>{children}</ScrollLockContext.Provider>
       </ScrollView>
       {tabRoot && <View style={[styles.scrim, { height: insets.top }]} />}
     </View>

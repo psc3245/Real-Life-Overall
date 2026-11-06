@@ -1,5 +1,6 @@
 import {
   distanceUnit,
+  formatDuration,
   emptySet,
   formatSet,
   MAX_SETS_PER_EXERCISE,
@@ -17,10 +18,13 @@ import {
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useState } from "react";
-import { ActionSheetIOS, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { Field } from "@/components/ui";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { PopMenu, usePopAnchor, type PopOption } from "./PopMenu";
+import { REST_CHOICES } from "./RestTimer";
 import { displayValue, SetCell } from "./SetCell";
+import { SwipeRow } from "./SwipeRow";
 
 /**
  * live: a workout in progress (sets are checked off). log: a finished workout being edited
@@ -71,7 +75,10 @@ export function ExerciseBlock({
   onChange,
   onRemove,
   onMove,
+  onHoldTitle,
+  onReleaseTitle,
   onSetDone,
+  dimmed,
 }: {
   exercise: WorkoutExerciseDto;
   info: ExerciseDto | undefined;
@@ -83,10 +90,18 @@ export function ExerciseBlock({
   onChange: (next: WorkoutExerciseDto) => void;
   onRemove: () => void;
   onMove: (delta: -1 | 1) => void;
-  /** live mode: a set was just checked off (starts the rest timer). */
-  onSetDone?: () => void;
+  /** The title was held: start dragging this exercise to a new place. */
+  onHoldTitle?: (e: GestureResponderEvent) => void;
+  onReleaseTitle?: () => void;
+  /** Another exercise is being dragged over this one. */
+  dimmed?: boolean;
+  /** live mode: a set was just checked off (starts this exercise's rest timer, if it has one). */
+  onSetDone?: (restS: number | null) => void;
 }) {
   const [showNotes, setShowNotes] = useState(exercise.notes !== "");
+  const menu = usePopAnchor();
+  const [menuPage, setMenuPage] = useState<"main" | "rest">("main");
+  const restS = exercise.restS ?? null;
   const tracking = info?.tracking ?? "weight_reps";
   const fields = TRACKING_FIELDS[tracking];
   const makes = tracking === "makes_attempts";
@@ -120,70 +135,81 @@ export function ExerciseBlock({
   const toggleDone = (i: number) => {
     const done = !exercise.sets[i]!.done;
     setAt(i, { done, ...(done && fromPrevious(i, true)) });
-    if (done) onSetDone?.();
+    if (done) onSetDone?.(restS);
   };
 
-  /** Tapping a set's number picks its kind or deletes it. */
-  const setMenu = (i: number) => {
-    const options = [...SET_KINDS.map((k) => SET_KIND_LABELS[k]), "Delete set", "Cancel"];
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: `Set ${i + 1}`,
-        options,
-        destructiveButtonIndex: SET_KINDS.length,
-        cancelButtonIndex: SET_KINDS.length + 1,
-        userInterfaceStyle: "dark",
-      },
-      (index) => {
-        if (index < SET_KINDS.length) setAt(i, { kind: SET_KINDS[index]! });
-        else if (index === SET_KINDS.length) removeSet(i);
-      },
-    );
-  };
-  const exerciseMenu = () => {
-    const actions = [
-      { label: showNotes ? "Hide note" : "Add a note", run: () => setShowNotes((v) => !v) },
-      ...(first ? [] : [{ label: "Move up", run: () => onMove(-1) }]),
-      ...(last ? [] : [{ label: "Move down", run: () => onMove(1) }]),
-      ...(info ? [{ label: "History and records", run: () => openExercise(info.id) }] : []),
-      { label: "Remove exercise", run: onRemove },
-    ];
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: name,
-        options: [...actions.map((a) => a.label), "Cancel"],
-        destructiveButtonIndex: actions.length - 1,
-        cancelButtonIndex: actions.length,
-        userInterfaceStyle: "dark",
-      },
-      (index) => actions[index]?.run(),
-    );
-  };
+  // Finished workouts don't rest, so their menu has no rest timer.
+  const mainOptions: PopOption[] = [
+    { label: showNotes ? "Hide note" : "Add a note", onPress: () => setShowNotes((v) => !v) },
+    ...(mode === "log"
+      ? []
+      : [
+          {
+            label: `Rest timer: ${restS ? formatDuration(restS) : "Off"}`,
+            onPress: () => setMenuPage("rest"),
+            keepOpen: true,
+          },
+        ]),
+    ...(info ? [{ label: "History and records", onPress: () => openExercise(info.id) }] : []),
+    { label: "Remove exercise", onPress: onRemove, destructive: true },
+  ];
+  const restOptions: PopOption[] = [null, ...REST_CHOICES].map((r) => ({
+    label: r ? formatDuration(r) : "Off",
+    selected: r === restS,
+    onPress: () => onChange({ ...exercise, restS: r }),
+  }));
 
   let working = 0;
   const showPrevious = mode !== "plan";
 
   return (
-    <View style={styles.block} accessibilityLabel={name}>
+    <View style={[styles.block, dimmed && { opacity: 0.15 }]} accessibilityLabel={name}>
       <View style={styles.head}>
         <Pressable
           style={{ flex: 1 }}
-          disabled={!info}
           onPress={() => info && openExercise(info.id)}
+          onLongPress={onHoldTitle}
+          onPressOut={onReleaseTitle}
+          delayLongPress={300}
           accessibilityRole="link"
+          accessibilityHint="Hold to reorder"
+          accessibilityActions={[
+            ...(first ? [] : [{ name: "moveUp", label: "Move up" }]),
+            ...(last ? [] : [{ name: "moveDown", label: "Move down" }]),
+          ]}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === "moveUp") onMove(-1);
+            if (e.nativeEvent.actionName === "moveDown") onMove(1);
+          }}
         >
           <Text style={[styles.name, !info && { color: colors.court300 }]} numberOfLines={1}>
             {name}
           </Text>
         </Pressable>
+        {restS !== null && mode !== "log" && (
+          <Text style={styles.rest} accessibilityLabel={`Rest ${formatDuration(restS)}`}>
+            {formatDuration(restS)}
+          </Text>
+        )}
         <Pressable
-          onPress={exerciseMenu}
+          ref={menu.ref}
+          onPress={() => {
+            setMenuPage("main");
+            menu.open();
+          }}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={`${name} options`}
         >
           <SymbolView name="ellipsis.circle" tintColor={colors.court300} size={22} />
         </Pressable>
+        <PopMenu
+          anchor={menu.anchor}
+          title={menuPage === "rest" ? "Rest after each set" : undefined}
+          options={menuPage === "rest" ? restOptions : mainOptions}
+          columns={menuPage === "rest" ? 3 : 1}
+          onClose={menu.close}
+        />
       </View>
       {showNotes && (
         <Field
@@ -211,17 +237,18 @@ export function ExerciseBlock({
         const prev = previous?.[i];
         const done = mode === "live" && s.done;
         return (
-          <View key={i} style={[styles.row, styles.setRow, done && styles.doneRow]}>
-            <Pressable
-              onPress={() => setMenu(i)}
-              accessibilityRole="button"
-              accessibilityLabel={`Set ${i + 1}: ${SET_KIND_LABELS[s.kind]}. Change or delete`}
-              style={[styles.setCol, styles.setNumber]}
-            >
-              <Text style={[styles.setText, { color: kindColor(s.kind) }]}>
-                {s.kind === "normal" ? working : SET_KIND_TAGS[s.kind]}
-              </Text>
-            </Pressable>
+          <SwipeRow
+            key={i}
+            label={`set ${i + 1}`}
+            onDelete={() => removeSet(i)}
+            style={[styles.row, styles.setRow, done && styles.doneRow]}
+          >
+            <SetNumber
+              index={i}
+              kind={s.kind}
+              text={s.kind === "normal" ? String(working) : SET_KIND_TAGS[s.kind]}
+              onKind={(kind) => setAt(i, { kind })}
+            />
             {showPrevious && (
               <Pressable
                 disabled={!prev}
@@ -264,7 +291,7 @@ export function ExerciseBlock({
                 />
               </Pressable>
             )}
-          </View>
+          </SwipeRow>
         );
       })}
       <Pressable
@@ -276,6 +303,45 @@ export function ExerciseBlock({
         <Text style={styles.addSetText}>+ Add set</Text>
       </Pressable>
     </View>
+  );
+}
+
+/** A set's number; tapping it pops up the set kinds. */
+function SetNumber({
+  index,
+  kind,
+  text,
+  onKind,
+}: {
+  index: number;
+  kind: WorkoutSetDto["kind"];
+  text: string;
+  onKind: (kind: WorkoutSetDto["kind"]) => void;
+}) {
+  const menu = usePopAnchor();
+  return (
+    <>
+      <Pressable
+        ref={menu.ref}
+        onPress={menu.open}
+        accessibilityRole="button"
+        accessibilityLabel={`Set ${index + 1}: ${SET_KIND_LABELS[kind]}. Change kind`}
+        style={[styles.setCol, styles.setNumber]}
+      >
+        <Text style={[styles.setText, { color: kindColor(kind) }]}>{text}</Text>
+      </Pressable>
+      <PopMenu
+        anchor={menu.anchor}
+        title={`Set ${index + 1}`}
+        options={SET_KINDS.map((k) => ({
+          label: SET_KIND_LABELS[k],
+          color: kindColor(k),
+          selected: k === kind,
+          onPress: () => onKind(k),
+        }))}
+        onClose={menu.close}
+      />
+    </>
   );
 }
 
@@ -321,6 +387,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   setText: { fontWeight: "700", fontSize: 15 },
+  rest: { color: colors.court300, fontSize: 13, fontVariant: ["tabular-nums"] },
   prevText: { color: colors.court500, fontSize: 13 },
   check: {
     height: 34,

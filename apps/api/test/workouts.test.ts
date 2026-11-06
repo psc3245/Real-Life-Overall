@@ -113,7 +113,11 @@ describe("workouts", () => {
         ...json({
           name: "Legs",
           exercises: [
-            { exerciseId: "squat-barbell", sets: [set({ weightKg: 100, reps: 5, done: true })] },
+            {
+              exerciseId: "squat-barbell",
+              sets: [set({ weightKg: 100, reps: 5, done: true })],
+              restS: 180,
+            },
           ],
         }),
       }),
@@ -123,6 +127,8 @@ describe("workouts", () => {
     const w = await start({ templateId: template.id });
     expect(w).toMatchObject({ name: "Legs", templateId: template.id });
     expect(w.exercises[0]!.sets[0]).toMatchObject({ weightKg: 100, done: false });
+    // The rest timer is set per exercise and comes along from the template.
+    expect(w.exercises[0]!.restS).toBe(180);
     await save(w.id, {
       exercises: [
         { exerciseId: "squat-barbell", sets: [set({ weightKg: 105, reps: 5, done: true })] },

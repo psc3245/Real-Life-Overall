@@ -97,6 +97,7 @@ function normalizeExercises(input: WorkoutExerciseDto[], lookup: Lookup): Workou
         attempts: fields.includes("attempts") ? s.attempts : null,
         done: s.done,
       })),
+      restS: e.restS ?? null,
     };
   });
 }
