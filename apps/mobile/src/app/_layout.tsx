@@ -11,7 +11,9 @@ import { useAuthState } from "@/api/session";
 import { Button, Card, Muted, Screen, Body } from "@/components/ui";
 import { API_URL } from "@/lib/config";
 import { pushedOptions } from "@/lib/stack";
-import { colors, setTierPalette } from "@/lib/theme";
+import { colors, SEASON_MODE_KEY, setTierPalette } from "@/lib/theme";
+import { useSeasonMode } from "@/lib/talk";
+import * as SecureStore from "expo-secure-store";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -115,6 +117,11 @@ function RootStack() {
 function SignedInSync() {
   const palette = useMe().data?.preferences.tierPalette;
   if (palette) setTierPalette(palette);
+  // Remember the season's mode so the next launch wears its look (Souls, DESIGN.md §4.7).
+  const mode = useSeasonMode();
+  useEffect(() => {
+    if (mode) SecureStore.setItem(SEASON_MODE_KEY, mode);
+  }, [mode]);
   return <TimezoneSync />;
 }
 

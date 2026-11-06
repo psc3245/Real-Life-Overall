@@ -16,6 +16,7 @@ import { StatTile } from "../../components/StatTile";
 import { shortDate } from "../../lib/format";
 import { DebugJson } from "../../components/debug/Debug";
 import { ChartLink } from "../charts/ChartLink";
+import { useTalk } from "../../lib/talk";
 
 const RANGE_LABEL: Record<HabitStatRange, string> = {
   week: "Week",
@@ -27,6 +28,7 @@ const pct = (rate: number | null) => (rate === null ? "—" : `${Math.round(rate
 
 /** Every habit's completion, averages and streaks for this week, month or season. */
 export function HabitsGlancePage() {
+  const talk = useTalk();
   const [params, setParams] = useSearchParams();
   const range = (HABIT_STAT_RANGES as readonly string[]).includes(params.get("range") ?? "")
     ? (params.get("range") as HabitStatRange)
@@ -51,7 +53,9 @@ export function HabitsGlancePage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-neon">At a glance</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Habits</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+            {talk.nav.habits}
+          </h1>
           {stats.data && (
             <p className="text-sm text-court-500">
               {shortDate(stats.data.start)} – {shortDate(stats.data.end)}

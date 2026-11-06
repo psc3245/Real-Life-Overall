@@ -7,7 +7,7 @@ import { llmCalls, users } from "../db/schema";
 import * as seasonRepo from "../repos/season-repo";
 import { estimateCostUsd, PREMIUM_PURPOSES, type LlmPurpose } from "./models";
 import { GROWTH_MODE, soulsMode } from "./prompts/shared";
-import { VOICE, VOICED_PURPOSES } from "./prompts/voice";
+import { SOULS_VOICE, VOICE, VOICED_PURPOSES } from "./prompts/voice";
 import type { ModelResolver } from "./providers";
 
 /** How the model should write for this player. */
@@ -94,10 +94,12 @@ export class LlmClient {
         ? await this.resolveVoice(req.userId).catch(() => DEFAULT_VOICE)
         : DEFAULT_VOICE;
     const note = mode === "growth" ? GROWTH_MODE : mode === "souls" ? soulsMode(talk) : null;
+    // Souls seasons trade sports talk for the Firekeeper's voice; plain stays plain.
+    const souls = mode === "souls" && talk !== "none";
     return {
       ...req,
-      system: [req.system, ...(note ? [note] : []), VOICE[talk]].join("\n\n"),
-      promptVersion: `${req.promptVersion}+talk-${talk}${note ? `+${mode}` : ""}`,
+      system: [req.system, ...(note ? [note] : []), souls ? SOULS_VOICE : VOICE[talk]].join("\n\n"),
+      promptVersion: `${req.promptVersion}+talk-${souls ? "souls" : talk}${note ? `+${mode}` : ""}`,
     };
   }
 

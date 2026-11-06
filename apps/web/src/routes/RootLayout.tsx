@@ -6,6 +6,8 @@ import { useApplyPreferences, usePreferences } from "../api/preferences";
 import { DebugPanel } from "../components/debug/DebugPanel";
 import { useAuthState, useSignOut } from "../api/auth";
 import { useRatings } from "../api/ratings";
+import { DeathBanner } from "../features/souls/DeathBanner";
+import { useSeasonMode } from "../lib/seasonMode";
 import { useFriends } from "../api/social";
 import { Menu, MenuButton, MenuDivider, MenuLabel, MenuLink } from "../components/Menu";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
@@ -29,6 +31,7 @@ const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
 export function RootLayout() {
   const health = useHealth();
   const auth = useAuthState();
+  const soulsSeason = useSeasonMode() === "souls";
   const signOut = useSignOut();
   const navigate = useNavigate();
   const apiUp = health.data?.ok === true;
@@ -89,6 +92,7 @@ export function RootLayout() {
         <MainNav requests={requests} features={prefs.features} sticky={prefs.stickyNav} />
       )}
       <main className="flex-1 pb-16">
+        <DeathBanner enabled={auth.signedIn && soulsSeason} />
         <OwnScoreProvider enabled={auth.signedIn}>
           <Outlet />
         </OwnScoreProvider>
@@ -177,8 +181,13 @@ function MainNav({
   const on = (items: (NavItem & { feature: Feature })[]) =>
     items.filter((i) => features[i.feature]);
   const plan = on([
-    { feature: "habits", to: "/habits", label: "Habits", detail: "Today's habits and streaks" },
-    { feature: "goals", to: "/goals", label: "Goals", detail: "Targets with a deadline" },
+    {
+      feature: "habits",
+      to: "/habits",
+      label: talk.nav.habits,
+      detail: "Today's habits and streaks",
+    },
+    { feature: "goals", to: "/goals", label: talk.nav.goals, detail: "Targets with a deadline" },
     {
       feature: "workouts",
       to: "/workouts",
@@ -190,7 +199,7 @@ function MainNav({
     {
       feature: "friends",
       to: "/friends",
-      label: "Friends",
+      label: talk.nav.friends,
       detail: "Requests and side-by-side compare",
       badge: requests,
     },
@@ -202,9 +211,19 @@ function MainNav({
     },
   ]);
   const stats = on([
-    { feature: "charts", to: "/charts", label: "Charts", detail: "Explore any metric over time" },
-    { feature: "reports", to: "/reports", label: "Reports", detail: "Chart sets with write-ups" },
-    { feature: "history", to: "/history", label: "History", detail: "Past seasons" },
+    {
+      feature: "charts",
+      to: "/charts",
+      label: talk.nav.charts,
+      detail: "Explore any metric over time",
+    },
+    {
+      feature: "reports",
+      to: "/reports",
+      label: talk.nav.reports,
+      detail: "Chart sets with write-ups",
+    },
+    { feature: "history", to: "/history", label: talk.nav.history, detail: "Past seasons" },
   ]);
   return (
     <nav
@@ -222,7 +241,7 @@ function MainNav({
         </NavLink>
         <span className="contents lg:flex lg:gap-5">
           <NavLink to="/log" className={side}>
-            Log
+            {talk.nav.log}
           </NavLink>
           <NavGroup label={talk.nav.plan} items={plan} />
           {features.week && (
@@ -248,7 +267,7 @@ function MainNav({
           `whitespace-nowrap rounded-full border-2 border-neon px-6 py-1.5 font-display text-lg font-bold uppercase tracking-[0.2em] shadow-[0_0_18px_-6px_var(--color-neon)] transition ${isActive ? "bg-neon text-court-950" : "text-neon hover:bg-neon/10"}`
         }
       >
-        Rating
+        {talk.nav.rating}
       </NavLink>
       <div className="contents lg:flex lg:items-center lg:justify-end lg:gap-5">
         <NavGroup label={talk.nav.social} items={social} />

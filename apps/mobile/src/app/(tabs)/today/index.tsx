@@ -126,7 +126,11 @@ export default function TodayScreen() {
         {t.showLogButton && (
           <View style={{ flex: 1 }}>
             <Button
-              title={d.status === "open" ? "Log today →" : "Open today's log →"}
+              title={
+                d.status === "open"
+                  ? `${talk.nav.log === "Log" ? "Log today" : talk.nav.log} →`
+                  : "Open today's log →"
+              }
               onPress={() => openLog(d.today, d.today)}
             />
           </View>
@@ -189,6 +193,7 @@ function TextLinkButton({ label, onPress }: { label: string; onPress: () => void
 }
 
 function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
+  const talk = useTalk();
   const scheduled = day.habits.filter((h) => h.scheduled);
   const extra = day.habits.filter(
     (h) => !h.scheduled && (h.entry || h.children?.some((c) => c.entry)),
@@ -197,7 +202,7 @@ function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
 
   return (
     <Section
-      title="Habits"
+      title={talk.nav.habits}
       action={{ label: "Stats →", href: { pathname: "/habits", params: { view: "habits" } } }}
     >
       {scheduled.length === 0 && extra.length === 0 ? (
@@ -279,8 +284,12 @@ function RatingCard({ nodes, movers: moverCount }: { nodes: RatedNodeDto[]; move
 
   return (
     <Section
-      title={mode === "growth" ? `Your ${talk.growthMode} season` : "Your rating"}
-      action={{ label: "Full rating →", href: "/ratings" }}
+      title={
+        mode === "growth"
+          ? `Your ${talk.growthMode} season`
+          : `Your ${talk.nav.rating.toLowerCase()}`
+      }
+      action={{ label: `Full ${talk.nav.rating.toLowerCase()} →`, href: "/ratings" }}
     >
       <View style={styles.rating}>
         <OvrBadge value={root.value} size={72} />
@@ -404,13 +413,14 @@ function MissedRecaps({ today }: { today: string }) {
 }
 
 function GoalsCard({ day, limit }: { day: DayDto; limit: number }) {
+  const talk = useTalk();
   const running = day.objectives
     .filter((o) => o.objective.progress.status === "active")
     .sort((a, b) => a.objective.endsOn.localeCompare(b.objective.endsOn));
   const shown = running.slice(0, limit);
   return (
     <Section
-      title="Goals"
+      title={talk.nav.goals}
       action={{
         label: running.length > shown.length ? `All ${running.length} →` : "All goals →",
         href: { pathname: "/habits", params: { view: "goals" } },
@@ -437,9 +447,10 @@ function GoalsCard({ day, limit }: { day: DayDto; limit: number }) {
 }
 
 function TrainingCard({ day }: { day: DayDto }) {
+  const talk = useTalk();
   return (
     <Section
-      title="Training"
+      title={talk.nav.workouts}
       action={{
         label: day.workouts.length ? "Train →" : "Start a workout →",
         href: { pathname: "/habits", params: { view: "train" } },

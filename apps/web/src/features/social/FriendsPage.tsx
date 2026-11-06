@@ -5,8 +5,10 @@ import { useFriendAction, useFriends } from "../../api/social";
 import { Button } from "../../components/Button";
 import { OvrBadge } from "../../components/OvrBadge";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { useTalk } from "../../lib/talk";
 
 export function FriendsPage() {
+  const talk = useTalk();
   const friends = useFriends();
   const action = useFriendAction();
   const [username, setUsername] = useState("");
@@ -21,7 +23,7 @@ export function FriendsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-10 pt-4">
       <div className="space-y-4">
-        <h1 className="font-display text-4xl font-bold uppercase">Friends</h1>
+        <h1 className="font-display text-4xl font-bold uppercase">{talk.nav.friends}</h1>
         <form onSubmit={onAdd} className="flex gap-2" aria-label="Add a friend">
           <input
             value={username}

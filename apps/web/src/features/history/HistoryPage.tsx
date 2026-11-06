@@ -5,9 +5,11 @@ import { OvrBadge } from "../../components/OvrBadge";
 import { formatScore, seasonCardScores } from "../../components/score";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { seasonDates } from "../../lib/format";
+import { useTalk } from "../../lib/talk";
 
 /** Every season: the one in progress first, then archived ones, newest first. */
 export function HistoryPage() {
+  const talk = useTalk();
   const ratings = useRatings();
   const cards = useSeasonCards();
   if (ratings.isPending || cards.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
@@ -47,7 +49,9 @@ export function HistoryPage() {
     <div className="mx-auto max-w-3xl space-y-6 pt-4">
       <header>
         <p className="text-sm uppercase tracking-[0.3em] text-neon">Seasons</p>
-        <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">History</h1>
+        <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+          {talk.nav.history}
+        </h1>
         <p className="text-court-300">
           Each calendar quarter is a season. Open one to see how it went.
         </p>

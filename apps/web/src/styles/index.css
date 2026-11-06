@@ -109,3 +109,70 @@
     animation: none;
   }
 }
+
+/*
+ * Souls seasons (DESIGN.md §4.7): worn stone lit from below by embers, a heavy vignette and
+ * film grain. Colors and fonts come from appearance.ts (SOULS_LOOK); this adds the texture.
+ */
+[data-souls="on"] body {
+  background-color: var(--color-court-950);
+  background-image:
+    radial-gradient(
+      ellipse 90% 45% at 50% 110%,
+      color-mix(in srgb, var(--color-neon) 16%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(ellipse at 50% 40%, transparent 35%, rgb(0 0 0 / 0.7) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+[data-souls="on"] .font-display {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+/* Panels read as carved stone: a faint gilt edge and a shadowed inside. */
+[data-souls="on"] .border-court-700,
+[data-souls="on"] .border-court-800 {
+  border-color: color-mix(in srgb, var(--color-neon) 14%, var(--color-court-700));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-neon) 8%, transparent),
+    inset 0 0 24px rgb(0 0 0 / 0.55);
+}
+[data-souls="on"] ::selection {
+  background: color-mix(in srgb, var(--color-neon) 35%, transparent);
+}
+
+@keyframes ember-flicker {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--color-neon) 55%, transparent));
+  }
+  45% {
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--color-neon) 75%, transparent));
+  }
+  70% {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--color-neon) 45%, transparent));
+  }
+}
+.ember-flicker {
+  animation: ember-flicker 3.2s ease-in-out infinite;
+}
+@keyframes death-in {
+  from {
+    opacity: 0;
+    letter-spacing: 0.2em;
+  }
+  to {
+    opacity: 1;
+    letter-spacing: 0.35em;
+  }
+}
+.death-in {
+  animation: death-in 2.4s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .ember-flicker,
+  :root:not([data-motion="full"]) .death-in {
+    animation: none;
+  }
+}

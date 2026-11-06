@@ -53,7 +53,11 @@ export function BonfirePage() {
     <ScoreProvider mode="souls" values={[]}>
       <div className="space-y-10 pt-4">
         <header className="flex flex-wrap items-center gap-6">
-          {data.soulLevel !== null && <OvrBadge value={data.soulLevel} mode="souls" />}
+          {data.soulLevel !== null && (
+            <div className="ember-flicker">
+              <OvrBadge value={data.soulLevel} mode="souls" />
+            </div>
+          )}
           <div className="min-w-0 flex-1 space-y-1">
             <h1 className="font-display text-4xl font-bold uppercase">{talk.souls.bonfire}</h1>
             <p className="text-court-300">

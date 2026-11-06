@@ -14,9 +14,11 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { since } from "./format";
 import { WorkoutsNav } from "./WorkoutsNav";
 import { DebugJson } from "../../components/debug/Debug";
+import { useTalk } from "../../lib/talk";
 
 /** Start a workout: resume the one in progress, start empty, or start from a template. */
 export function StartWorkoutPage() {
+  const talk = useTalk();
   const active = useActiveWorkout();
   const templates = useTemplates();
   const exercises = useExercises();
@@ -36,7 +38,9 @@ export function StartWorkoutPage() {
       <header className="space-y-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-neon">Training</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Workout</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+            {talk.nav.workouts}
+          </h1>
         </div>
         <WorkoutsNav />
       </header>

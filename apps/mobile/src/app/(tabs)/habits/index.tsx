@@ -48,8 +48,8 @@ export default function PlaybookScreen() {
     );
 
   const labels: Record<View, string> = {
-    habits: "Habits",
-    goals: "Goals",
+    habits: talk.nav.habits,
+    goals: talk.nav.goals,
     train: talk.nav.workouts,
   };
   return (

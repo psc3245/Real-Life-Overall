@@ -4,16 +4,20 @@ import { useReports } from "../../api/reports";
 import { DebugJson } from "../../components/debug/Debug";
 import { instantDate } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { useTalk } from "../../lib/talk";
 
 /** Saved reports: collections of charts you can re-run over any period. */
 export function ReportsPage() {
+  const talk = useTalk();
   const reports = useReports();
   return (
     <div className="space-y-6 pt-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-neon">Charts, run on demand</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Reports</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+            {talk.nav.reports}
+          </h1>
         </div>
         <Link
           to="/reports/new"

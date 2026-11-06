@@ -13,19 +13,17 @@ export const ratingsKey = ["ratings"] as const;
 export const changesKey = ["rating-changes"] as const;
 
 /** Resolves to null (not an error) when the user has no ratings yet. */
+export async function fetchRatings(): Promise<RatingsDto | null> {
+  try {
+    return await api<RatingsDto>("/ratings");
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 export function useRatings(enabled = true) {
-  return useQuery({
-    enabled,
-    queryKey: ratingsKey,
-    queryFn: async () => {
-      try {
-        return await api<RatingsDto>("/ratings");
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) return null;
-        throw error;
-      }
-    },
-  });
+  return useQuery({ enabled, queryKey: ratingsKey, queryFn: fetchRatings });
 }
 
 export function useRateInitial() {

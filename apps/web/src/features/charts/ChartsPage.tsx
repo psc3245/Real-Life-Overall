@@ -32,6 +32,7 @@ import { ErrorNote } from "../onboarding/ErrorNote";
 import { MetricChart } from "./MetricChart";
 import { MetricPicker } from "./MetricPicker";
 import { buildChart, chartHref, type SeriesStats } from "./model";
+import { useTalk } from "../../lib/talk";
 
 const pick = <T extends string>(value: string | null, options: readonly T[], fallback: T): T =>
   options.includes(value as T) ? (value as T) : fallback;
@@ -60,6 +61,7 @@ function useChartConfig(): [ChartConfig, (next: Partial<ChartConfig>) => void, s
 
 /** Pick any metrics, chart them together, model the trend, and save the view. */
 export function ChartsPage() {
+  const talk = useTalk();
   const [config, set, viewId] = useChartConfig();
   const metrics = useMetrics();
   const me = useMe();
@@ -89,7 +91,9 @@ export function ChartsPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-neon">Everything you track</p>
-          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">Charts</h1>
+          <h1 className="font-display text-4xl font-bold uppercase md:text-5xl">
+            {talk.nav.charts}
+          </h1>
         </div>
         <Link to="/reports" className="text-sm text-court-300 hover:text-neon">
           Reports: run sets of charts with write-ups →

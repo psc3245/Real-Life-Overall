@@ -139,7 +139,29 @@ export function accentColor(prefs: Pick<Preferences, "theme" | "accent" | "custo
   return ACCENT_INFO[prefs.accent][light ? "light" : "dark"];
 }
 
-export function appearanceVars(prefs: Preferences): Record<string, string> {
+/**
+ * A Souls season's look (DESIGN.md §4.7): ash-and-stone surfaces, ember gold for the accent, a
+ * carved serif for headings and a book serif for text, square corners. It replaces the player's
+ * theme, accent, fonts and corners for the season; sizes, density and motion stay theirs.
+ */
+export const SOULS_LOOK = {
+  scale: ["#0a0908", "#12100e", "#1b1814", "#2a251f", "#4a4237", "#a39a8a", "#e8e0cf"] as Scale,
+  ember: "#d8a650",
+  blood: "#b3261e",
+  display: {
+    label: "Cinzel",
+    stack: `"Cinzel", Georgia, serif`,
+    google: "Cinzel:wght@500;600;700",
+  } satisfies FontInfo,
+  body: {
+    label: "EB Garamond",
+    stack: `"EB Garamond", Georgia, serif`,
+    google: "EB+Garamond:wght@400;500;600",
+  } satisfies FontInfo,
+};
+
+export function appearanceVars(prefs: Preferences, souls = false): Record<string, string> {
+  if (souls) return soulsVars(prefs);
   const light = isLightTheme(prefs.theme);
   const accent = accentColor(prefs);
   const vars: Record<string, string> = {
@@ -159,6 +181,23 @@ export function appearanceVars(prefs: Preferences): Record<string, string> {
   return vars;
 }
 
+function soulsVars(prefs: Preferences): Record<string, string> {
+  const vars: Record<string, string> = {
+    "--color-neon": SOULS_LOOK.ember,
+    "--color-neon-dim": `color-mix(in oklab, ${SOULS_LOOK.ember} 50%, black)`,
+    "--color-flare": SOULS_LOOK.blood,
+    "--font-display": SOULS_LOOK.display.stack,
+    "--font-sans": SOULS_LOOK.body.stack,
+    "--spacing": SPACING[prefs.density],
+    // The book serif runs small next to Inter.
+    "font-size": `calc(${TEXT_SIZE[prefs.textSize]} * 1.08)`,
+  };
+  SOULS_LOOK.scale.forEach((c, i) => (vars[`--color-court-${STEPS[i]}`] = c));
+  TIERS[prefs.tierPalette].dark.forEach((c, i) => (vars[`--color-tier-${TIER_NAMES[i]}`] = c));
+  RADII.sharp.forEach((r, i) => (vars[`--radius-${RADIUS_NAMES[i]}`] = r));
+  return vars;
+}
+
 const loadedFonts = new Set(["Oswald:wght@500;600;700", "Inter:wght@400;500;600"]);
 
 /** Adds a Google Fonts stylesheet for each family not loaded yet (index.html preloads the defaults). */
@@ -174,20 +213,33 @@ export function loadFonts(fonts: FontInfo[]) {
   }
 }
 
-/** Applies preferences to <html>: variables inline, toggles as data attributes for index.css. */
-export function applyAppearance(prefs: Preferences, root = document.documentElement) {
-  for (const [name, value] of Object.entries(appearanceVars(prefs))) {
+/**
+ * Applies preferences to <html>: variables inline, toggles as data attributes for index.css. In a
+ * Souls season the Souls look takes over (`data-souls`).
+ */
+export function applyAppearance(
+  prefs: Preferences,
+  root = document.documentElement,
+  souls = false,
+) {
+  for (const [name, value] of Object.entries(appearanceVars(prefs, souls))) {
     root.style.setProperty(name, value);
   }
-  root.style.colorScheme = isLightTheme(prefs.theme) ? "light" : "dark";
+  const light = !souls && isLightTheme(prefs.theme);
+  root.style.colorScheme = light ? "light" : "dark";
   root.dataset.backdrop = prefs.backdrop;
   root.dataset.motion = prefs.motion;
   root.dataset.caps = prefs.allCaps ? "on" : "off";
-  root.dataset.theme = isLightTheme(prefs.theme) ? "light" : "dark";
-  loadFonts([DISPLAY_FONT_INFO[prefs.displayFont], BODY_FONT_INFO[prefs.bodyFont]]);
+  root.dataset.theme = light ? "light" : "dark";
+  root.dataset.souls = souls ? "on" : "off";
+  loadFonts(
+    souls
+      ? [SOULS_LOOK.display, SOULS_LOOK.body]
+      : [DISPLAY_FONT_INFO[prefs.displayFont], BODY_FONT_INFO[prefs.bodyFont]],
+  );
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", THEME_INFO[prefs.theme].scale[0]);
+    ?.setAttribute("content", souls ? SOULS_LOOK.scale[0] : THEME_INFO[prefs.theme].scale[0]);
 }
 
 /** Whether to skip animations: the player's choice, else the system setting. */

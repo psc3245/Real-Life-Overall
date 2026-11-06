@@ -41,7 +41,7 @@ export function LeaderboardsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 pt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="font-display text-4xl font-bold uppercase">Leaderboards</h1>
+        <h1 className="font-display text-4xl font-bold uppercase">{talk.nav.leaderboards}</h1>
         {leaderboard.data && (
           <span className="text-sm uppercase tracking-wider text-court-500">
             Season {leaderboard.data.seasonLabel}

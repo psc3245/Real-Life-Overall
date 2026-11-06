@@ -122,7 +122,9 @@ export function TodayPage() {
               to="/log"
               className="rounded-lg bg-neon px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider text-court-950 hover:brightness-110"
             >
-              {d.status === "open" ? "Log today →" : "Open today's log →"}
+              {d.status === "open"
+                ? `${talk.nav.log === "Log" ? "Log today" : talk.nav.log} →`
+                : "Open today's log →"}
             </Link>
           )}
         </div>
@@ -183,6 +185,7 @@ function Card({
 const cardLink = "text-sm text-court-300 hover:text-neon";
 
 function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
+  const talk = useTalk();
   const scheduled = day.habits.filter((h) => h.scheduled);
   const extra = day.habits.filter(
     (h) => !h.scheduled && (h.entry || h.children?.some((c) => c.entry)),
@@ -192,7 +195,7 @@ function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
 
   return (
     <Card
-      title="Habits"
+      title={talk.nav.habits}
       action={
         <Link to="/habits" className={cardLink}>
           Stats →
@@ -294,10 +297,14 @@ function RatingCard({ nodes, movers: moverCount }: { nodes: RatedNodeDto[]; move
 
   return (
     <Card
-      title={mode === "growth" ? `Your ${talk.growthMode} season` : "Your rating"}
+      title={
+        mode === "growth"
+          ? `Your ${talk.growthMode} season`
+          : `Your ${talk.nav.rating.toLowerCase()}`
+      }
       action={
         <Link to="/ratings" className={cardLink}>
-          Full rating →
+          Full {talk.nav.rating.toLowerCase()} →
         </Link>
       }
     >
@@ -336,16 +343,19 @@ function RatingCard({ nodes, movers: moverCount }: { nodes: RatedNodeDto[]; move
 }
 
 function GoalsCard({ day, limit }: { day: DayDto; limit: number }) {
+  const talk = useTalk();
   const running = day.objectives
     .filter((o) => o.objective.progress.status === "active")
     .sort((a, b) => a.objective.endsOn.localeCompare(b.objective.endsOn));
   const shown = running.slice(0, limit);
   return (
     <Card
-      title="Goals"
+      title={talk.nav.goals}
       action={
         <Link to="/goals" className={cardLink}>
-          {running.length > shown.length ? `All ${running.length} →` : "All goals →"}
+          {running.length > shown.length
+            ? `All ${running.length} →`
+            : `All ${talk.nav.goals.toLowerCase()} →`}
         </Link>
       }
     >
@@ -405,9 +415,10 @@ function JournalCard({ day }: { day: DayDto }) {
 }
 
 function TrainingCard({ day }: { day: DayDto }) {
+  const talk = useTalk();
   return (
     <Card
-      title="Training"
+      title={talk.nav.workouts}
       action={
         <Link to="/workouts" className={cardLink}>
           {day.workouts.length ? "Train →" : "Start a workout →"}
