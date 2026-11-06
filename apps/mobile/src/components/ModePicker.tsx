@@ -1,12 +1,15 @@
 import { SEASON_MODE_INFO, SEASON_MODES, type SeasonMode } from "@rlo/shared";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { useAccount } from "@/api/account";
-import { useTalk } from "@/lib/talk";
+import { modeName, useTalk } from "@/lib/talk";
 import { colors, fonts, space } from "@/lib/theme";
 import { PremiumBadge } from "./Premium";
 import { Muted } from "./ui";
 
-/** Rating or growth, picked at the start of each season (DESIGN.md §4.6). */
+/**
+ * Rating, growth or souls, picked at the start of each season (DESIGN.md §4.6, §4.7). Souls is
+ * still in testing, so only dev and admin accounts see it.
+ */
 export function ModePicker({
   value,
   onChange,
@@ -17,10 +20,10 @@ export function ModePicker({
   disabled?: boolean;
 }) {
   const talk = useTalk();
-  const { premium } = useAccount();
+  const { premium, tester } = useAccount();
   return (
     <>
-      {SEASON_MODES.map((mode) => {
+      {SEASON_MODES.filter((m) => m !== "souls" || tester).map((mode) => {
         const active = value === mode;
         // Rating seasons are premium (DESIGN.md §8.9).
         const off = disabled || (mode === "rating" && !premium);
@@ -35,7 +38,8 @@ export function ModePicker({
           >
             {mode === "rating" && !premium && <PremiumBadge />}
             <Text style={[styles.title, active && { color: colors.neon }]}>
-              {mode === "growth" ? talk.growthMode : talk.ratingMode}
+              {modeName(talk, mode)}
+              {mode === "souls" && <Text style={styles.beta}> · Beta</Text>}
             </Text>
             <Muted style={{ fontSize: 14 }}>{SEASON_MODE_INFO[mode]}</Muted>
           </Pressable>
@@ -54,6 +58,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: space.lg,
   },
+  beta: { color: colors.court500, fontSize: 13 },
   active: { borderColor: colors.neon, backgroundColor: "rgba(60,242,200,0.08)" },
   title: {
     color: colors.court100,

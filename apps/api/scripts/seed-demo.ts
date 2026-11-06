@@ -6,23 +6,34 @@
  * its own ledger, logs and weekly reviews. Decay and catalog badges are then computed by the
  * app's own engine.
  *
+ * A second player lives the same kind of season in Souls mode (DESIGN.md §4.7): stat levels
+ * bought along the way with the souls the app says they earned, and a few forgotten days that
+ * dropped bloodstains (one picked back up, one lost for good).
+ *
  * Deterministic (seeded random) and repeatable: re-running replaces the demo account.
  * No LLM calls. Run with: npm run seed:demo -w @rlo/api
  *
- * Local test credentials for the demo account (sign in at /signin), or in AUTH_MODE=dev use
- * the dev user "demo".
+ * Local test credentials for the demo accounts (sign in at /signin), or in AUTH_MODE=dev use
+ * the dev users "demo" and "souls".
  */
 import {
   addDays,
   computeNodeValues,
   dayOfWeek,
+  foldSouls,
+  formatSouls,
   lastCompletedWeek,
   leafValuesFromEvents,
+  levelCost,
+  levelFromRating,
   localDateIn,
   normalizeHabitConfig,
   seasonForDate,
   type GuidedPromptDto,
   type HabitType,
+  type SoulDayInput,
+  type SoulSpend,
+  type UserRole,
 } from "@rlo/shared";
 import { eq, like, or } from "drizzle-orm";
 import { passwordHasher } from "../src/auth/password";
@@ -44,21 +55,75 @@ import {
   ratingNodes,
   recaps,
   seasons,
+  soulLevels,
   userBadges,
   users,
 } from "../src/db/schema";
 import { awardBadges } from "../src/services/badge-service";
 import { applyDecay } from "../src/services/decay-service";
 import { getRatings } from "../src/services/ratings-service";
+import { getSouls } from "../src/services/souls-service";
 
 export const DEMO_EMAIL = "demo@example.test";
 export const DEMO_PASSWORD = "demo-player-2026";
 const DEMO_USERNAME = "demo";
-const DEMO_NAME = "Jordan Reyes";
 const TIMEZONE = "America/Chicago";
 
-// Deterministic randomness (mulberry32) so every run tells the same story. Extra stories (the
-// previous season, the morning routine) get their own streams so they don't reshuffle this one.
+export const SOULS_EMAIL = "souls@example.test";
+export const SOULS_PASSWORD = "souls-player-2026";
+const SOULS_USERNAME = "souls";
+
+interface PlayerSpec {
+  email: string;
+  password: string;
+  username: string;
+  name: string;
+  mode: "rating" | "souls";
+  /** Souls mode is tester-only for now, so the Souls player is a playtester. */
+  role: UserRole;
+  /** Seeds this player's random stream. */
+  seed: number;
+  /** Days (from the season's start) that were lived but never ended: no recap, a death. */
+  forgotten: number[];
+  goals: [node: string, target: number][];
+}
+
+const DEMO: PlayerSpec = {
+  email: DEMO_EMAIL,
+  password: DEMO_PASSWORD,
+  username: DEMO_USERNAME,
+  name: "Jordan Reyes",
+  mode: "rating",
+  role: "user",
+  seed: 20261022,
+  forgotten: [],
+  goals: [
+    ["Overall", 64],
+    ["Endurance", 70],
+    ["Project Ownership", 75],
+  ],
+};
+
+/** Node goals are level targets in Souls mode (DESIGN.md §4.7). */
+const SOULS_PLAYER: PlayerSpec = {
+  email: SOULS_EMAIL,
+  password: SOULS_PASSWORD,
+  username: SOULS_USERNAME,
+  name: "Riley Vance",
+  mode: "souls",
+  role: "dev",
+  seed: 20261105,
+  forgotten: [8, 20, 21],
+  goals: [
+    ["Overall", 26],
+    ["Endurance", 30],
+    ["Strength", 22],
+  ],
+};
+
+// Deterministic randomness (mulberry32) so every run tells the same story. Each player gets its
+// own stream, and extra stories (the previous season, the morning routine) get theirs, so they
+// don't reshuffle one another.
 function mulberry32(start: number) {
   let seed = start;
   return () => {
@@ -69,7 +134,7 @@ function mulberry32(start: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const rand = mulberry32(20261022);
+let rand = mulberry32(DEMO.seed);
 const between = (lo: number, hi: number) => lo + rand() * (hi - lo);
 const pick = <T>(items: T[]) => items[Math.floor(rand() * items.length)]!;
 const round = (n: number, places = 2) => Math.round(n * 10 ** places) / 10 ** places;
@@ -89,10 +154,17 @@ const RIVALS: {
   name: string;
   visibility: "friends" | "public";
   link: "friends" | "incoming" | "none";
-  mode?: "rating" | "growth";
+  mode?: "rating" | "growth" | "souls";
   archetype: string;
   recappedDays: number;
-  categories: [name: string, templateKey: string | null, value: number, growth: number][];
+  /** Souls-mode rivals also list each category's stat level. */
+  categories: [
+    name: string,
+    templateKey: string | null,
+    value: number,
+    growth: number,
+    level?: number,
+  ][];
 }[] = [
   {
     username: "maya",
@@ -217,6 +289,48 @@ const RIVALS: {
     categories: [
       ["Mind", "mind", 53.3, 3.9],
       ["Social", "social", 49.7, 4.6],
+    ],
+  },
+  {
+    username: "kai",
+    name: "Kai Mendes",
+    visibility: "public",
+    link: "friends",
+    mode: "souls",
+    archetype: "Strength Build",
+    recappedDays: 22,
+    categories: [
+      ["Fitness", "fitness", 72.0, 4.1, 41],
+      ["Health", "health", 63.5, 2.2, 30],
+      ["Career", "career", 58.0, 1.0, 24],
+    ],
+  },
+  {
+    username: "ingrid",
+    name: "Ingrid Sato",
+    visibility: "friends",
+    link: "friends",
+    mode: "souls",
+    archetype: "Quality Build",
+    recappedDays: 17,
+    categories: [
+      ["Career", "career", 66.1, 2.8, 31],
+      ["Mind", "mind", 70.2, 3.0, 33],
+      ["Social", "social", 51.4, 1.9, 21],
+      ["Fitness", "fitness", 48.8, 3.6, 22],
+    ],
+  },
+  {
+    username: "rowan",
+    name: "Rowan Hale",
+    visibility: "public",
+    link: "none",
+    mode: "souls",
+    archetype: "Hollowed Out",
+    recappedDays: 11,
+    categories: [
+      ["Mind", "mind", 55.0, 0.8, 19],
+      ["Creativity", "creativity", 61.7, 2.4, 27],
     ],
   },
 ];
@@ -439,9 +553,23 @@ async function main() {
 }
 
 async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
-  // Replace any previous demo account (cascades remove its data).
-  await db.delete(authUsers).where(eq(authUsers.email, DEMO_EMAIL));
-  await db.delete(users).where(or(eq(users.email, DEMO_EMAIL), eq(users.username, DEMO_USERNAME)));
+  const demoId = await seedPlayer(db, DEMO);
+  const soulsId = await seedPlayer(db, SOULS_PLAYER);
+  await db.insert(friendships).values({
+    requesterId: soulsId,
+    addresseeId: demoId,
+    status: "accepted",
+    respondedAt: new Date(),
+  });
+  await seedRivals(db, demoId, soulsId, seasonForDate(localDateIn(TIMEZONE)));
+}
+
+/** One player's account and season history; returns their user id. */
+async function seedPlayer(db: ReturnType<typeof createNeonDb>["db"], spec: PlayerSpec) {
+  rand = mulberry32(spec.seed);
+  // Replace any previous copy of this account (cascades remove its data).
+  await db.delete(authUsers).where(eq(authUsers.email, spec.email));
+  await db.delete(users).where(or(eq(users.email, spec.email), eq(users.username, spec.username)));
 
   const today = localDateIn(TIMEZONE);
   const season = seasonForDate(today);
@@ -456,23 +584,25 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
   const authId = crypto.randomUUID();
   await db
     .insert(authUsers)
-    .values({ id: authId, name: DEMO_NAME, email: DEMO_EMAIL, emailVerified: true });
+    .values({ id: authId, name: spec.name, email: spec.email, emailVerified: true });
   await db.insert(authAccounts).values({
     id: crypto.randomUUID(),
     userId: authId,
     accountId: authId,
     providerId: "credential",
-    password: await passwordHasher(100_000).hash(DEMO_PASSWORD),
+    password: await passwordHasher(100_000).hash(spec.password),
   });
   const [user] = await db
     .insert(users)
     .values({
-      email: DEMO_EMAIL,
-      username: DEMO_USERNAME,
-      displayName: DEMO_NAME,
+      email: spec.email,
+      username: spec.username,
+      displayName: spec.name,
       timezone: TIMEZONE,
       weekStart: 1,
       authSubject: authId,
+      role: spec.role,
+      premiumSince: spec.role === "user" ? null : new Date(`${start}T15:00:00Z`),
       profileSummary:
         "Software engineer aiming for senior by the March review; promotion hinges on owning projects end to end and mentoring. Training for a spring half marathon, running about four times a week. Lifts inconsistently. Tends to cancel plans with close friends when work gets busy but keeps up weekly calls with family. Had the flu mid-October and bounced back.",
     })
@@ -496,6 +626,7 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
       userId,
       ...season,
       status: "active",
+      mode: spec.mode,
       archetype: "Ambitious Builder",
       archetypeDescription:
         "Career-first, with a growing endurance base and social life to rebuild.",
@@ -608,11 +739,9 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
     },
     createdAt: onboardedAt,
   });
-  await db.insert(goals).values([
-    { nodeId: rootId, targetValue: 64 },
-    { nodeId: nodeId.get("Endurance")!, targetValue: 70 },
-    { nodeId: nodeId.get("Project Ownership")!, targetValue: 75 },
-  ]);
+  await db
+    .insert(goals)
+    .values(spec.goals.map(([node, targetValue]) => ({ nodeId: nodeId.get(node)!, targetValue })));
 
   // Habits.
   const habitIds = new Map<string, string>();
@@ -718,6 +847,8 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
     );
     const logged = done.length > 0 || notes.length > 0;
     if (!logged) continue;
+    const forgotten = spec.forgotten.some((offset) => addDays(start, offset) === d);
+    if (forgotten && !flu) continue;
 
     // Rating changes: linked habits done raise, scheduled misses dent; social notes count.
     const changes = new Map<string, { delta: number; reason: string; evidence: string }>();
@@ -941,9 +1072,24 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
   // Let the app's own engines fill in decay and catalog badges.
   const decayed = await applyDecay(db, userId);
   const badges = await awardBadges(db, userId);
-  await db.update(users).set({ profileVisibility: "friends" }).where(eq(users.id, userId));
-  await getRatings(db, userId); // writes the demo player's shared card
-  await seedRivals(db, userId, season);
+  const souls =
+    spec.mode === "souls"
+      ? await seedSoulLevels(
+          db,
+          userId,
+          seasonId,
+          start,
+          nodeId,
+          new Set(recapRows.map((r) => r.periodStart!)),
+        )
+      : null;
+  // The Souls player is public so the global Souls board has them.
+  const isPublic = spec.mode === "souls";
+  await db
+    .update(users)
+    .set({ profileVisibility: isPublic ? "public" : "friends", leaderboardOptIn: isPublic })
+    .where(eq(users.id, userId));
+  await getRatings(db, userId); // writes the player's shared card
 
   const events2 = await db.select().from(ratingEvents).where(eq(ratingEvents.seasonId, seasonId));
   const finalValues = computeNodeValues(
@@ -957,7 +1103,7 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
   );
   console.log(
     [
-      `Seeded "${DEMO_NAME}" (${season.label}, onboarded ${start}):`,
+      `Seeded "${spec.name}" (${season.label}, ${spec.mode} mode, onboarded ${start}):`,
       `  ${logs.length - 1} logged days, ${recapRows.length} daily recaps, ${weeks.length} weekly reviews, ${entries.length} habit entries`,
       `  ${decayed} days of decay applied, ${badges.length} catalog badges earned`,
       `  Overall ${finalValues.get(rootId)?.toFixed(1)} (started ${computeNodeValues(
@@ -971,9 +1117,85 @@ async function seedDemo(db: ReturnType<typeof createNeonDb>["db"]) {
       )
         .get(rootId)
         ?.toFixed(1)}); previous season ${previous.label} card at ${prevOverall}`,
-      `Sign in with the demo credentials in apps/api/scripts/seed-demo.ts, or use dev user "${DEMO_USERNAME}".`,
+      ...(souls ? [`  ${souls}`] : []),
+      `Sign in as ${spec.email} (password in apps/api/scripts/seed-demo.ts), or use dev user "${spec.username}".`,
     ].join("\n"),
   );
+  return userId;
+}
+
+/**
+ * Starting stat levels on the season's first day, then levels bought along the way with the
+ * souls the app's own engine says each day earned: the player spends on any day they survive,
+ * favoring heavily weighted, low stats, and banks the last few days' souls.
+ */
+async function seedSoulLevels(
+  db: ReturnType<typeof createNeonDb>["db"],
+  userId: string,
+  seasonId: string,
+  start: string,
+  nodeId: Map<string, string>,
+  recapped: Set<string>,
+): Promise<string> {
+  const leaves = TREE.flatMap((c) => c.leaves);
+  const level = new Map(leaves.map((l) => [l.name, levelFromRating(l.start)]));
+  await db.insert(soulLevels).values(
+    leaves.map((l) => ({
+      userId,
+      seasonId,
+      nodeId: nodeId.get(l.name)!,
+      kind: "start" as const,
+      levels: level.get(l.name)!,
+      afterDate: start,
+      createdAt: new Date(`${start}T15:00:00Z`),
+    })),
+  );
+
+  // Earnings and deaths straight from the app, oldest day first.
+  const run = await getSouls(db, userId);
+  const days: SoulDayInput[] = run.days
+    .map((d) => ({
+      date: d.date,
+      earned: d.earned,
+      logged: recapped.has(d.date),
+      paused: d.paused,
+      deaths: d.deaths,
+    }))
+    .reverse();
+  const bankFrom = addDays(run.today, -3);
+  const spends: SoulSpend[] = [];
+  const rows: (typeof soulLevels.$inferInsert)[] = [];
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i]!;
+    if (day.date >= bankFrom) break;
+    const state = foldSouls(days.slice(0, i + 1), spends);
+    if (state.days.at(-1)!.deaths.length) continue;
+    let held = state.held;
+    for (;;) {
+      const leaf = [...leaves].sort(
+        (a, b) => level.get(a.name)! - a.weight / 2 - (level.get(b.name)! - b.weight / 2),
+      )[0]!;
+      const cost = levelCost(level.get(leaf.name)!);
+      if (cost === null || cost > held) break;
+      held -= cost;
+      level.set(leaf.name, level.get(leaf.name)! + 1);
+      spends.push({ afterDate: day.date, cost });
+      rows.push({
+        userId,
+        seasonId,
+        nodeId: nodeId.get(leaf.name)!,
+        kind: "level_up",
+        levels: 1,
+        cost,
+        afterDate: day.date,
+        createdAt: evening(day.date),
+      });
+    }
+  }
+  if (rows.length) await db.insert(soulLevels).values(rows);
+
+  const final = await getSouls(db, userId);
+  return `Soul Level ${final.soulLevel?.toFixed(1)}: ${rows.length} levels bought, ${formatSouls(final.earned)} souls earned, ${formatSouls(final.held)} held, ${final.deaths} deaths, ${formatSouls(final.lost)} lost${final.bloodstain ? `, ${formatSouls(final.bloodstain.amount)} in a bloodstain` : ""}`;
 }
 
 /** Last quarter: same tree, starting a little lower, moved week by week to its final values. */
@@ -1240,13 +1462,19 @@ async function reseedRivals(db: ReturnType<typeof createNeonDb>["db"]) {
     .select({ id: users.id })
     .from(users)
     .where(eq(users.username, DEMO_USERNAME));
-  if (!demo) throw new Error("No demo account yet; run the full seed first");
-  await seedRivals(db, demo.id, seasonForDate(localDateIn(TIMEZONE)));
+  const [souls] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, SOULS_USERNAME));
+  if (!demo || !souls) throw new Error("No demo accounts yet; run the full seed first");
+  await seedRivals(db, demo.id, souls.id, seasonForDate(localDateIn(TIMEZONE)));
 }
 
+/** Rivals link to the demo player; Souls rivals who are friends also know the Souls player. */
 async function seedRivals(
   db: ReturnType<typeof createNeonDb>["db"],
   demoUserId: string,
+  soulsUserId: string,
   season: { label: string; startsOn: string; endsOn: string },
 ) {
   await db.delete(users).where(like(users.email, `%@${RIVAL_EMAIL_DOMAIN}`));
@@ -1273,13 +1501,15 @@ async function seedRivals(
         archetype: r.archetype,
       })
       .returning({ id: seasons.id });
-    const categories = r.categories.map(([name, templateKey, value, growth]) => ({
+    const categories = r.categories.map(([name, templateKey, value, growth, level]) => ({
       name,
       templateKey,
       value,
       growth,
+      ...(level === undefined ? {} : { level }),
     }));
     const mean = (ns: number[]) => round(ns.reduce((a, b) => a + b, 0) / ns.length);
+    const levels = categories.flatMap((c) => (c.level === undefined ? [] : [c.level]));
     await db.insert(playerCards).values({
       userId: user!.id,
       seasonId: rivalSeason!.id,
@@ -1287,17 +1517,21 @@ async function seedRivals(
       mode: r.mode ?? "rating",
       overall: mean(categories.map((c) => c.value)),
       growth: mean(categories.map((c) => c.growth)),
+      level: levels.length ? mean(levels) : null,
       archetype: r.archetype,
       categories,
       recappedDays: r.recappedDays,
     });
     if (r.link === "friends") {
-      await db.insert(friendships).values({
-        requesterId: user!.id,
-        addresseeId: demoUserId,
-        status: "accepted",
-        respondedAt: new Date(),
-      });
+      const friends = r.mode === "souls" ? [demoUserId, soulsUserId] : [demoUserId];
+      await db.insert(friendships).values(
+        friends.map((addresseeId) => ({
+          requesterId: user!.id,
+          addresseeId,
+          status: "accepted" as const,
+          respondedAt: new Date(),
+        })),
+      );
     } else if (r.link === "incoming") {
       await db.insert(friendships).values({ requesterId: user!.id, addresseeId: demoUserId });
     }

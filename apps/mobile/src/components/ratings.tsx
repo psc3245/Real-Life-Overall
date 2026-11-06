@@ -43,7 +43,7 @@ export function OvrBadge({
             : Math.round(value)}
       </Text>
       <Text style={[styles.ovrLabel, { fontSize: Math.max(10, size * 0.15) }]} numberOfLines={1}>
-        {growth ? talk.growthLabel : talk.ovr}
+        {growth ? talk.growthLabel : mode === "souls" ? talk.souls.level : talk.ovr}
       </Text>
     </View>
   );

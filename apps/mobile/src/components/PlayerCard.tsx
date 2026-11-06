@@ -3,7 +3,7 @@ import { Link } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, space } from "@/lib/theme";
-import { useTalk } from "@/lib/talk";
+import { modeName, useTalk } from "@/lib/talk";
 import { OvrBadge, StatBar } from "./ratings";
 import { formatScore, ScoreProvider, useScore } from "./score";
 
@@ -72,7 +72,7 @@ export function PlayerCard({ ratings, name }: { ratings: RatingsDto; name: strin
     <CardView
       name={name}
       overall={root?.value ?? 0}
-      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}${mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
+      subtitle={`${ratings.archetype?.name ?? talk.unranked} · ${ratings.season.label}${mode !== "rating" ? ` · ${modeName(talk, mode)}` : ""}`}
       note={
         root?.projection != null
           ? `Projected ${formatScore(mode, root.projection, 0)} by season end${root.goal != null ? ` · goal ${formatScore(mode, root.goal, 0)}` : ""}`
@@ -102,7 +102,7 @@ export function PublicCard({ card, name }: { card: PublicCardDto; name: string }
       <CardView
         name={name}
         overall={card.overall}
-        subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}${card.mode === "growth" ? ` · ${talk.growthMode}` : ""}`}
+        subtitle={`${card.archetype ?? talk.unranked} · ${card.seasonLabel}${card.mode !== "rating" ? ` · ${modeName(talk, card.mode)}` : ""}`}
         note={`${card.recappedDays} recapped day${card.recappedDays === 1 ? "" : "s"} this season${card.recappedDays < LEADERBOARD_MIN_RECAPPED_DAYS ? " · provisional" : ""}`}
         categories={card.categories.map((c) => ({ key: c.name, name: c.name, value: c.value }))}
       />

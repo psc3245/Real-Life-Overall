@@ -14,7 +14,8 @@ import { useLeaderboard } from "@/api/social";
 import { Chip, Segmented } from "@/components/controls";
 import { Card, ErrorNote, Label, Loading, Muted, Screen, TextLink } from "@/components/ui";
 import { formatScore, scoreColor } from "@/components/score";
-import { useTalk } from "@/lib/talk";
+import { modeName, useTalk } from "@/lib/talk";
+import { useAccount } from "@/api/account";
 import { colors, fonts, space } from "@/lib/theme";
 import { FeatureGate } from "@/components/FeatureGate";
 
@@ -26,6 +27,7 @@ function LeaderboardsScreen() {
   const leaderboard = useLeaderboard(scope, board, chosenMode);
   const mode = leaderboard.data?.mode ?? chosenMode ?? "rating";
   const talk = useTalk();
+  const { tester } = useAccount();
 
   return (
     <Screen
@@ -44,10 +46,10 @@ function LeaderboardsScreen() {
       />
       <Segmented
         label="Mode"
-        options={SEASON_MODES.map((m) => ({
-          value: m,
-          label: m === "growth" ? talk.growthMode : talk.ratingMode,
-        }))}
+        options={SEASON_MODES.filter(
+          // Souls is in testing: its board shows to testers and to anyone already playing it.
+          (m) => m !== "souls" || tester || leaderboard.data?.myMode === "souls",
+        ).map((m) => ({ value: m, label: modeName(talk, m) }))}
         value={mode}
         onChange={setMode}
       />
@@ -73,10 +75,8 @@ function LeaderboardsScreen() {
           {leaderboard.data.myMode && leaderboard.data.myMode !== leaderboard.data.mode ? (
             <Card style={{ gap: space.xs }}>
               <Muted>
-                You&apos;re playing{" "}
-                {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} this
-                season, so you rank on the{" "}
-                {leaderboard.data.myMode === "growth" ? talk.growthMode : talk.ratingMode} board.
+                You&apos;re playing {modeName(talk, leaderboard.data.myMode)} this season, so you
+                rank on the {modeName(talk, leaderboard.data.myMode)} board.
               </Muted>
               <Pressable onPress={() => setMode(leaderboard.data.myMode!)} hitSlop={6}>
                 <Text style={{ color: colors.neon }}>Show that board →</Text>

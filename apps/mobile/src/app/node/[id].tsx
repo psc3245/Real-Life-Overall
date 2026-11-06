@@ -87,6 +87,7 @@ function NodeDetail({ node, nodes }: { node: RatedNodeDto; nodes: RatedNodeDto[]
           {node.value == null ? "—" : formatScore(mode, node.value)}
         </Text>
         {mode === "growth" && <Muted style={{ fontSize: 12 }}>gained this season</Muted>}
+        {mode === "souls" && <TextLink href="/bonfire">Level · Bonfire →</TextLink>}
         <HiddenRating rating={node.rating} />
         <ChartButton
           ids={[`rating:${node.id}`]}
