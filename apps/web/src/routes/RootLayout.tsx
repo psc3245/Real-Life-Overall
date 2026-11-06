@@ -5,6 +5,7 @@ import { useHealth, useMe } from "../api/hooks";
 import { useApplyPreferences, usePreferences } from "../api/preferences";
 import { DebugPanel } from "../components/debug/DebugPanel";
 import { useAuthState, useSignOut } from "../api/auth";
+import { useRatings } from "../api/ratings";
 import { useFriends } from "../api/social";
 import { Menu, MenuButton, MenuDivider, MenuLabel, MenuLink } from "../components/Menu";
 import { DevUserSwitcher } from "../components/DevUserSwitcher";
@@ -172,6 +173,7 @@ function MainNav({
   sticky: boolean;
 }) {
   const talk = useTalk();
+  const souls = useRatings().data?.season.mode === "souls";
   const on = (items: (NavItem & { feature: Feature })[]) =>
     items.filter((i) => features[i.feature]);
   const plan = on([
@@ -231,6 +233,11 @@ function MainNav({
           {features.coach && (
             <NavLink to="/coach" className={side}>
               {talk.coach}
+            </NavLink>
+          )}
+          {souls && (
+            <NavLink to="/bonfire" className={side}>
+              {talk.souls.bonfire}
             </NavLink>
           )}
         </span>

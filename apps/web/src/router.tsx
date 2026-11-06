@@ -21,6 +21,7 @@ import { CoachPage } from "./features/coach/CoachPage";
 import { UpgradePage } from "./features/account/UpgradePage";
 import { ScoutingReportPage } from "./features/scouting/ScoutingReportPage";
 import { SeasonSetupPage } from "./features/seasons/SeasonSetupPage";
+import { BonfirePage } from "./features/souls/BonfirePage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ComparePage } from "./features/social/ComparePage";
 import { FriendsPage } from "./features/social/FriendsPage";
@@ -152,6 +153,14 @@ export const router = createBrowserRouter([
             <FeatureGate feature="coach">
               <CoachPage />
             </FeatureGate>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "bonfire",
+        element: (
+          <RequireAuth>
+            <BonfirePage />
           </RequireAuth>
         ),
       },

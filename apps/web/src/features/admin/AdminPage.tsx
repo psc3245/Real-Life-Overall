@@ -1,43 +1,16 @@
-import {
-  ROLE_DETAILS,
-  ROLE_LABELS,
-  USER_ROLES,
-  type LlmCallDto,
-  type UsageRowDto,
-  type UserRole,
-} from "@rlo/shared";
+import type { LlmCallDto, UsageRowDto } from "@rlo/shared";
 import { useState } from "react";
 import { Navigate } from "react-router";
-import {
-  useAdminOverview,
-  useAdminUsers,
-  useIsAdmin,
-  useLlmCalls,
-  useSetRole,
-} from "../../api/admin";
+import { useAdminOverview, useIsAdmin, useLlmCalls } from "../../api/admin";
 import { useBugReports, useSetBugReportStatus } from "../../api/bugReports";
 import { useMe } from "../../api/hooks";
 import { StatTile } from "../../components/StatTile";
 import { SectionNav } from "../../components/SectionNav";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { usd, when } from "./format";
+import { FrontOffice } from "./FrontOffice";
 
-const ROLE_STYLE: Record<UserRole, string> = {
-  user: "border-court-700",
-  premium: "border-neon/60 text-neon",
-  dev: "border-tier-purple text-tier-purple",
-  admin: "border-tier-orange text-tier-orange",
-};
-
-const usd = (n: number) => (n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
-const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-/** Usage, costs, LLM calls and accounts (DESIGN.md §8.7). Admins only. */
+/** Usage, costs, LLM calls, account management and bug reports (DESIGN.md §8.7). Admins only. */
 export function AdminPage() {
   const me = useMe();
   const admin = useIsAdmin();
@@ -53,7 +26,7 @@ export function AdminPage() {
         sections={[
           { id: "usage", label: "Usage" },
           { id: "calls", label: "LLM calls" },
-          { id: "users", label: "Users" },
+          { id: "users", label: "Front office" },
           { id: "bugs", label: "Bug reports" },
         ]}
       />
@@ -64,7 +37,7 @@ export function AdminPage() {
         <Calls />
       </div>
       <div id="users" className="scroll-mt-16">
-        <Users myId={me.data!.id} />
+        <FrontOffice myId={me.data!.id} />
       </div>
       <div id="bugs" className="scroll-mt-16">
         <BugReports />
@@ -317,70 +290,5 @@ function CallTable({ calls }: { calls: LlmCallDto[] }) {
         </tbody>
       </table>
     </div>
-  );
-}
-
-function Users({ myId }: { myId: string }) {
-  const users = useAdminUsers();
-  const setRole = useSetRole();
-  return (
-    <section className="space-y-3">
-      <h2 className="font-display text-xl uppercase tracking-wider">
-        Users {users.data && <span className="text-court-500">({users.data.length})</span>}
-      </h2>
-      <ErrorNote error={users.error ?? setRole.error} />
-      <div className="overflow-x-auto rounded-xl border border-court-700 bg-court-900/70">
-        <table className="w-full text-sm tabular-nums">
-          <thead className="text-left text-[11px] uppercase tracking-wider text-court-500">
-            <tr>
-              <th className="px-3 py-2 font-semibold">User</th>
-              <th className="pr-3 font-semibold">Joined</th>
-              <th className="pr-3 font-semibold">Last logged</th>
-              <th className="pr-3 text-right font-semibold">LLM</th>
-              <th className="pr-3 font-semibold">Account</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.data?.map((u) => (
-              <tr key={u.id} className="border-t border-court-800">
-                <td className="px-3 py-1.5">
-                  <span className="block">{u.displayName}</span>
-                  <span className="block text-xs text-court-500">
-                    @{u.username} · {u.email} · {u.timezone}
-                  </span>
-                </td>
-                <td className="pr-3 whitespace-nowrap text-court-300">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </td>
-                <td className="pr-3 whitespace-nowrap text-court-300">{u.lastLogged ?? "—"}</td>
-                <td className="pr-3 text-right text-court-300">
-                  {u.llmCalls} · {usd(u.costUsd)}
-                </td>
-                <td className="pr-3">
-                  <select
-                    aria-label={`Account type for ${u.username}`}
-                    value={u.role}
-                    disabled={u.id === myId || setRole.isPending}
-                    title={
-                      u.id === myId
-                        ? "You can't change your own account type"
-                        : ROLE_DETAILS[u.role]
-                    }
-                    onChange={(e) => setRole.mutate({ id: u.id, role: e.target.value as UserRole })}
-                    className={`rounded border bg-court-950 px-2 py-1 text-xs disabled:opacity-60 ${ROLE_STYLE[u.role]}`}
-                  >
-                    {USER_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
   );
 }

@@ -3,6 +3,8 @@ import {
   growthTier,
   ratingTier,
   RATING_MAX,
+  soulsTier,
+  STAT_LEVEL_MAX,
   type SeasonCardDto,
   type SeasonMode,
 } from "@rlo/shared";
@@ -30,9 +32,10 @@ const ScoreContext = createContext<Score>(RATING_SCORE);
 /** The score in effect: the signed-in player's season, or a card's own mode. */
 export const useScore = () => useContext(ScoreContext);
 
-/** A growth scale that fits every value (rounded up to a tidy number); 100 for ratings. */
+/** A growth scale that fits every value (rounded up to a tidy number); 100 for ratings, 99 for levels. */
 export function scaleFor(mode: SeasonMode, values: (number | null | undefined)[]): number {
   if (mode === "rating") return RATING_MAX;
+  if (mode === "souls") return STAT_LEVEL_MAX;
   const top = Math.max(GROWTH_SCALE_MIN, ...values.filter((v): v is number => v != null));
   const step = top <= 20 ? 5 : top <= 50 ? 10 : 25;
   return Math.ceil(top / step) * step;
@@ -68,11 +71,14 @@ export function OwnScoreProvider({ enabled, children }: { enabled: boolean; chil
 }
 
 export function scoreColor(mode: SeasonMode, value: number): string {
-  return tierColor(mode === "growth" ? growthTier(value) : ratingTier(value));
+  return tierColor(
+    mode === "growth" ? growthTier(value) : mode === "souls" ? soulsTier(value) : ratingTier(value),
+  );
 }
 
-/** "74.3" for a rating, "+3.4" for growth. */
+/** "74.3" for a rating, "+3.4" for growth, "24" for a stat level (categories "24.3"). */
 export function formatScore(mode: SeasonMode, value: number, digits = 1): string {
+  if (mode === "souls") return Number.isInteger(value) ? String(value) : value.toFixed(digits);
   return mode === "growth" ? formatGrowth(value, digits) : value.toFixed(digits);
 }
 
@@ -126,7 +132,7 @@ export function useShowRatings(): [boolean, (show: boolean) => void] {
 }
 
 /**
- * In a growth season, the rating under a growth number: hidden behind a toggle, and only ever
+ * In a growth or souls season, the rating under a growth number or level: hidden behind a toggle, and only ever
  * on the owner's own pages (other players never receive it).
  */
 export function HiddenRating({
@@ -139,7 +145,7 @@ export function HiddenRating({
   const { mode } = useScore();
   const [show, setShow] = useShowRatings();
   const { premium } = useAccount();
-  if (mode !== "growth" || rating === null || !premium) return null;
+  if (mode === "rating" || rating === null || !premium) return null;
   return (
     <button
       type="button"

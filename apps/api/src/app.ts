@@ -33,6 +33,7 @@ import { pauseRoutes } from "./routes/pauses";
 import { profileRoutes } from "./routes/profiles";
 import { reportRoutes } from "./routes/reports";
 import { seasonRoutes } from "./routes/seasons";
+import { soulRoutes } from "./routes/souls";
 import { ratingsRoutes } from "./routes/ratings";
 import { weeklyRoutes } from "./routes/weekly";
 import { scoutingReportRoutes, treeProposalRoutes, weightRoutes } from "./routes/evolution";
@@ -147,6 +148,8 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/dev/*", requireUser)
     .use("/goals/*", requireUser)
     .use("/badges", requireUser)
+    .use("/souls", requireUser)
+    .use("/souls/*", requireUser)
     .use("/seasons", requireUser)
     .use("/seasons/*", requireUser)
     .use("/weekly", requireUser)
@@ -179,6 +182,7 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/chart-views", chartViewRoutes)
     .route("/reports", reportRoutes)
     .route("/pauses", pauseRoutes)
+    .route("/souls", soulRoutes)
     .route("/dev", devRoutes)
     .route("/weekly", weeklyRoutes)
     .route("/goals", goalRoutes)

@@ -1,14 +1,19 @@
 import {
   addDays,
+  type AccountAction,
   type AdminOverviewDto,
   type AdminUserDto,
   type LlmCallDto,
   type RecapDebugDto,
+  type createAccountBodySchema,
   type UserRole,
 } from "@rlo/shared";
+import type { z } from "zod";
+import type { Auth } from "../auth/auth";
 import type { Database } from "../db/client";
-import { badRequest, notFound } from "../errors";
+import { badRequest, conflict, notFound } from "../errors";
 import * as adminRepo from "../repos/admin-repo";
+import * as userRepo from "../repos/user-repo";
 
 const DAY_MS = 86_400_000;
 const round = (n: number, places = 4) => Math.round(n * 10 ** places) / 10 ** places;
@@ -58,8 +63,12 @@ export async function listCalls(
   return (await adminRepo.findCalls(db, filter, limit)).map(toCallDto);
 }
 
-export async function listUsers(db: Database): Promise<AdminUserDto[]> {
-  return (await adminRepo.findUsers(db)).map((u) => ({
+export async function listUsers(
+  db: Database,
+  filter: adminRepo.UserFilter = {},
+  limit?: number,
+): Promise<AdminUserDto[]> {
+  return (await adminRepo.findUsers(db, filter, limit)).map((u) => ({
     ...u,
     createdAt: u.createdAt.toISOString(),
     lastLogged: u.lastLogged ?? null,
@@ -73,6 +82,99 @@ export async function setRole(db: Database, actorId: string, userId: string, rol
     throw badRequest("You can't remove your own admin role");
   }
   if (!(await adminRepo.setRole(db, userId, role))) throw notFound("User not found");
+}
+
+/** Where links in admin-triggered emails land: the same pages the sign-in screens use. */
+export interface AuthLinks {
+  /** The web origin (PUBLIC_URL). */
+  origin: string;
+}
+
+/**
+ * Creates an email + password account by hand. Pre-verified accounts can sign in straight away;
+ * otherwise the confirmation email goes out as if they'd signed up. Needs AUTH_MODE=better-auth.
+ */
+export async function createAccount(
+  db: Database,
+  auth: Auth | null,
+  links: AuthLinks,
+  body: z.output<typeof createAccountBodySchema>,
+): Promise<AdminUserDto> {
+  if (!auth) throw badRequest("Creating accounts needs AUTH_MODE=better-auth");
+  if (await adminRepo.emailTaken(db, body.email)) {
+    throw conflict("An account with that email already exists");
+  }
+  const ctx = await auth.$context;
+  // The same two steps as Better Auth's own email sign-up.
+  const identity = await ctx.internalAdapter.createUser(
+    { email: body.email, name: body.name, emailVerified: body.verified },
+    { method: "email-password" },
+  );
+  await ctx.internalAdapter.linkAccount({
+    userId: identity.id,
+    providerId: "credential",
+    accountId: identity.id,
+    password: await ctx.password.hash(body.password),
+  });
+  // The app user would also be created on first sign-in; doing it now lets the type be set.
+  const user = await userRepo.createForAuth(db, identity);
+  if (body.role !== "user") await adminRepo.setRole(db, user.id, body.role);
+  if (!body.verified) {
+    await auth.api.sendVerificationEmail({
+      body: { email: body.email, callbackURL: `${links.origin}/signin?next=/onboarding` },
+    });
+  }
+  const [created] = await listUsers(db, { id: user.id });
+  return created!;
+}
+
+/** Deletes an account and everything in it. The username must be typed back to confirm. */
+export async function deleteAccount(
+  db: Database,
+  actorId: string,
+  userId: string,
+  confirm: string,
+) {
+  if (actorId === userId) throw badRequest("You can't delete your own account from here");
+  const account = await adminRepo.findAccount(db, userId);
+  if (!account) throw notFound("User not found");
+  if (confirm !== account.username) throw badRequest(`Type ${account.username} to confirm`);
+  await adminRepo.deleteAccount(db, account.id, account.authSubject);
+}
+
+/** One-off fixes to an account's sign-in (DESIGN.md §8.7). */
+export async function accountAction(
+  db: Database,
+  auth: Auth | null,
+  links: AuthLinks,
+  userId: string,
+  action: AccountAction,
+) {
+  const account = await adminRepo.findAccount(db, userId);
+  if (!account) throw notFound("User not found");
+  if (!auth || !account.authSubject || !account.authEmail) {
+    throw badRequest("This account has no sign-in to manage");
+  }
+  const email = account.authEmail;
+  switch (action) {
+    case "verify-email":
+      await adminRepo.markEmailVerified(db, account.authSubject);
+      return;
+    case "resend-verification":
+      if (account.emailVerified) throw badRequest("That email is already confirmed");
+      await auth.api.sendVerificationEmail({
+        body: { email, callbackURL: `${links.origin}/signin?next=/onboarding` },
+      });
+      return;
+    case "send-password-reset":
+      await auth.api.requestPasswordReset({
+        body: { email, redirectTo: `${links.origin}/reset-password` },
+      });
+      return;
+    case "sign-out-everywhere":
+      await adminRepo.deleteSessions(db, account.authSubject);
+      return;
+  }
 }
 
 /** A recap's stored output, its re-runs, and the LLM calls that most likely produced it. */

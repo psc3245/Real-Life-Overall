@@ -17,6 +17,7 @@ import {
   type SeasonSetupDto,
   type TreeDraft,
   isPremiumRole,
+  isTesterRole,
   combineDecay,
 } from "@rlo/shared";
 import type { Database } from "../db/client";
@@ -97,8 +98,16 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
     ),
   ]);
 
-  // Free accounts play Growth seasons (DESIGN.md §8.9); a lapsed Rating season turns Growth.
-  const mode = isPremiumRole(user.role) ? active.mode : "growth";
+  // Free accounts play Growth seasons (DESIGN.md §8.9); a lapsed Rating season turns Growth,
+  // and a Souls season (still in testing) turns Rating for anyone who's lost tester access.
+  const mode =
+    active.mode === "souls" && !isTesterRole(user.role)
+      ? isPremiumRole(user.role)
+        ? "rating"
+        : "growth"
+      : isPremiumRole(user.role)
+        ? active.mode
+        : "growth";
   await db.transaction(async (tx) => {
     if (!(await seasonRepo.archiveIfActive(tx, active.id, snapshot))) return; // already rolled
     const next = await seasonRepo.findOrCreate(tx, userId, period);
