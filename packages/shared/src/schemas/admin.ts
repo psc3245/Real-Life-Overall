@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SEASON_MODES, type SeasonMode } from "../rating/growth";
 import { USER_ROLES, type UserRole } from "./account";
 
 export interface LlmCallDto {
@@ -47,6 +48,8 @@ export interface AdminUserDto {
   displayName: string;
   email: string;
   role: UserRole;
+  /** The running season's mode; null before the first season starts. */
+  seasonMode: SeasonMode | null;
   /** Null for accounts with no sign-in (dev-mode users). */
   emailVerified: boolean | null;
   /** How the account signs in: "credential" (email + password), "google". Empty for dev-mode users. */
@@ -98,6 +101,9 @@ export const createAccountBodySchema = z.object({
   verified: z.boolean().default(true),
 });
 export type CreateAccountBody = z.input<typeof createAccountBodySchema>;
+
+/** Changes the running season's mode, past the setup window (DESIGN.md §4.6). */
+export const setAccountSeasonModeBodySchema = z.object({ mode: z.enum(SEASON_MODES) });
 
 /** One-off actions on an account's sign-in. */
 export const ACCOUNT_ACTIONS = [

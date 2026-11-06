@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SeasonMode } from "../rating/growth";
 import type { Feature } from "./preferences";
 
 /**
@@ -54,6 +55,9 @@ export const setRoleBodySchema = z.object({ role: z.enum(USER_ROLES) });
 export const isPremiumRole = (role: UserRole) => role !== "user";
 /** Dev and admin accounts: features in testing and bug reports. */
 export const isTesterRole = (role: UserRole) => role === "dev" || role === "admin";
+/** Rating seasons are premium and Souls seasons are still in testing (DESIGN.md §4.6, §4.7). */
+export const seasonModeAllowed = (role: UserRole, mode: SeasonMode) =>
+  mode === "souls" ? isTesterRole(role) : mode === "rating" ? isPremiumRole(role) : true;
 
 /** Features only premium accounts get. Free accounts see them locked rather than switched off. */
 export const PREMIUM_FEATURES: readonly Feature[] = ["coach"];
