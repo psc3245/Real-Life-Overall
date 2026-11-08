@@ -57,6 +57,11 @@ describe("validateHabitEntry", () => {
     expect(validateHabitEntry("checkbox", cfg("checkbox"), { num: 1, text: null })).toBeNull();
     expect(validateHabitEntry("checkbox", cfg("checkbox"), { num: 2, text: null })).not.toBeNull();
     expect(validateHabitEntry("counter", cfg("counter"), { num: 2.5, text: null })).not.toBeNull();
+    // Step counts run well past 10k.
+    expect(validateHabitEntry("counter", cfg("counter"), { num: 12_500, text: null })).toBeNull();
+    expect(validateHabitEntry("counter", cfg("counter"), { num: 2_000_000, text: null })).toBe(
+      "Enter a whole number from 0 to 1,000,000",
+    );
     expect(validateHabitEntry("slider", cfg("slider"), { num: 11, text: null })).not.toBeNull();
     expect(validateHabitEntry("rating", cfg("rating"), { num: 5, text: null })).toBeNull();
     expect(validateHabitEntry("rating", cfg("rating"), { num: 0, text: null })).not.toBeNull();
