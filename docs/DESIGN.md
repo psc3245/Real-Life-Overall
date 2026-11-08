@@ -360,6 +360,7 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 - **Status** is computed, never stored: upcoming, active, completed (the day the running total reached the target is kept) or missed. **Pace** compares the total with an even pace through the days already behind (today is still in play), shown as a tick on the progress bar.
 - Goals link to attributes like habits (by lineage). Daily recaps see every goal running that day, its total, what the day added, and whether the target was reached that day; a manual goal entry alone counts as logging the day.
 - **Progress sources:** also `workouts` (each finished workout inside the window counts as one).
+- **Reach goals** (added 2026-11-08; `kind` `reach`, the original kind is `total`): get a number from a starting value to a target by the deadline, up or down: "200 lb to 185 lb by June", "pay the card from 5,000 down to 0" (a reach target may be 0; a total's must be positive). Progress (`reachProgress`) is where the latest reading in the window (or the start, with none) sits between start and target, (start − now) / (start − target) for a decrease; reaching the target once completes it, even if a later reading bounces back; pace is an even line from start to target. Sources: `manual` (each day's field takes a reading, and 0 is a reading, not a clear) or `weight` (follows logged body weight, in the player's weight unit fixed when the goal is made; the start defaults to the latest weight on or before the start date). Charts carry the latest reading forward; the coach and recaps describe it as "at X, going from start to target".
 - Screens: `/goals` (short term, long term, finished), a Goals section in the day log, and a Goals card on Today.
 
 ### 7.5 Workouts and body tracking (added 2026-10-25)
@@ -583,7 +584,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `weight_changes` | `season_id`, `node_id`, `recap_id`, `from_weight`, `to_weight`, `from_share`, `to_share`, `reason`, `reverted_at` | Weekly weight shifts (§4.5) |
 | `coach_messages` | `user_id`, `role` (`user`/`assistant`), `content`, `suggestions` jsonb | Coach chat (§5.9) |
 | `tree_proposals` | `season_id`, `recap_id`, `reason`, `changes` jsonb, `status` (`pending`/`accepted`/`dismissed`/`expired`), `resolved_at` | Proposed tree changes (§4.5) |
-| `objectives` | `user_id`, `name`, `unit`, `target`, `starts_on`, `ends_on`, `source` (`manual`/`habit`/`workouts`), `habit_id`, `archived_at` | Goals with a deadline (§7.4) |
+| `objectives` | `user_id`, `name`, `kind` (`total`/`reach`), `unit`, `target`, `start_value` (reach only), `starts_on`, `ends_on`, `source` (`manual`/`habit`/`workouts`/`weight`), `habit_id`, `archived_at` | Goals with a deadline (§7.4) |
 | `workouts` | `user_id`, `name`, `notes`, `local_date`, `started_at`, `ended_at` (null while in progress), `template_id`, `exercises` jsonb | §7.5; one in progress per user |
 | `workout_templates` | `user_id`, `name`, `notes`, `exercises` jsonb, `last_used_at` | No cap |
 | `exercises` | `user_id`, `name`, `category`, `tracking`, `archived_at` | Custom exercises; the library is in `packages/shared` |

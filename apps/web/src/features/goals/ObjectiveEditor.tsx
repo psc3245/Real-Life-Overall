@@ -1,18 +1,24 @@
 import {
   addDays,
   habitObjectiveUnit,
+  KIND_SOURCES,
   MAX_HABIT_LINKS,
+  OBJECTIVE_KIND_HINTS,
+  OBJECTIVE_KIND_LABELS,
+  OBJECTIVE_KINDS,
   OBJECTIVE_SOURCE_LABELS,
-  OBJECTIVE_SOURCES,
   OBJECTIVE_TERM_LABELS,
   objectiveTerm,
   statPeriod,
+  weightUnit,
   type HabitDto,
   type ObjectiveDto,
+  type ObjectiveKind,
   type ObjectiveSource,
   type RatedNodeDto,
 } from "@rlo/shared";
 import { useState, type FormEvent } from "react";
+import { useMe } from "../../api/hooks";
 import { useCreateObjective, useUpdateObjective } from "../../api/objectives";
 import { AttributePicker } from "../../components/AttributePicker";
 import { Button } from "../../components/Button";
@@ -26,7 +32,9 @@ const SOURCE_DETAIL: Record<ObjectiveSource, string> = {
   habit:
     "Every entry of the habit inside the goal's dates counts: amounts for counts and time, otherwise days done.",
   workouts: "Every workout you finish inside the goal's dates counts as one.",
+  weight: "The weight you log each day is the reading; the latest one counts.",
 };
+const REACH_MANUAL_DETAIL = "Log where you are on any day; the latest reading counts.";
 
 /** Quick deadlines; a date input covers everything else. */
 function deadlinePresets(today: string, weekStart: number) {
@@ -55,8 +63,11 @@ export function ObjectiveEditor({
   weekStart: number;
   onDone: () => void;
 }) {
+  const me = useMe();
   const [name, setName] = useState(objective?.name ?? "");
+  const [kind, setKind] = useState<ObjectiveKind>(objective?.kind ?? "total");
   const [source, setSource] = useState<ObjectiveSource>(objective?.source ?? "manual");
+  const [startValue, setStartValue] = useState<number | null>(objective?.startValue ?? null);
   const [habitId, setHabitId] = useState(objective?.habitId ?? "");
   const [target, setTarget] = useState<number | null>(objective?.target ?? null);
   const [unit, setUnit] = useState(objective?.unit ?? "");
@@ -72,6 +83,7 @@ export function ObjectiveEditor({
   // Habits that can be counted: anything but groups (their sub-habits count instead).
   const countable = habits.filter((h) => h.type !== "group");
   const habit = countable.find((h) => h.id === habitId);
+  const tracksWeight = me.data?.trackWeight ?? false;
   const shownUnit =
     source === "habit"
       ? habit
@@ -79,8 +91,19 @@ export function ObjectiveEditor({
         : ""
       : source === "workouts"
         ? "workouts"
-        : unit;
+        : source === "weight"
+          ? weightUnit(me.data?.unitSystem ?? "imperial")
+          : unit;
   const validWindow = Boolean(startsOn && endsOn && endsOn >= startsOn);
+  const reach = kind === "reach";
+  // Weight goals may leave the start blank to begin from the latest logged weight.
+  const validNumbers = reach
+    ? target !== null && (startValue !== null ? startValue !== target : source === "weight")
+    : Boolean(target);
+  const pickKind = (k: ObjectiveKind) => {
+    setKind(k);
+    if (!KIND_SOURCES[k].includes(source)) setSource(KIND_SOURCES[k][0]!);
+  };
 
   const toggleLink = (id: string) =>
     setLinks((prev) =>
@@ -93,12 +116,20 @@ export function ObjectiveEditor({
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!target) return;
-    const body = { name: name.trim(), target, unit: unit.trim(), startsOn, endsOn, links };
+    if (target === null || !validNumbers) return;
+    const body = {
+      name: name.trim(),
+      target,
+      unit: unit.trim(),
+      startsOn,
+      endsOn,
+      links,
+      ...(reach && startValue !== null && { startValue }),
+    };
     if (objective) update.mutate({ id: objective.id, ...body }, { onSuccess: onDone });
     else
       create.mutate(
-        { ...body, source, ...(source === "habit" && { habitId }) },
+        { ...body, kind, source, ...(source === "habit" && { habitId }) },
         { onSuccess: onDone },
       );
   };
@@ -123,14 +154,37 @@ export function ObjectiveEditor({
       </label>
 
       <fieldset className="space-y-2">
+        <legend className={label}>Kind of goal</legend>
+        <div className="flex flex-wrap gap-2">
+          {OBJECTIVE_KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={kind === k}
+              disabled={Boolean(objective)}
+              onClick={() => pickKind(k)}
+              className={`rounded-lg border px-3 py-2 text-sm disabled:opacity-40 ${kind === k ? "border-neon bg-neon/10 text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`}
+            >
+              {OBJECTIVE_KIND_LABELS[k]}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-court-500">{OBJECTIVE_KIND_HINTS[kind]}</p>
+      </fieldset>
+
+      <fieldset className="space-y-2">
         <legend className={label}>How progress is counted</legend>
         <div className="flex flex-wrap gap-2">
-          {OBJECTIVE_SOURCES.map((s) => (
+          {KIND_SOURCES[kind].map((s) => (
             <button
               key={s}
               type="button"
               aria-pressed={source === s}
-              disabled={Boolean(objective) || (s === "habit" && countable.length === 0)}
+              disabled={
+                Boolean(objective) ||
+                (s === "habit" && countable.length === 0) ||
+                (s === "weight" && !tracksWeight)
+              }
               onClick={() => setSource(s)}
               className={`rounded-lg border px-3 py-2 text-sm disabled:opacity-40 ${source === s ? "border-neon bg-neon/10 text-neon" : "border-court-700 text-court-300 hover:border-court-500"}`}
             >
@@ -138,7 +192,12 @@ export function ObjectiveEditor({
             </button>
           ))}
         </div>
-        <p className="text-sm text-court-500">{SOURCE_DETAIL[source]}</p>
+        <p className="text-sm text-court-500">
+          {reach && source === "manual" ? REACH_MANUAL_DETAIL : SOURCE_DETAIL[source]}
+          {kind === "reach" &&
+            !tracksWeight &&
+            " Turn on weight tracking in settings to follow your weight."}
+        </p>
         {source === "habit" && (
           <select
             aria-label="Habit to count"
@@ -159,6 +218,26 @@ export function ObjectiveEditor({
       </fieldset>
 
       <div className="flex flex-wrap items-end gap-4">
+        {reach && (
+          <label className="space-y-1">
+            <span className={label}>Starting at</span>
+            <input
+              type="number"
+              aria-label="Starting at"
+              min={0}
+              step="any"
+              required={source !== "weight"}
+              placeholder={source === "weight" ? "Latest" : undefined}
+              value={startValue ?? ""}
+              onChange={(e) =>
+                setStartValue(
+                  Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : null,
+                )
+              }
+              className={`${compactFieldClass} w-28`}
+            />
+          </label>
+        )}
         <label className="space-y-1">
           <span className={label}>Target</span>
           <input
@@ -251,7 +330,11 @@ export function ObjectiveEditor({
           type="submit"
           variant="primary"
           disabled={
-            !name.trim() || !target || !validWindow || (source === "habit" && !habitId) || saving
+            !name.trim() ||
+            !validNumbers ||
+            !validWindow ||
+            (source === "habit" && !habitId) ||
+            saving
           }
         >
           {saving ? "Saving…" : objective ? "Save goal" : "Add goal"}

@@ -57,6 +57,70 @@ describe("goals (objectives)", () => {
     expect(listed!.progress.current).toBe(6.5);
   });
 
+  it("tracks a reach goal from readings logged on it, down to 0", async () => {
+    const { request, today, create } = await setup();
+    const res = await create({
+      name: "Pay off the card",
+      kind: "reach",
+      startValue: 5000,
+      target: 0,
+      unit: "dollars",
+      startsOn: addDays(today, -1),
+      endsOn: addDays(today, 30),
+    });
+    expect(res.status).toBe(201);
+    const goal = await body<ObjectiveDto>(res);
+    expect(goal).toMatchObject({ kind: "reach", startValue: 5000, progress: { current: 5000 } });
+
+    await request(`/days/${addDays(today, -1)}/objectives/${goal.id}`, {
+      method: "PUT",
+      ...json({ value: 3500 }),
+    });
+    let [listed] = await body<ObjectiveDto[]>(await request("/objectives"));
+    expect(listed!.progress).toMatchObject({ current: 3500, pct: 30, status: "active" });
+
+    // 0 is a reading here, not a clear.
+    await request(`/days/${today}/objectives/${goal.id}`, { method: "PUT", ...json({ value: 0 }) });
+    [listed] = await body<ObjectiveDto[]>(await request("/objectives"));
+    expect(listed!.progress).toMatchObject({ current: 0, pct: 100, completedOn: today });
+
+    // The start can move, but not onto the target.
+    const moved = await request(`/objectives/${goal.id}`, {
+      method: "PATCH",
+      ...json({ startValue: 0 }),
+    });
+    expect(moved.status).toBe(400);
+  });
+
+  it("follows logged weight in the player's units, starting from the latest", async () => {
+    const { request, today, create } = await setup();
+    // No weight logged yet and no start given.
+    const base = {
+      name: "Cut",
+      kind: "reach",
+      source: "weight",
+      target: 185,
+      endsOn: addDays(today, 60),
+    };
+    expect((await create(base)).status).toBe(400);
+    await request("/me", { method: "PATCH", ...json({ trackWeight: true }) });
+
+    await request(`/body/${addDays(today, -3)}`, { method: "PUT", ...json({ weightKg: 90.7185 }) });
+    const goal = await body<ObjectiveDto>(await create(base));
+    expect(goal).toMatchObject({ unit: "lb", startValue: 200, progress: { current: 200 } });
+    // Readings from before it started don't count; today's does.
+    await request(`/body/${today}`, { method: "PUT", ...json({ weightKg: 88.4505 }) });
+    const [listed] = await body<ObjectiveDto[]>(await request("/objectives"));
+    expect(listed!.progress.current).toBe(195);
+    expect(listed!.progress.pct).toBeCloseTo(33.33, 1);
+    // It can't be logged on directly.
+    const logged = await request(`/days/${today}/objectives/${goal.id}`, {
+      method: "PUT",
+      ...json({ value: 190 }),
+    });
+    expect(logged.status).toBe(400);
+  });
+
   it("counts a habit's entries inside the window", async () => {
     const { request, today, create } = await setup();
     const gym = await body<HabitDto>(

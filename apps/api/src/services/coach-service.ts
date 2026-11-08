@@ -130,7 +130,9 @@ const renderGoals = (goals: ObjectiveDto[]) =>
     .filter((g) => g.progress.status === "active" || g.progress.status === "upcoming")
     .map(
       (g) =>
-        `- ${g.name}: ${g.progress.current} of ${g.target} ${g.unit}, due ${g.endsOn} ` +
+        (g.kind === "reach"
+          ? `- ${g.name}: at ${g.progress.current} ${g.unit}, from ${g.startValue} to ${g.target}, due ${g.endsOn} `
+          : `- ${g.name}: ${g.progress.current} of ${g.target} ${g.unit}, due ${g.endsOn} `) +
         `(${g.progress.daysLeft} days left, ${g.progress.onPace ? "on pace" : "behind pace"})`,
     )
     .join("\n");
@@ -375,6 +377,7 @@ export async function resolveSuggestion(
       const today = localDateIn(user?.timezone ?? "UTC");
       goal = await createObjective(db, userId, {
         name: s.name,
+        kind: "total",
         target: s.target,
         unit: s.unit,
         startsOn: today,

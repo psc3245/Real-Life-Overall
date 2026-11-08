@@ -1,4 +1,4 @@
-import type { ObjectiveDto } from "@rlo/shared";
+import { objectivePacePct, type ObjectiveDto } from "@rlo/shared";
 import { StyleSheet, Text, View } from "react-native";
 import { formatNumber, shortDate } from "@/lib/format";
 import { colors, tierColor } from "@/lib/theme";
@@ -18,10 +18,12 @@ export function objectiveStatusText(o: ObjectiveDto): string {
     default: {
       const left = p.daysLeft === 0 ? "Due today" : `${plural(p.daysLeft, "day")} left`;
       if (p.onPace) return `${left} · On pace`;
-      const remaining = formatNumber(Math.ceil((o.target - p.current) * 10) / 10);
+      // Reach goals can be heading down; what's left is the distance either way.
+      const gap = o.kind === "reach" ? Math.abs(o.target - p.current) : o.target - p.current;
+      const remaining = formatNumber(Math.ceil(gap * 10) / 10);
       if (p.daysLeft === 0) return `${left} · ${remaining} ${o.unit} to go`;
       // Today counts, so the remainder spreads over daysLeft + 1 days.
-      const perDay = Math.ceil(((o.target - p.current) / (p.daysLeft + 1)) * 10) / 10;
+      const perDay = Math.ceil((gap / (p.daysLeft + 1)) * 10) / 10;
       return `${left} · ${remaining} ${o.unit} to go (${formatNumber(perDay)}/day)`;
     }
   }
@@ -44,7 +46,8 @@ export function ObjectiveBar({
   thin?: boolean;
 }) {
   const p = o.progress;
-  const pacePct = Math.min(100, (100 * p.expected) / o.target);
+  const pacePct = objectivePacePct(o);
+  const reach = o.kind === "reach";
   const fill =
     p.status === "completed"
       ? colors.neon
@@ -59,7 +62,17 @@ export function ObjectiveBar({
       accessible
       accessibilityRole="progressbar"
       accessibilityLabel={`${o.name} progress`}
-      accessibilityValue={{ min: 0, max: o.target, now: p.current }}
+      // A reach goal can head down, so its value is the share of the way there.
+      accessibilityValue={
+        reach
+          ? {
+              min: 0,
+              max: 100,
+              now: Math.round(p.pct),
+              text: `${formatNumber(p.current)} ${o.unit}`,
+            }
+          : { min: 0, max: o.target, now: p.current }
+      }
     >
       <View
         style={[
@@ -74,7 +87,7 @@ export function ObjectiveBar({
   );
 }
 
-/** "37.5 / 100 miles" */
+/** "37.5 / 100 miles", or for reach goals "196 → 185 lb · from 200" */
 export function ObjectiveAmount({
   objective: o,
   size = 15,
@@ -87,7 +100,9 @@ export function ObjectiveAmount({
       {formatNumber(o.progress.current)}
       <Text style={{ color: colors.court500 }}>
         {" "}
-        / {formatNumber(o.target)} {o.unit}
+        {o.kind === "reach"
+          ? `→ ${formatNumber(o.target)} ${o.unit} · from ${formatNumber(o.startValue ?? 0)}`
+          : `/ ${formatNumber(o.target)} ${o.unit}`}
       </Text>
     </Text>
   );

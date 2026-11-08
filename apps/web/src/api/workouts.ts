@@ -222,7 +222,11 @@ export function useSaveBody() {
     }) => api<BodyDto>(`/body/${date}`, { method: "PUT", body: JSON.stringify(values) }),
     onSuccess: async (body) => {
       queryClient.setQueryData(bodyKey, body);
-      await queryClient.invalidateQueries({ queryKey: ["day"] });
+      // Weight goals follow these readings.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["day"] }),
+        queryClient.invalidateQueries({ queryKey: ["objectives"] }),
+      ]);
     },
   });
 }

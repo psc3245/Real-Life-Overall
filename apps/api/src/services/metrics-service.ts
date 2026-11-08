@@ -140,7 +140,7 @@ export async function catalog(db: Database, userId: string): Promise<MetricDto[]
       unit: g.unit,
       kind: "level",
       target: g.target,
-      detail: `Running total · ${g.startsOn} to ${g.endsOn}`,
+      detail: `${g.kind === "reach" ? "Latest reading" : "Running total"} · ${g.startsOn} to ${g.endsOn}`,
     });
   }
   for (const [id, m] of Object.entries(WORKOUT_METRICS)) {
@@ -328,11 +328,14 @@ export async function series(
       const goal = goals.dtos.find((g) => g.id === key);
       const daily = goals.daily.get(key);
       if (goal && daily) {
+        // Totals run up; reach goals carry the latest reading forward from the start.
         const running = new Map<string, number>();
-        let total = 0;
+        let total = goal.startValue ?? 0;
         const end = goal.endsOn < to ? goal.endsOn : to;
         for (let d = goal.startsOn; d <= end; d = addDays(d, 1)) {
-          total += daily.get(d) ?? 0;
+          const v = daily.get(d);
+          if (goal.kind === "reach") total = v ?? total;
+          else total += v ?? 0;
           running.set(d, total);
         }
         points = sparse(running, from, to);

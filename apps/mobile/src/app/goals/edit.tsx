@@ -1,13 +1,19 @@
 import {
   addDays,
   habitObjectiveUnit,
+  KIND_SOURCES,
   MAX_HABIT_LINKS,
+  OBJECTIVE_KIND_HINTS,
+  OBJECTIVE_KIND_LABELS,
+  OBJECTIVE_KINDS,
   OBJECTIVE_SOURCE_LABELS,
-  OBJECTIVE_SOURCES,
   OBJECTIVE_TERM_LABELS,
   objectiveTerm,
   statPeriod,
+  weightUnit,
+  type MeDto,
   type ObjectiveDto,
+  type ObjectiveKind,
   type ObjectiveSource,
 } from "@rlo/shared";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -28,7 +34,9 @@ const SOURCE_DETAIL: Record<ObjectiveSource, string> = {
   habit:
     "Every entry of the habit inside the goal's dates counts: amounts for counts and time, otherwise days done.",
   workouts: "Every workout you finish inside the goal's dates counts as one.",
+  weight: "The weight you log each day is the reading; the latest one counts.",
 };
+const REACH_MANUAL_DETAIL = "Log where you are on any day; the latest reading counts.";
 
 /** Quick deadlines; the steppers cover everything else. */
 function deadlinePresets(today: string, weekStart: number) {
@@ -57,30 +65,26 @@ function GoalEditScreen() {
       </Screen>
     );
   }
-  return (
-    <Editor
-      objective={objective}
-      habits={habits.data ?? []}
-      today={today}
-      weekStart={me.data.weekStart}
-    />
-  );
+  return <Editor objective={objective} habits={habits.data ?? []} today={today} me={me.data} />;
 }
 
 function Editor({
   objective,
   habits,
   today,
-  weekStart,
+  me,
 }: {
   objective?: ObjectiveDto;
   habits: NonNullable<ReturnType<typeof useHabits>["data"]>;
   today: string;
-  weekStart: number;
+  me: MeDto;
 }) {
+  const { weekStart, trackWeight } = me;
   const nodes = useRatings().data?.nodes ?? [];
   const [name, setName] = useState(objective?.name ?? "");
+  const [kind, setKind] = useState<ObjectiveKind>(objective?.kind ?? "total");
   const [source, setSource] = useState<ObjectiveSource>(objective?.source ?? "manual");
+  const [startValue, setStartValue] = useState<number | null>(objective?.startValue ?? null);
   const [habitId, setHabitId] = useState(objective?.habitId ?? "");
   const [target, setTarget] = useState<number | null>(objective?.target ?? null);
   const [unit, setUnit] = useState(objective?.unit ?? "");
@@ -103,8 +107,19 @@ function Editor({
         : ""
       : source === "workouts"
         ? "workouts"
-        : unit;
+        : source === "weight"
+          ? weightUnit(me.unitSystem)
+          : unit;
   const validWindow = Boolean(startsOn && endsOn && endsOn >= startsOn);
+  const reach = kind === "reach";
+  // Weight goals may leave the start blank to begin from the latest logged weight.
+  const validNumbers = reach
+    ? target !== null && (startValue !== null ? startValue !== target : source === "weight")
+    : Boolean(target);
+  const pickKind = (k: ObjectiveKind) => {
+    setKind(k);
+    if (!KIND_SOURCES[k].includes(source)) setSource(KIND_SOURCES[k][0]!);
+  };
 
   const toggleLink = (nodeId: string) =>
     setLinks((prev) =>
@@ -116,11 +131,19 @@ function Editor({
     );
 
   const submit = () => {
-    if (!target) return;
-    const body = { name: name.trim(), target, unit: unit.trim(), startsOn, endsOn, links };
+    if (target === null || !validNumbers) return;
+    const body = {
+      name: name.trim(),
+      target,
+      unit: unit.trim(),
+      startsOn,
+      endsOn,
+      links,
+      ...(reach && startValue !== null && { startValue }),
+    };
     const done = { onSuccess: () => router.back() };
     if (objective) update.mutate({ id: objective.id, ...body }, done);
-    else create.mutate({ ...body, source, ...(source === "habit" && { habitId }) }, done);
+    else create.mutate({ ...body, kind, source, ...(source === "habit" && { habitId }) }, done);
   };
 
   return (
@@ -136,19 +159,41 @@ function Editor({
         />
       </FormRow>
 
+      <FormRow label="Kind of goal">
+        <View style={styles.wrap}>
+          {OBJECTIVE_KINDS.map((k) => (
+            <Chip
+              key={k}
+              label={OBJECTIVE_KIND_LABELS[k]}
+              selected={kind === k}
+              disabled={Boolean(objective)}
+              onPress={() => pickKind(k)}
+            />
+          ))}
+        </View>
+        <Muted style={{ fontSize: 13 }}>{OBJECTIVE_KIND_HINTS[kind]}</Muted>
+      </FormRow>
+
       <FormRow label="How progress is counted">
         <View style={styles.wrap}>
-          {OBJECTIVE_SOURCES.map((s) => (
+          {KIND_SOURCES[kind].map((s) => (
             <Chip
               key={s}
               label={OBJECTIVE_SOURCE_LABELS[s]}
               selected={source === s}
-              disabled={Boolean(objective) || (s === "habit" && countable.length === 0)}
+              disabled={
+                Boolean(objective) ||
+                (s === "habit" && countable.length === 0) ||
+                (s === "weight" && !trackWeight)
+              }
               onPress={() => setSource(s)}
             />
           ))}
         </View>
-        <Muted style={{ fontSize: 13 }}>{SOURCE_DETAIL[source]}</Muted>
+        <Muted style={{ fontSize: 13 }}>
+          {reach && source === "manual" ? REACH_MANUAL_DETAIL : SOURCE_DETAIL[source]}
+          {reach && !trackWeight && " Turn on weight tracking in settings to follow your weight."}
+        </Muted>
       </FormRow>
       {source === "habit" && (
         <FormRow label="Habit to count">
@@ -167,6 +212,16 @@ function Editor({
       )}
 
       <View style={{ flexDirection: "row", gap: space.lg }}>
+        {reach && (
+          <FormRow label={source === "weight" ? "Start (blank: latest)" : "Starting at"}>
+            <NumberField
+              label="Starting at"
+              value={startValue}
+              onChange={setStartValue}
+              width={110}
+            />
+          </FormRow>
+        )}
         <FormRow label="Target">
           <NumberField label="Target" value={target} onChange={setTarget} width={110} />
         </FormRow>
@@ -220,7 +275,11 @@ function Editor({
       <Button
         title={saving ? "Saving…" : objective ? "Save goal" : "Add goal"}
         disabled={
-          !name.trim() || !target || !validWindow || (source === "habit" && !habitId) || saving
+          !name.trim() ||
+          !validNumbers ||
+          !validWindow ||
+          (source === "habit" && !habitId) ||
+          saving
         }
         onPress={submit}
       />

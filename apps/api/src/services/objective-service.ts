@@ -7,6 +7,9 @@ import {
   localDateIn,
   objectiveProgress,
   objectiveTerm,
+  reachProgress,
+  toDisplayWeight,
+  weightUnit,
   type DayObjectiveDto,
   type HabitConfig,
   type ObjectiveDto,
@@ -16,6 +19,7 @@ import {
 import type { z } from "zod";
 import type { Database } from "../db/client";
 import { badRequest, conflict, notFound } from "../errors";
+import * as bodyRepo from "../repos/body-repo";
 import * as habitRepo from "../repos/habit-repo";
 import type { HabitRow } from "../repos/habit-repo";
 import * as objectiveRepo from "../repos/objective-repo";
@@ -30,7 +34,10 @@ async function todayFor(db: Database, userId: string) {
   return localDateIn(user.timezone);
 }
 
-/** Per-goal amounts by local date, from the goal's own entries or its habit's. */
+/**
+ * Per-goal amounts by local date, from the goal's own entries, its habit's, workouts, or (weight
+ * goals) body weight readings in the goal's unit.
+ */
 async function dailyAmounts(
   db: Database,
   rows: ObjectiveRow[],
@@ -88,6 +95,16 @@ async function dailyAmounts(
     const counts = await workoutCountsByDate(db, rows[0]!.userId);
     for (const r of rows.filter((r) => r.source === "workouts")) out.set(r.id, new Map(counts));
   }
+  const fromWeight = rows.filter((r) => r.source === "weight");
+  if (fromWeight.length) {
+    const weights = (await bodyRepo.findAll(db, rows[0]!.userId)).filter(
+      (b) => b.kind === "weight",
+    );
+    for (const r of fromWeight) {
+      const system = r.unit === "kg" ? "metric" : "imperial";
+      out.set(r.id, new Map(weights.map((b) => [b.localDate, toDisplayWeight(b.value, system)])));
+    }
+  }
   return out;
 }
 
@@ -109,6 +126,8 @@ async function toDtos(
   const dtos = rows.map((r): ObjectiveDto => ({
     id: r.id,
     name: r.name,
+    kind: r.kind,
+    startValue: r.startValue,
     unit: r.unit,
     target: r.target,
     startsOn: r.startsOn,
@@ -121,7 +140,10 @@ async function toDtos(
       .filter((l) => l.objectiveId === r.id)
       .map((l) => ctx?.nodeByLineage.get(l.nodeLineageId))
       .filter((id): id is string => !!id),
-    progress: objectiveProgress(r, daily.get(r.id)!, today),
+    progress:
+      r.kind === "reach"
+        ? reachProgress({ ...r, startValue: r.startValue! }, daily.get(r.id)!, today)
+        : objectiveProgress(r, daily.get(r.id)!, today),
   }));
   return { dtos, daily };
 }
@@ -176,12 +198,26 @@ export async function createObjective(
   userId: string,
   input: z.infer<typeof createObjectiveBodySchema>,
 ): Promise<ObjectiveDto> {
-  const [ctx, today] = await Promise.all([loadLeafContext(db, userId), todayFor(db, userId)]);
+  const [ctx, user] = await Promise.all([
+    loadLeafContext(db, userId),
+    userRepo.findById(db, userId),
+  ]);
+  if (!user) throw notFound("User not found");
   const lineages = linksToLineages(input.links, ctx, "goals");
-  const startsOn = input.startsOn ?? today;
+  const startsOn = input.startsOn ?? localDateIn(user.timezone);
   if (input.endsOn < startsOn) throw badRequest("The deadline must be on or after the start");
 
   let unit = input.source === "workouts" ? "workouts" : input.unit || "times";
+  let startValue = input.kind === "reach" ? (input.startValue ?? null) : null;
+  if (input.source === "weight") {
+    unit = weightUnit(user.unitSystem);
+    if (startValue === null) {
+      const latest = await bodyRepo.findLatestBefore(db, userId, "weight", addDays(startsOn, 1));
+      if (!latest) throw badRequest("Log your weight first, or enter where you're starting");
+      startValue = toDisplayWeight(latest.value, user.unitSystem);
+    }
+    if (startValue === input.target) throw badRequest("The target has to differ from the start");
+  }
   let habitId: string | null = null;
   if (input.source === "habit") {
     const habit = await habitRepo.findById(db, userId, input.habitId!);
@@ -194,8 +230,10 @@ export async function createObjective(
     const created = await objectiveRepo.insert(tx, {
       userId,
       name: input.name,
+      kind: input.kind,
       unit,
       target: input.target,
+      startValue,
       startsOn,
       endsOn: input.endsOn,
       source: input.source,
@@ -218,12 +256,19 @@ export async function updateObjective(
   const startsOn = input.startsOn ?? existing.startsOn;
   const endsOn = input.endsOn ?? existing.endsOn;
   if (endsOn < startsOn) throw badRequest("The deadline must be on or after the start");
+  const target = input.target ?? existing.target;
+  const startValue = existing.kind === "reach" ? (input.startValue ?? existing.startValue) : null;
+  if (existing.kind === "total" && target <= 0) throw badRequest("Aim for more than 0");
+  if (startValue !== null && startValue === target) {
+    throw badRequest("The target has to differ from the start");
+  }
   const ctx = await loadLeafContext(db, userId);
   const lineages = input.links ? linksToLineages(input.links, ctx, "goals") : null;
   const row = await db.transaction(async (tx) => {
     const updated = await objectiveRepo.update(tx, existing.id, {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.target !== undefined && { target: input.target }),
+      ...(input.startValue !== undefined && startValue !== null && { startValue }),
       // Habit goals count in the habit's unit.
       ...(input.unit !== undefined &&
         existing.source === "manual" && { unit: input.unit || "times" }),
@@ -257,12 +302,16 @@ export async function saveObjectiveEntry(
     throw badRequest(
       objective.source === "habit"
         ? "This goal counts a habit; log the habit instead"
-        : "This goal counts workouts; log a workout instead",
+        : objective.source === "weight"
+          ? "This goal follows your weight; log your weight instead"
+          : "This goal counts workouts; log a workout instead",
     );
   }
   if (day < objective.startsOn || day > objective.endsOn) {
     throw badRequest(`This goal runs ${objective.startsOn} to ${objective.endsOn}`);
   }
-  if (!value) await objectiveRepo.deleteEntry(db, objective.id, day);
-  else await objectiveRepo.upsertEntry(db, objective.id, day, Math.round(value * 100) / 100);
+  // A reach goal's reading can be 0 ("paid off"); only null clears it.
+  if (value === null || (value === 0 && objective.kind === "total")) {
+    await objectiveRepo.deleteEntry(db, objective.id, day);
+  } else await objectiveRepo.upsertEntry(db, objective.id, day, Math.round(value * 100) / 100);
 }

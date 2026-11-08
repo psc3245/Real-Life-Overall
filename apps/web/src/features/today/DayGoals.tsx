@@ -44,17 +44,20 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
   const { objective: o } = item;
   const save = useSaveObjectiveEntry(day.date, o.id);
   const [value, setValue] = useState(item.logged === null ? "" : String(item.logged));
+  // Reach goals take a reading (0 included) rather than an amount to add.
+  const reach = o.kind === "reach";
   const commit = () => {
     const n = value.trim() === "" ? null : Number(value);
     if (n !== null && (!Number.isFinite(n) || n < 0)) return;
-    if (n === item.logged || (n === 0 && item.logged === null)) return;
+    if (n === item.logged || (!reach && n === 0 && item.logged === null)) return;
     save.mutate(n);
   };
+  const active = reach ? item.logged !== null || item.dayAmount > 0 : item.dayAmount > 0;
 
   return (
     <div
       id={`goal-${o.id}`}
-      className={`scroll-mt-16 space-y-3 rounded-xl border bg-court-900/70 p-4 ${item.dayAmount > 0 ? "border-neon/50" : "border-court-700"}`}
+      className={`scroll-mt-16 space-y-3 rounded-xl border bg-court-900/70 p-4 ${active ? "border-neon/50" : "border-court-700"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -67,7 +70,7 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
         {o.source === "manual" ? (
           <label className="flex items-center gap-2 text-sm text-court-300">
             <span className="sr-only">{o.name} on this day</span>
-            <span aria-hidden>+</span>
+            {!reach && <span aria-hidden>+</span>}
             <input
               type="number"
               inputMode="decimal"
@@ -75,14 +78,14 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
               step="any"
               value={value}
               disabled={!day.editable}
-              placeholder="0"
+              placeholder={reach ? formatNumber(o.progress.current) : "0"}
               onChange={(e) => setValue(e.target.value)}
               onBlur={commit}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
               className="w-24 rounded-lg border border-court-700 bg-court-950 px-3 py-1.5 text-right tabular-nums outline-none focus:border-neon"
             />
             {o.unit}
-            {day.editable && (
+            {day.editable && !reach && (
               <button
                 type="button"
                 aria-label={`Add 1 ${o.unit}`}
@@ -99,13 +102,17 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
           </label>
         ) : (
           <p className="text-sm text-court-300">
-            {o.source === "workouts"
+            {o.source === "weight"
               ? item.dayAmount > 0
-                ? `+${formatNumber(item.dayAmount)} from workouts`
-                : "Counts finished workouts"
-              : item.dayAmount > 0
-                ? `+${formatNumber(item.dayAmount)} from ${o.habitName ?? "the habit"}`
-                : `Counts ${o.habitName ?? "a habit"}`}
+                ? `Weighed ${formatNumber(item.dayAmount)} ${o.unit}`
+                : "Follows your logged weight"
+              : o.source === "workouts"
+                ? item.dayAmount > 0
+                  ? `+${formatNumber(item.dayAmount)} from workouts`
+                  : "Counts finished workouts"
+                : item.dayAmount > 0
+                  ? `+${formatNumber(item.dayAmount)} from ${o.habitName ?? "the habit"}`
+                  : `Counts ${o.habitName ?? "a habit"}`}
           </p>
         )}
       </div>

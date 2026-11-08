@@ -3,6 +3,7 @@ import {
   BUG_REPORT_STATUSES,
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
+  OBJECTIVE_KINDS,
   OBJECTIVE_SOURCES,
   ONBOARDING_METHODS,
   RATING_EVENT_SOURCES,
@@ -399,6 +400,7 @@ export const habitEntries = pgTable(
 );
 
 export const objectiveSource = pgEnum("objective_source", OBJECTIVE_SOURCES);
+export const objectiveKind = pgEnum("objective_kind", OBJECTIVE_KINDS);
 
 /** Goals with a deadline (called objectives so they don't clash with `goals`, goal ratings). */
 export const objectives = pgTable(
@@ -409,8 +411,11 @@ export const objectives = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text().notNull(),
+    kind: objectiveKind().notNull().default("total"),
     unit: text().notNull(),
     target: numeric({ precision: 12, scale: 2, mode: "number" }).notNull(),
+    /** kind "reach": where it started. */
+    startValue: numeric({ precision: 12, scale: 2, mode: "number" }),
     startsOn: date().notNull(),
     /** The deadline, inclusive. */
     endsOn: date().notNull(),
@@ -424,7 +429,11 @@ export const objectives = pgTable(
   (t) => [
     index().on(t.userId),
     check("objectives_window", sql`${t.endsOn} >= ${t.startsOn}`),
-    check("objectives_target_positive", sql`${t.target} > 0`),
+    check(
+      "objectives_target_positive",
+      sql`${t.target} > 0 OR (${t.kind} = 'reach' AND ${t.target} >= 0)`,
+    ),
+    check("objectives_reach_start", sql`(${t.kind} = 'reach') = (${t.startValue} IS NOT NULL)`),
   ],
 );
 
@@ -441,7 +450,7 @@ export const objectiveLinks = pgTable(
   (t) => [uniqueIndex().on(t.objectiveId, t.nodeLineageId)],
 );
 
-/** What a manual goal gained on a day. */
+/** What a manual goal gained on a day (a reach goal: that day's reading). */
 export const objectiveEntries = pgTable(
   "objective_entries",
   {

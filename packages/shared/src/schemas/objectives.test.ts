@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   createObjectiveBodySchema,
   habitContribution,
+  objectivePacePct,
   objectiveProgress,
   objectiveTerm,
+  reachProgress,
+  type ObjectiveDto,
 } from "./objectives";
 import { normalizeHabitConfig } from "./habits";
 
@@ -65,5 +68,59 @@ describe("createObjectiveBodySchema", () => {
       false,
     );
     expect(createObjectiveBodySchema.safeParse({ ...base, source: "habit" }).success).toBe(false);
+  });
+});
+
+describe("reach goals", () => {
+  // 10 days to go from 200 down to 190.
+  const cut = { target: 190, startValue: 200, startsOn: "2026-11-01", endsOn: "2026-11-10" };
+
+  it("tracks the latest reading between the start and the target", () => {
+    const p = reachProgress(cut, days({ "2026-11-02": 199, "2026-11-04": 196 }), "2026-11-06");
+    expect(p).toMatchObject({ current: 196, pct: 40, status: "active", completedOn: null });
+    // Five days in, an even pace is at 195: 196 is behind.
+    expect(p.expected).toBe(195);
+    expect(p.onPace).toBe(false);
+  });
+
+  it("starts at the start, ignores readings outside the window, and works upward", () => {
+    const none = reachProgress(cut, days({ "2026-10-31": 150 }), "2026-11-01");
+    expect(none).toMatchObject({ current: 200, pct: 0, onPace: true });
+    const up = { ...cut, startValue: 20, target: 30 };
+    expect(reachProgress(up, days({ "2026-11-03": 25 }), "2026-11-03").pct).toBe(50);
+    // Going the wrong way shows 0, not negative.
+    expect(reachProgress(up, days({ "2026-11-03": 18 }), "2026-11-03").pct).toBe(0);
+  });
+
+  it("completes the first day the target is reached, even after a bounce", () => {
+    const p = reachProgress(cut, days({ "2026-11-05": 189.6, "2026-11-07": 191 }), "2026-11-08");
+    expect(p).toMatchObject({ status: "completed", completedOn: "2026-11-05", current: 191 });
+  });
+
+  it("puts the pace marker on the reach scale", () => {
+    const o = {
+      kind: "reach",
+      startValue: 200,
+      target: 190,
+      unit: "lb",
+      progress: reachProgress(cut, days({ "2026-11-04": 196.4 }), "2026-11-06"),
+    } as ObjectiveDto;
+    expect(objectivePacePct(o)).toBe(50);
+  });
+
+  it("validates a reach goal's start", () => {
+    const base = { name: "Cut", kind: "reach", target: 185, endsOn: "2026-12-31" } as const;
+    expect(createObjectiveBodySchema.safeParse(base).success).toBe(false);
+    expect(createObjectiveBodySchema.safeParse({ ...base, startValue: 185 }).success).toBe(false);
+    expect(createObjectiveBodySchema.safeParse({ ...base, startValue: 200 }).success).toBe(true);
+    // Weight goals can start from the latest logged weight; paying something off aims at 0.
+    expect(createObjectiveBodySchema.safeParse({ ...base, source: "weight" }).success).toBe(true);
+    expect(
+      createObjectiveBodySchema.safeParse({ ...base, startValue: 5000, target: 0 }).success,
+    ).toBe(true);
+    expect(createObjectiveBodySchema.safeParse({ ...base, source: "habit" }).success).toBe(false);
+    expect(
+      createObjectiveBodySchema.safeParse({ name: "Run", target: 0, endsOn: "2026-12-31" }).success,
+    ).toBe(false);
   });
 });
