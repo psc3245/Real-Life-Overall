@@ -163,6 +163,57 @@ describe("workouts", () => {
     expect(fromWorkout.status).toBe(201);
   });
 
+  it("on finish, copies just the numbers into a template or saves a new one", async () => {
+    const { request, start, save, finish } = await setup();
+    const template = await body<WorkoutTemplateDto>(
+      await request("/workout-templates", {
+        method: "POST",
+        ...json({
+          name: "Push",
+          exercises: [
+            {
+              exerciseId: "squat-barbell",
+              sets: [set({ weightKg: 100, reps: 5 }), set({ weightKg: 100, reps: 5 })],
+            },
+          ],
+        }),
+      }),
+    );
+    const w = await start({ templateId: template.id });
+    // A heavier first set, a skipped second, and an extra set the template doesn't have.
+    await save(w.id, {
+      exercises: [
+        {
+          exerciseId: "squat-barbell",
+          sets: [
+            set({ weightKg: 110, reps: 4, done: true }),
+            set({ weightKg: 100, reps: 5 }),
+            set({ weightKg: 60, reps: 10, done: true }),
+          ],
+        },
+      ],
+    });
+    expect((await finish(w.id, { template: "values" })).status).toBe(200);
+    const [updated] = await body<WorkoutTemplateDto[]>(await request("/workout-templates"));
+    expect(updated!.exercises[0]!.sets.map((s) => [s.weightKg, s.reps, s.done])).toEqual([
+      [110, 4, false],
+      [100, 5, false],
+    ]);
+
+    // A workout without a template can become one.
+    const blank = await start();
+    await save(blank.id, {
+      exercises: [
+        { exerciseId: "squat-barbell", sets: [set({ weightKg: 80, reps: 8, done: true })] },
+      ],
+    });
+    await finish(blank.id, { template: "new", templateName: "Squats" });
+    const all = await body<WorkoutTemplateDto[]>(await request("/workout-templates"));
+    expect(all.map((t) => t.name).sort()).toEqual(["Push", "Squats"]);
+    const squats = all.find((t) => t.name === "Squats")!;
+    expect(squats.exercises[0]!.sets[0]).toMatchObject({ weightKg: 80, reps: 8, done: false });
+  });
+
   it("supports custom exercises and per-exercise records", async () => {
     const { request, start, save, finish } = await setup();
     const custom = await body<ExerciseDto>(
