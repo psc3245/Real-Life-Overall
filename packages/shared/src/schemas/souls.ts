@@ -56,6 +56,10 @@ export interface SoulsDto {
   days: SoulDayDto[];
 }
 
+/** Whether the souls held buy at least one stat's next level. */
+export const canLevelUp = (souls: SoulsDto) =>
+  souls.stats.some((s) => s.cost !== null && s.cost <= souls.held);
+
 export const MAX_LEVELS_PER_PURCHASE = 10;
 
 export const levelUpBodySchema = z.object({

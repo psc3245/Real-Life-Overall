@@ -1,7 +1,9 @@
 import {
   addDays,
   BACKFILL_DAYS,
+  canLevelUp,
   formatHabitEntry,
+  formatSouls,
   groupProgress,
   isDayHabitDone,
   MAX_COACH_MESSAGE,
@@ -24,6 +26,7 @@ import { useDay } from "@/api/days";
 import { useMe } from "@/api/hooks";
 import { useChartViews, useMetricSeries } from "@/api/metrics";
 import { usePreferences } from "@/api/preferences";
+import { useSouls } from "@/api/souls";
 import { MetricChart } from "@/components/charts/MetricChart";
 import { Starters } from "@/components/CoachStarters";
 import {
@@ -161,6 +164,7 @@ export default function TodayScreen() {
           <SymbolView name="slider.horizontal.3" tintColor={colors.court300} size={20} />
         </Pressable>
       </View>
+      {ratings.data?.season?.mode === "souls" && <BonfireButton />}
 
       {shown.length === 0 ? (
         <Card>
@@ -174,6 +178,32 @@ export default function TodayScreen() {
         shown.map((w) => <View key={w.id}>{widgets[w.id]}</View>)
       )}
     </Screen>
+  );
+}
+
+/** Souls seasons: the way to the level-up screen, with the souls held and whether a level is affordable. */
+function BonfireButton() {
+  const talk = useTalk();
+  const souls = useSouls();
+  const ready = souls.data ? canLevelUp(souls.data) : false;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push("/bonfire")}
+      style={[styles.bonfire, ready && styles.bonfireReady]}
+    >
+      <SymbolView name="flame.fill" tintColor={colors.neon} size={22} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.bonfireTitle}>{talk.souls.bonfire}</Text>
+        {souls.data && (
+          <Muted style={{ fontSize: 13 }}>
+            {formatSouls(souls.data.held)} {talk.souls.souls} held
+            {ready && " · enough for a level"}
+          </Muted>
+        )}
+      </View>
+      <Text style={{ color: colors.neon, fontSize: 18 }}>→</Text>
+    </Pressable>
   );
 }
 
@@ -577,6 +607,25 @@ const styles = StyleSheet.create({
     borderColor: colors.court700,
     alignItems: "center",
     justifyContent: "center",
+  },
+  bonfire: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    borderWidth: 1,
+    borderColor: colors.court700,
+    borderRadius: 12,
+    backgroundColor: colors.court900,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+  },
+  bonfireReady: { borderColor: colors.neon },
+  bonfireTitle: {
+    color: colors.court100,
+    fontFamily: fonts.display,
+    fontSize: 18,
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
   goalHead: { flexDirection: "row", alignItems: "baseline", gap: space.md },
   ask: {
