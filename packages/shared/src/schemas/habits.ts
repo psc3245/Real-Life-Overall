@@ -58,6 +58,8 @@ export const HABIT_DIRECTION_LABELS: Record<HabitDirection, string> = {
 export const MAX_HABIT_NOTE = 280;
 export const MAX_HABIT_SHORT_TEXT = 200;
 export const MAX_HABIT_JOURNAL = 5000;
+/** Room for big daily counts like steps. */
+export const MAX_HABIT_COUNT = 1_000_000;
 export const MAX_DAY_JOURNAL = 10_000;
 export const MAX_HABIT_LINKS = 4;
 export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -163,7 +165,9 @@ export function validateHabitEntry(
       if (num !== 1 && num !== 0) return "Mark it done or not done";
       return (text ?? "").length <= MAX_HABIT_NOTE ? null : "Note is too long";
     case "counter":
-      return isInt(num) && num >= 0 && num <= 10_000 ? null : "Enter a whole number";
+      return isInt(num) && num >= 0 && num <= MAX_HABIT_COUNT
+        ? null
+        : `Enter a whole number from 0 to ${MAX_HABIT_COUNT.toLocaleString("en-US")}`;
     case "duration":
       return num !== null && num >= 0 && num <= 1440 ? null : "Enter minutes (0-1440)";
     case "slider":
