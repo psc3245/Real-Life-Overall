@@ -1,7 +1,9 @@
 import {
   addDays,
   BACKFILL_DAYS,
+  canLevelUp,
   formatHabitEntry,
+  formatSouls,
   groupProgress,
   isDayHabitDone,
   TODAY_WIDGET_FEATURE,
@@ -17,6 +19,7 @@ import { useDay } from "../../api/days";
 import { useMe } from "../../api/hooks";
 import { usePreferences } from "../../api/preferences";
 import { useActivity, useRatings } from "../../api/ratings";
+import { useSouls } from "../../api/souls";
 import { DayPicker } from "../../components/DayPicker";
 import { ChangeDelta, Delta, OverallMove } from "../../components/Delta";
 import { formatScore, useScore } from "../../components/score";
@@ -117,6 +120,7 @@ export function TodayPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <DayPicker today={d.today} />
+          {ratings.data?.season?.mode === "souls" && <BonfireButton />}
           {t.showLogButton && (
             <Link
               to="/log"
@@ -152,6 +156,31 @@ export function TodayPage() {
       )}
       <DebugJson label="day (DayDto)" data={d} />
     </div>
+  );
+}
+
+/** Souls seasons: the way to the level-up screen, with the souls held and whether a level is affordable. */
+function BonfireButton() {
+  const talk = useTalk();
+  const souls = useSouls();
+  const ready = souls.data ? canLevelUp(souls.data) : false;
+  return (
+    <Link
+      to="/bonfire"
+      className={`rounded-lg border px-5 py-2 hover:border-neon ${
+        ready ? "border-neon" : "border-court-700"
+      }`}
+    >
+      <span className="block font-display text-lg uppercase tracking-wider text-neon">
+        🔥 {talk.souls.bonfire} →
+      </span>
+      {souls.data && (
+        <span className="block text-xs text-court-500">
+          {formatSouls(souls.data.held)} {talk.souls.souls} held
+          {ready && " · enough for a level"}
+        </span>
+      )}
+    </Link>
   );
 }
 
