@@ -4,6 +4,7 @@ import type {
   ExerciseDetailDto,
   ExerciseDto,
   ExerciseTracking,
+  TemplateAction,
   WorkoutDto,
   WorkoutExerciseDto,
   WorkoutHistoryDto,
@@ -99,7 +100,7 @@ export function useSaveWorkout(id: string) {
 export function useFinishWorkout(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (options: { updateTemplate: boolean }) =>
+    mutationFn: (options: { template: TemplateAction; templateName?: string }) =>
       api<WorkoutDto>(`/workouts/${id}/finish`, {
         method: "POST",
         body: JSON.stringify(options),

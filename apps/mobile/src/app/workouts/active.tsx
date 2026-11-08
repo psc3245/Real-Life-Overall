@@ -1,7 +1,15 @@
-import { formatDuration, type WorkoutDto, type WorkoutExerciseDto } from "@rlo/shared";
+import {
+  finishTemplateOptions,
+  formatDuration,
+  templateChange,
+  type TemplateAction,
+  type TemplateChange,
+  type WorkoutDto,
+  type WorkoutExerciseDto,
+} from "@rlo/shared";
 import { Redirect, router, Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   useActiveWorkout,
   useDeleteWorkout,
@@ -114,6 +122,7 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
   const sets = draft.exercises.flatMap((e) => e.sets);
   const doneSets = sets.filter((s) => s.done).length;
   const template = templates.data?.find((t) => t.id === workout.templateId);
+  const change = template ? templateChange(template.exercises, draft.exercises) : "none";
   // The server's copy has "previous" for exercises added since the screen opened.
   const previous = save.data?.previous ?? workout.previous;
 
@@ -204,22 +213,21 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
         <FinishDialog
           doneSets={doneSets}
           skipped={sets.length - doneSets}
+          workoutName={draft.name.trim() || workout.name}
           templateName={template?.name ?? null}
+          change={change}
           pending={finish.isPending}
           error={finish.error}
-          onFinish={(updateTemplate) =>
-            finish.mutate(
-              { updateTemplate },
-              {
-                onSuccess: (w) => {
-                  setFinishing(false);
-                  router.replace({
-                    pathname: "/workouts/[id]",
-                    params: { id: w.id, finished: "1" },
-                  });
-                },
+          onFinish={(options) =>
+            finish.mutate(options, {
+              onSuccess: (w) => {
+                setFinishing(false);
+                router.replace({
+                  pathname: "/workouts/[id]",
+                  params: { id: w.id, finished: "1" },
+                });
               },
-            )
+            })
           }
         />
       </Sheet>
@@ -243,19 +251,25 @@ function Elapsed({ since }: { since: string }) {
 function FinishDialog({
   doneSets,
   skipped,
+  workoutName,
   templateName,
+  change,
   pending,
   error,
   onFinish,
 }: {
   doneSets: number;
   skipped: number;
+  workoutName: string;
   templateName: string | null;
+  change: TemplateChange;
   pending: boolean;
   error: unknown;
-  onFinish: (updateTemplate: boolean) => void;
+  onFinish: (options: { template: TemplateAction; templateName?: string }) => void;
 }) {
-  const [updateTemplate, setUpdateTemplate] = useState(false);
+  const options = doneSets > 0 ? finishTemplateOptions(templateName, change) : [];
+  const [action, setAction] = useState<TemplateAction>("none");
+  const [name, setName] = useState(workoutName);
   return (
     <View style={{ gap: space.lg }}>
       {doneSets === 0 ? (
@@ -266,27 +280,55 @@ function FinishDialog({
           {skipped > 0 && ` ${skipped} unchecked set${skipped === 1 ? "" : "s"} will be left out.`}
         </Body>
       )}
-      {templateName && doneSets > 0 && (
-        <Card style={styles.option}>
-          <View style={{ flex: 1 }}>
-            <Body style={{ fontWeight: "600" }}>Update &quot;{templateName}&quot;</Body>
-            <Muted style={{ fontSize: 13 }}>
-              Save today&apos;s exercises, sets and numbers as the template.
-            </Muted>
-          </View>
-          <Switch
-            value={updateTemplate}
-            onValueChange={setUpdateTemplate}
-            trackColor={{ true: colors.neonDim }}
-            thumbColor={colors.court100}
-          />
-        </Card>
+      {options.length > 0 && (
+        <View
+          style={{ gap: space.sm }}
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Template"
+        >
+          <Muted style={styles.optionsLabel}>
+            {templateName ? `You changed "${templateName}"` : "Make it a template?"}
+          </Muted>
+          {options.map((o) => {
+            const selected = o.value === action;
+            return (
+              <Pressable
+                key={o.value}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => setAction(o.value)}
+              >
+                <Card style={[styles.option, selected && styles.optionOn]}>
+                  <View style={[styles.radio, selected && styles.radioOn]} />
+                  <View style={{ flex: 1 }}>
+                    <Body style={{ fontWeight: "600" }}>{o.label}</Body>
+                    <Muted style={{ fontSize: 13 }}>{o.detail}</Muted>
+                  </View>
+                </Card>
+              </Pressable>
+            );
+          })}
+          {action === "new" && (
+            <Field
+              accessibilityLabel="Template name"
+              value={name}
+              maxLength={80}
+              placeholder="Template name"
+              onChangeText={setName}
+            />
+          )}
+        </View>
       )}
       <ErrorNote error={error} />
       <Button
         title={pending ? "Finishing…" : "Finish"}
-        disabled={doneSets === 0 || pending}
-        onPress={() => onFinish(updateTemplate)}
+        disabled={doneSets === 0 || pending || (action === "new" && !name.trim())}
+        onPress={() =>
+          onFinish({
+            template: action,
+            ...(action === "new" && { templateName: name.trim() }),
+          })
+        }
       />
     </View>
   );
@@ -316,7 +358,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   status: { color: colors.court500, fontSize: 11, letterSpacing: 1, textTransform: "uppercase" },
+  optionsLabel: { fontSize: 12, letterSpacing: 1, textTransform: "uppercase" },
   option: { flexDirection: "row", alignItems: "center", gap: space.md },
+  optionOn: { borderColor: colors.neon },
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: colors.court500,
+  },
+  radioOn: { borderColor: colors.neon, backgroundColor: colors.neon },
 });
 
 export default function GatedActiveWorkoutScreen() {

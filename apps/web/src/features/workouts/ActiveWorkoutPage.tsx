@@ -1,4 +1,12 @@
-import { formatDuration, type WorkoutDto, type WorkoutExerciseDto } from "@rlo/shared";
+import {
+  finishTemplateOptions,
+  formatDuration,
+  templateChange,
+  type TemplateAction,
+  type TemplateChange,
+  type WorkoutDto,
+  type WorkoutExerciseDto,
+} from "@rlo/shared";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
 import {
@@ -108,6 +116,7 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
   const sets = draft.exercises.flatMap((e) => e.sets);
   const doneSets = sets.filter((s) => s.done).length;
   const template = templates.data?.find((t) => t.id === workout.templateId);
+  const change = template ? templateChange(template.exercises, draft.exercises) : "none";
   // The server's copy has "previous" for exercises added since the page loaded.
   const previous = save.data?.previous ?? workout.previous;
 
@@ -206,17 +215,16 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
         <FinishDialog
           doneSets={doneSets}
           skipped={sets.length - doneSets}
+          workoutName={draft.name.trim() || workout.name}
           templateName={template?.name ?? null}
+          change={change}
           pending={finish.isPending}
           error={finish.error}
           onCancel={() => setFinishing(false)}
-          onFinish={(updateTemplate) =>
-            finish.mutate(
-              { updateTemplate },
-              {
-                onSuccess: (w) => navigate(`/workouts/${w.id}`, { state: { justFinished: true } }),
-              },
-            )
+          onFinish={(options) =>
+            finish.mutate(options, {
+              onSuccess: (w) => navigate(`/workouts/${w.id}`, { state: { justFinished: true } }),
+            })
           }
         />
       </Modal>
@@ -240,7 +248,9 @@ function Elapsed({ since }: { since: string }) {
 function FinishDialog({
   doneSets,
   skipped,
+  workoutName,
   templateName,
+  change,
   pending,
   error,
   onCancel,
@@ -248,13 +258,17 @@ function FinishDialog({
 }: {
   doneSets: number;
   skipped: number;
+  workoutName: string;
   templateName: string | null;
+  change: TemplateChange;
   pending: boolean;
   error: unknown;
   onCancel: () => void;
-  onFinish: (updateTemplate: boolean) => void;
+  onFinish: (options: { template: TemplateAction; templateName?: string }) => void;
 }) {
-  const [updateTemplate, setUpdateTemplate] = useState(false);
+  const options = doneSets > 0 ? finishTemplateOptions(templateName, change) : [];
+  const [action, setAction] = useState<TemplateAction>("none");
+  const [name, setName] = useState(workoutName);
   return (
     <div className="space-y-4">
       <h2 className="font-display text-2xl uppercase">Finish workout?</h2>
@@ -268,21 +282,42 @@ function FinishDialog({
           {skipped > 0 && ` ${skipped} unchecked set${skipped === 1 ? "" : "s"} will be left out.`}
         </p>
       )}
-      {templateName && doneSets > 0 && (
-        <label className="flex cursor-pointer gap-3 rounded-lg border border-court-700 px-4 py-3">
-          <input
-            type="checkbox"
-            checked={updateTemplate}
-            onChange={(e) => setUpdateTemplate(e.target.checked)}
-            className="mt-1 accent-[var(--color-neon)]"
-          />
-          <span>
-            <span className="block font-medium">Update "{templateName}"</span>
-            <span className="block text-sm text-court-500">
-              Save today's exercises, sets and numbers as the template.
-            </span>
-          </span>
-        </label>
+      {options.length > 0 && (
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-xs uppercase tracking-wider text-court-500">
+            {templateName ? `You changed "${templateName}"` : "Make it a template?"}
+          </legend>
+          {options.map((o) => (
+            <label
+              key={o.value}
+              className={`flex cursor-pointer gap-3 rounded-lg border px-4 py-3 ${
+                o.value === action ? "border-neon" : "border-court-700"
+              }`}
+            >
+              <input
+                type="radio"
+                name="template"
+                checked={o.value === action}
+                onChange={() => setAction(o.value)}
+                className="mt-1 accent-[var(--color-neon)]"
+              />
+              <span>
+                <span className="block font-medium">{o.label}</span>
+                <span className="block text-sm text-court-500">{o.detail}</span>
+              </span>
+            </label>
+          ))}
+          {action === "new" && (
+            <input
+              aria-label="Template name"
+              value={name}
+              maxLength={80}
+              placeholder="Template name"
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-court-700 bg-court-900/70 p-3 text-sm outline-none focus:border-neon"
+            />
+          )}
+        </fieldset>
       )}
       <ErrorNote error={error} />
       <div className="flex justify-end gap-2">
@@ -291,8 +326,13 @@ function FinishDialog({
         </Button>
         <Button
           variant="primary"
-          disabled={doneSets === 0 || pending}
-          onClick={() => onFinish(updateTemplate)}
+          disabled={doneSets === 0 || pending || (action === "new" && !name.trim())}
+          onClick={() =>
+            onFinish({
+              template: action,
+              ...(action === "new" && { templateName: name.trim() }),
+            })
+          }
         >
           {pending ? "Finishing…" : "Finish"}
         </Button>

@@ -307,6 +307,60 @@ export const emptySet = (kind: SetKind = "normal"): WorkoutSetDto => ({
   done: false,
 });
 
+/** How a workout differs from the template it started from. */
+export type TemplateChange = "none" | "values" | "structure";
+
+const SET_VALUES = ["kind", "weightKg", "reps", "durationS", "distanceM", "attempts"] as const;
+
+/**
+ * "structure" when exercises were added, removed or reordered or an exercise's set count changed;
+ * "values" when only the numbers (or set kinds) in its sets did; otherwise "none".
+ */
+export function templateChange(
+  plan: WorkoutExerciseDto[],
+  exercises: WorkoutExerciseDto[],
+): TemplateChange {
+  if (
+    plan.length !== exercises.length ||
+    plan.some(
+      (e, i) =>
+        e.exerciseId !== exercises[i]!.exerciseId || e.sets.length !== exercises[i]!.sets.length,
+    )
+  ) {
+    return "structure";
+  }
+  const changed = plan.some((e, i) =>
+    e.sets.some((s, j) => SET_VALUES.some((k) => s[k] !== exercises[i]!.sets[j]![k])),
+  );
+  return changed ? "values" : "none";
+}
+
+/**
+ * The template with the numbers from the workout's checked-off sets copied into it, keeping its
+ * own exercises, order and set counts. Exercises match by id (the nth of an id to the nth) and
+ * sets by position; a template set with no done match keeps its numbers.
+ */
+export function withTemplateValues(
+  plan: WorkoutExerciseDto[],
+  exercises: WorkoutExerciseDto[],
+): WorkoutExerciseDto[] {
+  const seen = new Map<string, number>();
+  return plan.map((e) => {
+    const nth = seen.get(e.exerciseId) ?? 0;
+    seen.set(e.exerciseId, nth + 1);
+    const match = exercises.filter((w) => w.exerciseId === e.exerciseId)[nth];
+    if (!match) return e;
+    return {
+      ...e,
+      sets: e.sets.map((s, j) => {
+        const done = match.sets[j];
+        if (!done?.done) return s;
+        return { ...s, ...Object.fromEntries(SET_VALUES.map((k) => [k, done[k]])) };
+      }),
+    };
+  });
+}
+
 // Request bodies
 
 const positive = (cap: number) => z.number().finite().min(0).max(cap).nullable().default(null);
@@ -352,8 +406,70 @@ export const updateWorkoutBodySchema = z
   })
   .partial();
 
+/**
+ * What finishing does to templates: "values" copies the numbers into the template's existing
+ * sets, "overwrite" replaces the template with what was done, "new" saves what was done as a new
+ * template.
+ */
+export const TEMPLATE_ACTIONS = ["none", "values", "overwrite", "new"] as const;
+export type TemplateAction = (typeof TEMPLATE_ACTIONS)[number];
+
+export interface TemplateOption {
+  value: TemplateAction;
+  label: string;
+  detail: string;
+}
+
+/**
+ * The template choices offered when finishing, "none" first: save-as-new for a workout with no
+ * template; for one with a template, only what fits how far today strayed from it.
+ */
+export function finishTemplateOptions(
+  templateName: string | null,
+  change: TemplateChange,
+): TemplateOption[] {
+  if (templateName === null) {
+    return [
+      { value: "none", label: "Don't save it", detail: "Just log today's workout." },
+      { value: "new", label: "Save as a template", detail: "Start it again from your templates." },
+    ];
+  }
+  if (change === "none") return [];
+  const leave: TemplateOption = {
+    value: "none",
+    label: `Leave "${templateName}" as is`,
+    detail: "No changes to the template.",
+  };
+  const values: TemplateOption = {
+    value: "values",
+    label: "Update just the numbers",
+    detail:
+      change === "values"
+        ? "Today's weights and reps go into its sets."
+        : "Today's weights and reps go into its sets; its exercises and set counts stay.",
+  };
+  if (change === "values") return [leave, values];
+  return [
+    leave,
+    values,
+    {
+      value: "overwrite",
+      label: `Replace "${templateName}"`,
+      detail: "With today's exercises, sets and numbers.",
+    },
+    {
+      value: "new",
+      label: "Save as a new template",
+      detail: `Keeps "${templateName}" as is.`,
+    },
+  ];
+}
+
 export const finishWorkoutBodySchema = z.object({
-  /** Overwrite the template it started from with what was done. */
+  template: z.enum(TEMPLATE_ACTIONS).optional(),
+  /** The new template's name ("new" only); defaults to the workout's. */
+  templateName: z.string().trim().min(1).max(80).optional(),
+  /** Older apps: true means "overwrite". */
   updateTemplate: z.boolean().default(false),
 });
 

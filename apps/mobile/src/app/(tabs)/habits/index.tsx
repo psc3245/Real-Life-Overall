@@ -1,5 +1,5 @@
 import type { Feature } from "@rlo/shared";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { usePreferences } from "@/api/preferences";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,13 +27,19 @@ const VIEWS: { value: View; feature: Feature }[] = [
 export default function PlaybookScreen() {
   const talk = useTalk();
   const { features } = usePreferences();
-  const params = useLocalSearchParams<{ view?: View }>();
+  const params = useLocalSearchParams<{ view?: View; resume?: string }>();
   const available = VIEWS.filter((v) => features[v.feature]);
   const [view, setView] = useState<View>(params.view ?? available[0]?.value ?? "habits");
   // Links like "Start a workout →" land here with ?view=train.
   useEffect(() => {
     if (params.view) setView(params.view);
   }, [params.view]);
+  // Opening the app with a workout in progress lands here with ?resume=1.
+  useEffect(() => {
+    if (params.resume !== "1") return;
+    router.setParams({ resume: "" });
+    router.push("/workouts/active");
+  }, [params.resume]);
   const shown = available.some((v) => v.value === view) ? view : available[0]?.value;
 
   const queryClient = useQueryClient();

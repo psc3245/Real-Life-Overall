@@ -7,7 +7,10 @@ import {
   formatSet,
   mergeRecords,
   recordsFromSets,
+  templateChange,
+  withTemplateValues,
   workoutVolume,
+  type WorkoutExerciseDto,
   type WorkoutSetDto,
 } from "./workouts";
 
@@ -62,5 +65,56 @@ describe("workout math", () => {
       formatSet("distance_duration", set({ distanceM: 5000, durationS: 1500 }), "metric"),
     ).toBe("5 km · 25:00");
     expect(formatSet("makes_attempts", set({ reps: 8, attempts: 10 }), "metric")).toBe("8/10");
+  });
+});
+
+describe("template changes", () => {
+  const ex = (exerciseId: string, sets: Partial<WorkoutSetDto>[]): WorkoutExerciseDto => ({
+    exerciseId,
+    notes: "",
+    restS: null,
+    sets: sets.map((s) => set({ done: false, ...s })),
+  });
+  const plan = [
+    ex("bench", [
+      { weightKg: 60, reps: 8 },
+      { weightKg: 60, reps: 8 },
+    ]),
+    ex("row", [{}]),
+  ];
+
+  it("tells unchanged, value-only and structural edits apart", () => {
+    // Checking sets off doesn't count as an edit.
+    const checked = plan.map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s, done: true })) }));
+    expect(templateChange(plan, checked)).toBe("none");
+    const heavier = [
+      ex("bench", [
+        { weightKg: 65, reps: 8 },
+        { weightKg: 60, reps: 8 },
+      ]),
+      plan[1]!,
+    ];
+    expect(templateChange(plan, heavier)).toBe("values");
+    expect(templateChange(plan, [plan[1]!, plan[0]!])).toBe("structure");
+    expect(templateChange(plan, [plan[0]!])).toBe("structure");
+    expect(templateChange(plan, [ex("bench", [{ weightKg: 60, reps: 8 }]), plan[1]!])).toBe(
+      "structure",
+    );
+  });
+
+  it("copies done numbers into the template's own sets", () => {
+    const workout = [
+      ex("row", [{ weightKg: 50, reps: 10, done: true }]),
+      ex("bench", [{ weightKg: 70, reps: 5, done: true }, { weightKg: 99, reps: 1 }, { reps: 3 }]),
+      ex("curl", [{ weightKg: 15, reps: 12, done: true }]),
+    ];
+    const next = withTemplateValues(plan, workout);
+    expect(next.map((e) => e.exerciseId)).toEqual(["bench", "row"]);
+    // The unchecked second set keeps the template's numbers; the extra third set isn't added.
+    expect(next[0]!.sets.map((s) => [s.weightKg, s.reps, s.done])).toEqual([
+      [70, 5, false],
+      [60, 8, false],
+    ]);
+    expect(next[1]!.sets[0]).toMatchObject({ weightKg: 50, reps: 10, done: false });
   });
 });

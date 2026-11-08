@@ -10,6 +10,7 @@ import {
   RECORD_LABELS,
   recordsFromSets,
   TRACKING_FIELDS,
+  withTemplateValues,
   workoutVolume,
   type DayWorkoutDto,
   type ExerciseCategory,
@@ -25,6 +26,7 @@ import {
   type WorkoutTemplateDto,
   type createTemplateBodySchema,
   type exerciseBodySchema,
+  type finishWorkoutBodySchema,
   type templateBodySchema,
   type updateWorkoutBodySchema,
 } from "@rlo/shared";
@@ -295,27 +297,44 @@ export async function updateWorkout(
 
 /**
  * Finishes the workout: sets that weren't checked off are dropped, and so are exercises left
- * with none. Optionally rewrites the template it came from with what was done.
+ * with none. Optionally updates the template it came from (just the numbers, or replaced
+ * outright) or saves what was done as a new template.
  */
 export async function finishWorkout(
   db: Database,
   userId: string,
   id: string,
-  options: { updateTemplate: boolean },
+  options: z.infer<typeof finishWorkoutBodySchema>,
 ): Promise<WorkoutDto> {
   const row = await workoutRepo.findById(db, userId, id);
   if (!row) throw notFound("Workout not found");
   if (row.endedAt) throw conflict("This workout is already finished");
-  const done = exercisesOf(row)
+  const exercises = exercisesOf(row);
+  const done = exercises
     .map((e) => ({ ...e, sets: e.sets.filter((s) => s.done) }))
     .filter((e) => e.sets.length > 0);
   if (!done.length) throw badRequest("Check off at least one set to finish the workout");
+  const action = options.template ?? (options.updateTemplate ? "overwrite" : "none");
 
   const finished = await db.transaction(async (tx) => {
     const updated = await workoutRepo.update(tx, row.id, { exercises: done, endedAt: new Date() });
-    if (options.updateTemplate && row.templateId) {
+    if (action === "new") {
+      await workoutRepo.insertTemplate(tx, {
+        userId,
+        name: options.templateName ?? row.name,
+        notes: row.notes,
+        exercises: asPlan(done),
+      });
+    } else if (action !== "none" && row.templateId) {
       const template = await workoutRepo.findTemplate(tx, userId, row.templateId);
-      if (template) await workoutRepo.updateTemplate(tx, template.id, { exercises: asPlan(done) });
+      if (template) {
+        await workoutRepo.updateTemplate(tx, template.id, {
+          exercises:
+            action === "values"
+              ? withTemplateValues(exercisesOf(template), exercises)
+              : asPlan(done),
+        });
+      }
     }
     return updated;
   });

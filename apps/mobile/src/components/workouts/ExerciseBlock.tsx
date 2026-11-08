@@ -15,6 +15,7 @@ import {
   type WorkoutExerciseDto,
   type WorkoutSetDto,
 } from "@rlo/shared";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useState } from "react";
@@ -135,7 +136,9 @@ export function ExerciseBlock({
   const toggleDone = (i: number) => {
     const done = !exercise.sets[i]!.done;
     setAt(i, { done, ...(done && fromPrevious(i, true)) });
-    if (done) onSetDone?.(restS);
+    if (!done) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onSetDone?.(restS);
   };
 
   // Finished workouts don't rest, so their menu has no rest timer.
