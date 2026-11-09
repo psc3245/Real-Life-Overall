@@ -1,4 +1,4 @@
-import type { DayDto, ObjectiveDto, ObjectiveSource } from "@rlo/shared";
+import type { DayDto, ObjectiveDto, ObjectiveKind, ObjectiveSource } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { dayKey } from "./days";
@@ -23,7 +23,10 @@ function useObjectiveMutation<TInput, TOutput>(request: (input: TInput) => Promi
 
 export interface ObjectiveInput {
   name: string;
+  kind: ObjectiveKind;
   target: number;
+  /** kind "reach": where it starts (weight goals default to the latest weight). */
+  startValue?: number;
   unit: string;
   startsOn: string;
   endsOn: string;
@@ -40,7 +43,10 @@ export function useCreateObjective() {
 
 export function useUpdateObjective() {
   return useObjectiveMutation(
-    ({ id, ...input }: Partial<Omit<ObjectiveInput, "source" | "habitId">> & { id: string }) =>
+    ({
+      id,
+      ...input
+    }: Partial<Omit<ObjectiveInput, "kind" | "source" | "habitId">> & { id: string }) =>
       api<ObjectiveDto>(`/objectives/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   );
 }

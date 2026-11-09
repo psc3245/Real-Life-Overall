@@ -164,10 +164,20 @@ export function renderDay(
         : p.completedOn
           ? ` Reached on ${p.completedOn}.`
           : "";
+    const progress =
+      o.kind === "reach"
+        ? `at ${formatNumber(p.current)} ${o.unit}, going from ${formatNumber(o.startValue!)} to ${formatNumber(o.target)} `
+        : `${formatNumber(p.current)}/${formatNumber(o.target)} ${o.unit} `;
+    const onDay =
+      o.kind === "reach"
+        ? dayAmount
+          ? `Read ${formatNumber(dayAmount)} on this day.`
+          : "No reading on this day."
+        : `This day added ${formatNumber(dayAmount)}.`;
     return (
-      `- ${o.name}: ${formatNumber(p.current)}/${formatNumber(o.target)} ${o.unit} ` +
+      `- ${o.name}: ${progress}` +
       `(${o.startsOn} to ${o.endsOn}${o.habitName ? `, counts the habit "${o.habitName}"` : ""}). ` +
-      `This day added ${formatNumber(dayAmount)}.${reached}${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
+      `${onDay}${reached}${builds.length ? ` Builds: ${builds.join(", ")}` : ""}`
     );
   });
   const workouts = day.workouts.map((w) =>

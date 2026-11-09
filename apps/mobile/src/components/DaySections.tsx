@@ -58,15 +58,18 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
   const { objective: o } = item;
   const save = useSaveObjectiveEntry(day.date, o.id);
   const [value, setValue] = useState(item.logged === null ? "" : String(item.logged));
+  // Reach goals take a reading (0 included) rather than an amount to add.
+  const reach = o.kind === "reach";
   const commit = () => {
     const n = value.trim() === "" ? null : Number(value);
     if (n !== null && (!Number.isFinite(n) || n < 0)) return;
-    if (n === item.logged || (n === 0 && item.logged === null)) return;
+    if (n === item.logged || (!reach && n === 0 && item.logged === null)) return;
     save.mutate(n);
   };
+  const active = reach ? item.logged !== null || item.dayAmount > 0 : item.dayAmount > 0;
 
   return (
-    <Card style={[{ gap: space.sm }, item.dayAmount > 0 && { borderColor: colors.neonDim }]}>
+    <Card style={[{ gap: space.sm }, active && { borderColor: colors.neonDim }]}>
       <Body style={{ fontWeight: "600" }}>{o.name}</Body>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
         <ObjectiveAmount objective={o} />
@@ -74,20 +77,20 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
       </View>
       {o.source === "manual" ? (
         <View style={styles.row}>
-          <Text style={styles.unit}>+</Text>
+          {!reach && <Text style={styles.unit}>+</Text>}
           <Field
             accessibilityLabel={`${o.name} on this day`}
             keyboardType="decimal-pad"
             returnKeyType="done"
             value={value}
             editable={day.editable}
-            placeholder="0"
+            placeholder={reach ? formatNumber(o.progress.current) : "0"}
             onChangeText={setValue}
             onEndEditing={commit}
             style={styles.amount}
           />
           <Text style={styles.unit}>{o.unit}</Text>
-          {day.editable && (
+          {day.editable && !reach && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Add 1 ${o.unit}`}
@@ -104,13 +107,17 @@ function DayGoalRow({ item, day }: { item: DayObjectiveDto; day: DayDto }) {
         </View>
       ) : (
         <Muted>
-          {o.source === "workouts"
+          {o.source === "weight"
             ? item.dayAmount > 0
-              ? `+${formatNumber(item.dayAmount)} from workouts`
-              : "Counts finished workouts"
-            : item.dayAmount > 0
-              ? `+${formatNumber(item.dayAmount)} from ${o.habitName ?? "the habit"}`
-              : `Counts ${o.habitName ?? "a habit"}`}
+              ? `Weighed ${formatNumber(item.dayAmount)} ${o.unit}`
+              : "Follows your logged weight"
+            : o.source === "workouts"
+              ? item.dayAmount > 0
+                ? `+${formatNumber(item.dayAmount)} from workouts`
+                : "Counts finished workouts"
+              : item.dayAmount > 0
+                ? `+${formatNumber(item.dayAmount)} from ${o.habitName ?? "the habit"}`
+                : `Counts ${o.habitName ?? "a habit"}`}
         </Muted>
       )}
       <ObjectiveBar objective={o} thin />
