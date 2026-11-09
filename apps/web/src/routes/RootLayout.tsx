@@ -228,9 +228,11 @@ function MainNav({
   return (
     <nav
       aria-label="Main"
-      className={`-mx-4 mb-4 flex items-center gap-5 overflow-x-auto border-y border-court-800/70 px-4 py-2.5 lg:mx-0 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:overflow-visible lg:rounded-full lg:border lg:px-5 ${sticky ? "sticky top-0 z-30 bg-court-950/90 backdrop-blur" : ""}`}
+      // Tighter gaps from lg to xl: the row stops scrolling at lg, and longer nav words (Souls
+      // talk) would otherwise push it past the window at 1024px.
+      className={`-mx-4 mb-4 flex items-center gap-5 overflow-x-auto border-y border-court-800/70 px-4 py-2.5 lg:mx-0 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-3 lg:overflow-visible lg:rounded-full lg:border lg:px-5 xl:gap-5 ${sticky ? "sticky top-0 z-30 bg-court-950/90 backdrop-blur" : ""}`}
     >
-      <div className="contents lg:flex lg:items-center lg:justify-between lg:gap-5">
+      <div className="contents lg:flex lg:items-center lg:justify-between lg:gap-3 xl:gap-5">
         <NavLink
           to="/today"
           className={({ isActive }) =>
@@ -239,7 +241,7 @@ function MainNav({
         >
           {talk.nav.today}
         </NavLink>
-        <span className="contents lg:flex lg:gap-5">
+        <span className="contents lg:flex lg:gap-3 xl:gap-5">
           <NavLink to="/log" className={side}>
             {talk.nav.log}
           </NavLink>
@@ -269,7 +271,7 @@ function MainNav({
       >
         {talk.nav.rating}
       </NavLink>
-      <div className="contents lg:flex lg:items-center lg:justify-end lg:gap-5">
+      <div className="contents lg:flex lg:items-center lg:justify-end lg:gap-3 xl:gap-5">
         <NavGroup label={talk.nav.social} items={social} />
         <NavGroup label={talk.nav.stats} items={stats} />
       </div>
