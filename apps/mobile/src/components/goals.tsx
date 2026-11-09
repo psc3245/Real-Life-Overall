@@ -101,7 +101,8 @@ export function ObjectiveAmount({
       <Text style={{ color: colors.court500 }}>
         {" "}
         {o.kind === "reach"
-          ? `→ ${formatNumber(o.target)} ${o.unit} · from ${formatNumber(o.startValue ?? 0)}`
+          ? // Until the first reading, "from" would just repeat the current value.
+            `→ ${formatNumber(o.target)} ${o.unit}${o.progress.current !== o.startValue ? ` · from ${formatNumber(o.startValue ?? 0)}` : ""}`
           : `/ ${formatNumber(o.target)} ${o.unit}`}
       </Text>
     </Text>

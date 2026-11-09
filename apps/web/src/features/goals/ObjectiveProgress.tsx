@@ -86,7 +86,9 @@ export function ObjectiveAmount({ objective: o }: { objective: ObjectiveDto }) {
         {formatNumber(o.progress.current)}
         <span className="text-court-500">
           {" "}
-          → {formatNumber(o.target)} {o.unit} · from {formatNumber(o.startValue ?? 0)}
+          → {formatNumber(o.target)} {o.unit}
+          {/* Until the first reading, "from" would just repeat the current value. */}
+          {o.progress.current !== o.startValue && ` · from ${formatNumber(o.startValue ?? 0)}`}
         </span>
       </span>
     );
