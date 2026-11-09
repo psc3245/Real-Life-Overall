@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { SeasonMode } from "../rating/growth";
 import type { EarnedBadgeDto } from "./badges";
+import { ALL_DAYS, daysSchema } from "./habits";
 
 /** Largest move one attribute can make in one daily recap (DESIGN.md §5.6). */
 export const DAILY_DELTA_CAP = 3;
@@ -8,10 +9,22 @@ export const DAILY_DELTA_CAP = 3;
 export const MAX_RECAPS_PER_DAY = 3;
 export const MAX_GUIDED_PROMPTS = 3;
 export const MAX_PROMPT_ANSWER = 500;
+/** The player's own scheduled questions (DESIGN.md §7.11). */
+export const MAX_CUSTOM_PROMPTS = 10;
+export const MAX_CUSTOM_PROMPT_QUESTION = 200;
 
 export interface GuidedPromptDto {
   question: string;
   answer: string | null;
+  /** Set on the player's own questions; the scout's have none. */
+  promptId?: string;
+}
+
+/** A question the player asks themselves on the weekdays in `days` (0 = Sunday). */
+export interface CustomPromptDto {
+  id: string;
+  question: string;
+  days: number[];
 }
 
 export interface RecapChangeDto {
@@ -65,8 +78,44 @@ export interface ChangeFeedItemDto {
 }
 
 export const savePromptAnswersBodySchema = z.object({
-  answers: z.array(z.string().max(MAX_PROMPT_ANSWER).nullable()).max(MAX_GUIDED_PROMPTS),
+  answers: z
+    .array(z.string().max(MAX_PROMPT_ANSWER).nullable())
+    .max(MAX_GUIDED_PROMPTS + MAX_CUSTOM_PROMPTS),
 });
+
+export const customPromptBodySchema = z.object({
+  question: z.string().trim().min(1).max(MAX_CUSTOM_PROMPT_QUESTION),
+  days: daysSchema.default(ALL_DAYS),
+});
+export const updateCustomPromptBodySchema = z
+  .object({
+    question: z.string().trim().min(1).max(MAX_CUSTOM_PROMPT_QUESTION),
+    days: daysSchema,
+  })
+  .partial();
+
+/**
+ * A day's questions: the stored ones (the scout's, plus own questions already answered or
+ * saved), then any own question scheduled that day that isn't there yet. `scheduled` holds the
+ * player's live questions for that weekday. A saved, unanswered own question follows edits to
+ * its wording and drops out once it's deleted or unscheduled; answered ones keep what was asked.
+ */
+export function mergeDayPrompts(
+  stored: GuidedPromptDto[],
+  scheduled: CustomPromptDto[],
+): GuidedPromptDto[] {
+  const byId = new Map(scheduled.map((p) => [p.id, p]));
+  const kept = stored
+    .filter((p) => !p.promptId || p.answer || byId.has(p.promptId))
+    .map((p) => (p.promptId && !p.answer ? { ...p, question: byId.get(p.promptId)!.question } : p));
+  const present = new Set(kept.map((p) => p.promptId));
+  return [
+    ...kept,
+    ...scheduled
+      .filter((p) => !present.has(p.id))
+      .map((p) => ({ question: p.question, answer: null, promptId: p.id })),
+  ];
+}
 
 // LLM output
 

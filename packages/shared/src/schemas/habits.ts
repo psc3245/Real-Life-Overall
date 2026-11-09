@@ -380,7 +380,7 @@ export interface LinkSuggestionDto {
 
 const dateSchema = z.string().refine(isValidDate, "Use a valid YYYY-MM-DD date");
 
-const daysSchema = z
+export const daysSchema = z
   .array(z.number().int().min(0).max(6))
   .min(1)
   .max(7)

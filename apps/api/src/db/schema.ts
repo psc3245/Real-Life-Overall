@@ -319,7 +319,10 @@ export const dayLogs = pgTable(
     journalSearch: tsvector().generatedAlwaysAs(
       (): SQL => sql`to_tsvector('english', ${dayLogs.journal})`,
     ),
-    /** GuidedPromptDto[] written by the previous day's recap. */
+    /**
+     * GuidedPromptDto[]: the scout's, written by the previous day's recap, plus the player's own
+     * questions once saved (see mergeDayPrompts).
+     */
     prompts: jsonb().notNull().default([]),
     status: dayStatus().notNull().default("open"),
     createdAt: createdAt(),
@@ -329,6 +332,24 @@ export const dayLogs = pgTable(
     uniqueIndex().on(t.userId, t.localDate),
     index("day_logs_journal_search").using("gin", t.journalSearch),
   ],
+);
+
+/** The player's own questions, asked in the day log on the weekdays in `days` (DESIGN.md §7.11). */
+export const customPrompts = pgTable(
+  "custom_prompts",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    question: text().notNull(),
+    /** Weekdays, 0 = Sunday. */
+    days: smallint().array().notNull(),
+    archivedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
 );
 
 export const habitType = pgEnum("habit_type", [

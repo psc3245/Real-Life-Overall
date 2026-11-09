@@ -75,6 +75,7 @@ function RootStack() {
           <Stack.Screen name="leaderboards" options={pushedOptions} />
           <Stack.Screen name="compare/[username]" options={pushedOptions} />
           <Stack.Screen name="goals/edit" options={{ ...pushedOptions, presentation: "modal" }} />
+          <Stack.Screen name="questions" options={pushedOptions} />
           <Stack.Screen
             name="workouts/active"
             options={{ ...pushedOptions, gestureEnabled: false }}

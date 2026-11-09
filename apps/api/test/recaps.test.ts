@@ -1,6 +1,8 @@
 import {
   addDays,
+  dayOfWeek,
   type ChangeFeedItemDto,
+  type CustomPromptDto,
   type DayDto,
   type HabitDto,
   type RatingsDto,
@@ -214,5 +216,54 @@ describe("daily recap", () => {
     expect(prompt).toContain("Q: Any strength work?\\nA: Deadlifts, 3x5");
     expect(prompt).toContain(`- ${yesterday}: A solid day.`);
     void log;
+  });
+
+  it("asks the player's own questions on their days, next to the scout's", async () => {
+    const { request, endDay, today, model } = await setup([
+      recap([{ ref: "n3", delta: 0.3 }]),
+      recap([{ ref: "n4", delta: 0.4 }]),
+    ]);
+    const yesterday = addDays(today, -1);
+    const weekday = dayOfWeek(today);
+    const create = (question: string, days?: number[]) =>
+      request("/custom-prompts", { method: "POST", ...json({ question, days }) });
+    const grateful = await body<CustomPromptDto>(await create("What are you grateful for?"));
+    await create("Weekly review", [(weekday + 1) % 7]);
+    expect(await body<CustomPromptDto[]>(await request("/custom-prompts"))).toHaveLength(2);
+
+    // Not asked on a day before it existed, nor on a day it isn't scheduled.
+    await request(`/days/${yesterday}/journal`, { method: "PUT", ...json({ journal: "Ran." }) });
+    expect((await body<DayDto>(await request(`/days/${yesterday}`))).prompts).toEqual([]);
+    // The scout's questions for today land in front of it.
+    await endDay(yesterday);
+    const fresh = await body<DayDto>(await request(`/days/${today}`));
+    expect(fresh.prompts.map((p) => p.question)).toEqual([
+      "How did you sleep?",
+      "Any strength work?",
+      "What are you grateful for?",
+    ]);
+    expect(fresh.prompts[2]!.promptId).toBe(grateful.id);
+
+    const answered = await body<DayDto>(
+      await request(`/days/${today}/prompts`, {
+        method: "PUT",
+        ...json({ answers: [null, null, "My knees"] }),
+      }),
+    );
+    expect(answered.prompts[2]).toMatchObject({ answer: "My knees", promptId: grateful.id });
+
+    // Deleting it keeps today's answer.
+    expect((await request(`/custom-prompts/${grateful.id}`, { method: "DELETE" })).status).toBe(
+      204,
+    );
+    const after = await body<DayDto>(await request(`/days/${today}`));
+    expect(after.prompts.map((p) => p.answer)).toEqual([null, null, "My knees"]);
+
+    await endDay();
+    const prompt = JSON.stringify(model.doGenerateCalls.at(-1)!.prompt);
+    expect(prompt).toContain("Q: What are you grateful for?\\nA: My knees");
+
+    for (let i = 0; i < 9; i++) await create(`Q${i}`);
+    expect((await create("One too many")).status).toBe(400);
   });
 });

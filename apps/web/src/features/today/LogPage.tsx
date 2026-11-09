@@ -102,9 +102,7 @@ export function LogPage() {
 
       <SectionNav
         sections={[
-          ...(on.guidedPrompts && d.prompts.length
-            ? [{ id: "questions", label: "Questions" }]
-            : []),
+          ...(on.guidedPrompts ? [{ id: "questions", label: "Questions" }] : []),
           ...(on.journal ? [{ id: "journal-section", label: "Journal" }] : []),
           ...(on.habits ? [{ id: "habits", label: "Habits" }] : []),
           ...(on.workouts ? [{ id: "workouts", label: "Workouts" }] : []),

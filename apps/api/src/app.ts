@@ -28,6 +28,7 @@ import { leaderboardRoutes } from "./routes/leaderboards";
 import { meRoutes } from "./routes/me";
 import { chartViewRoutes, metricRoutes } from "./routes/metrics";
 import { objectiveRoutes } from "./routes/objectives";
+import { customPromptRoutes } from "./routes/custom-prompts";
 import { onboardingRoutes } from "./routes/onboarding";
 import { pauseRoutes } from "./routes/pauses";
 import { profileRoutes } from "./routes/profiles";
@@ -141,6 +142,8 @@ export function createApp(makeDeps: DepsFactory) {
     .use("/reports/*", requireUser)
     .use("/chart-views", requireUser)
     .use("/chart-views/*", requireUser)
+    .use("/custom-prompts", requireUser)
+    .use("/custom-prompts/*", requireUser)
     .use("/body", requireUser)
     .use("/body/*", requireUser)
     .use("/pauses", requireUser)
@@ -174,6 +177,7 @@ export function createApp(makeDeps: DepsFactory) {
     .route("/habits", habitRoutes)
     .route("/days", dayRoutes)
     .route("/objectives", objectiveRoutes)
+    .route("/custom-prompts", customPromptRoutes)
     .route("/workouts", workoutRoutes)
     .route("/workout-templates", templateRoutes)
     .route("/exercises", exerciseRoutes)
