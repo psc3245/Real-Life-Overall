@@ -6,6 +6,7 @@ import {
   validateHabitEntry,
   type DayDto,
   type DayHabitDto,
+  mergeDayPrompts,
   type GuidedPromptDto,
   type HabitConfig,
   type HabitEntryValue,
@@ -21,6 +22,7 @@ import { loadLeafContext, toHabitDtos } from "./habit-service";
 import { badgesByRecap } from "./badge-service";
 import { invalidateDecay } from "./decay-service";
 import { bodyForDay } from "./body-service";
+import { scheduledPrompts } from "./custom-prompt-service";
 import { objectivesForDay, saveObjectiveEntry } from "./objective-service";
 import { workoutsForDay } from "./workout-service";
 import { toRecapDto } from "./recap-view";
@@ -49,7 +51,7 @@ export async function requireEditable(db: Database, userId: string, date: string
  */
 export async function getDay(db: Database, userId: string, date?: string): Promise<DayDto> {
   const { day, today, user } = await resolveDate(db, userId, date);
-  const [log, rows, ctx, recap, objectives, workouts, body] = await Promise.all([
+  const [log, rows, ctx, recap, objectives, workouts, body, ownPrompts] = await Promise.all([
     dayRepo.find(db, userId, day),
     habitRepo.findAllByUser(db, userId),
     loadLeafContext(db, userId),
@@ -57,6 +59,7 @@ export async function getDay(db: Database, userId: string, date?: string): Promi
     objectivesForDay(db, userId, day),
     workoutsForDay(db, userId, day, user.unitSystem),
     bodyForDay(db, user, day),
+    scheduledPrompts(db, userId, day, user.timezone),
   ]);
   const recapDto =
     recap && ctx
@@ -120,7 +123,7 @@ export async function getDay(db: Database, userId: string, date?: string): Promi
     workouts,
     body,
     units: user.unitSystem,
-    prompts: (log?.prompts ?? []) as GuidedPromptDto[],
+    prompts: mergeDayPrompts((log?.prompts ?? []) as GuidedPromptDto[], ownPrompts),
     recap: recapDto,
   };
 }
@@ -183,9 +186,13 @@ export async function savePromptAnswers(
   date: string,
   answers: (string | null)[],
 ) {
-  const { day } = await requireEditable(db, userId, date);
-  const log = await dayRepo.find(db, userId, day);
-  const prompts = (log?.prompts ?? []) as GuidedPromptDto[];
+  const { day, user } = await requireEditable(db, userId, date);
+  const [log, ownPrompts] = await Promise.all([
+    dayRepo.find(db, userId, day),
+    scheduledPrompts(db, userId, day, user.timezone),
+  ]);
+  // Positions match what getDay showed: the scout's questions, then the player's own.
+  const prompts = mergeDayPrompts((log?.prompts ?? []) as GuidedPromptDto[], ownPrompts);
   if (answers.length > prompts.length) throw badRequest("There are no questions for that day");
   const updated = prompts.map((p, i) =>
     i < answers.length ? { ...p, answer: answers[i]?.trim() || null } : p,

@@ -17,6 +17,7 @@ import { WorkoutPage } from "./features/workouts/WorkoutPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { HabitsGlancePage } from "./features/habits/HabitsGlancePage";
 import { ManageHabitsPage } from "./features/habits/ManageHabitsPage";
+import { QuestionsPage } from "./features/questions/QuestionsPage";
 import { CoachPage } from "./features/coach/CoachPage";
 import { UpgradePage } from "./features/account/UpgradePage";
 import { ScoutingReportPage } from "./features/scouting/ScoutingReportPage";
@@ -204,6 +205,16 @@ export const router = createBrowserRouter([
           <RequireAuth>
             <FeatureGate feature="habits">
               <ManageHabitsPage />
+            </FeatureGate>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "questions",
+        element: (
+          <RequireAuth>
+            <FeatureGate feature="guidedPrompts">
+              <QuestionsPage />
             </FeatureGate>
           </RequireAuth>
         ),

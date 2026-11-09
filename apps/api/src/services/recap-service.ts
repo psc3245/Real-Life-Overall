@@ -306,16 +306,15 @@ export async function runDailyRecap(
       await dayRepo.ensure(tx, userId, day);
       await dayRepo.setStatus(tx, userId, day, "recapped");
 
-      // Tomorrow's questions, unless the user already started answering a set there.
+      // Tomorrow's questions, unless the user already started answering the scout's set there.
+      // The player's own questions there are kept.
       const next = await dayRepo.find(tx, userId, addDays(day, 1));
       const current = (next?.prompts ?? []) as GuidedPromptDto[];
-      if (nextPrompts.length && !current.some((p) => p.answer)) {
-        await dayRepo.setPrompts(
-          tx,
-          userId,
-          addDays(day, 1),
-          nextPrompts.map((question) => ({ question, answer: null })),
-        );
+      if (nextPrompts.length && !current.some((p) => !p.promptId && p.answer)) {
+        await dayRepo.setPrompts(tx, userId, addDays(day, 1), [
+          ...nextPrompts.map((question) => ({ question, answer: null })),
+          ...current.filter((p) => p.promptId),
+        ]);
       }
     });
   } catch (error) {

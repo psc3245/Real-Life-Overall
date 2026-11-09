@@ -409,6 +409,11 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 
 ---
 
+### 7.11 Your questions (added 2026-11-08)
+- The player writes their own questions and picks the weekdays they're asked ("What's one thing you're grateful for?" on Sundays). Up to 10 (`MAX_CUSTOM_PROMPTS`), in `custom_prompts`; managed at `/questions` (web and iOS), linked from the day log's Questions section. Part of the guided questions feature, so switching that off hides them too.
+- **On a day:** the day log shows the scout's questions, then "Your questions": every live question scheduled that weekday and made by then (a new question doesn't reach back into logged days). They aren't stored until answered or saved; answers sit in `day_logs.prompts` next to the scout's, tagged with `promptId` (`mergeDayPrompts`). An unanswered one follows edits and drops out when deleted or unscheduled; an answered one keeps what was asked, even after the question is deleted.
+- **Recaps** read the answers like the scout's ("Answers to today's questions"). A recap writing tomorrow's scout questions keeps the player's own there.
+
 ## 8. Architecture
 
 ### 8.1 Constraints
@@ -575,7 +580,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 | `decay_rules` | `node_id`, `grace_days`, `per_day`, `floor`, `notes`, `version`, `active`, `authored_by` (`llm`/`user`) | |
 | `pauses` | `user_id`, `starts_on`, `ends_on`, `reason` | Vacation / illness |
 | `onboarding_sessions` | `user_id`, `season_id`, `stage`, `method` (`scout`/`combine`), `questionnaire` jsonb, `answers` jsonb, `chat` jsonb, `result` jsonb | Resumable |
-| `day_logs` | `user_id`, `local_date`, `journal` text, `prompts` jsonb (guided questions and answers), `status` (`open`/`recapped`/`stale`) | Unique `(user_id, local_date)` |
+| `day_logs` | `user_id`, `local_date`, `journal` text, `prompts` jsonb (guided questions and answers, the scout's and the player's own), `status` (`open`/`recapped`/`stale`) | Unique `(user_id, local_date)` |
 | `habits` | `user_id`, `name`, `type` (8 types + `group`), `config` jsonb (target, slider min/max, group rule…), `days` (weekdays), `starts_on`, `sort_order`, `parent_id`, `archived_at` | Ported from Habit Tracker, with the type-specific columns folded into `config`. **Groups** (`type = group`) hold sub-habits (`parent_id`): done by a rule (all / any / at least N), no entries of their own, sub-habits share the group's schedule and carry the links. One level for now; the parent link leaves room for richer habits later. |
 | `habit_links` | `habit_id`, `node_lineage_id` | Confirmed links only (suggestions live in the editor); by lineage so links survive seasons |
 | `habit_entries` | `habit_id`, `local_date`, `value_num`, `value_text` | |
