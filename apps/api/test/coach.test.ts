@@ -1,7 +1,9 @@
 import {
+  addDays,
   MAX_COACH_MESSAGES_PER_DAY,
   type CoachStateDto,
   type DayDto,
+  type WorkoutTemplateDto,
   type WorkoutHistoryDto,
   type HabitDto,
   type ObjectiveDto,
@@ -352,5 +354,121 @@ describe("coach logging", () => {
     expect(
       (await t.request("/coach/postgame", { method: "POST", ...json({ date: "x" }) })).status,
     ).toBe(400);
+  });
+
+  it("creates habits, goals and templates, logs to a new habit in the same turn, and undoes them", async () => {
+    const plan = {
+      name: "Push Day",
+      notes: null,
+      exercises: [
+        {
+          exercise: "Bench Press (Barbell)",
+          newExercise: null,
+          sets: [set(185, 5), set(null, null)],
+        },
+        { exercise: "dip", newExercise: null, sets: [set(null, 10)] },
+      ],
+    };
+    const t = await setup([
+      toolCallResult(
+        [
+          "create_habit",
+          {
+            name: "Read",
+            type: "counter",
+            days: [],
+            target: 20,
+            unit: "pages",
+            avoid: false,
+            refs: ["n2", "n9"],
+          },
+        ],
+        [
+          "create_habit",
+          {
+            name: "Morning run",
+            type: "checkbox",
+            days: [],
+            target: null,
+            unit: null,
+            avoid: false,
+            refs: [],
+          },
+        ],
+        [
+          "create_goal",
+          {
+            name: "Run 50 miles",
+            kind: "total",
+            target: 50,
+            unit: "miles",
+            startValue: null,
+            deadline: addDays(new Date().toISOString().slice(0, 10), 29),
+            refs: ["n3"],
+          },
+        ],
+        [
+          "create_goal",
+          {
+            name: "Weigh 185",
+            kind: "reach",
+            target: 185,
+            unit: "lb",
+            startValue: null,
+            deadline: "2026-01-01",
+            refs: [],
+          },
+        ],
+        ["create_workout_template", plan],
+      ),
+      // The new habit's ref (after Morning run's h1) is h2.
+      toolCallResult(["log_habit", { habit: "h2", date: null, num: 12, text: null }]),
+      done,
+    ]);
+    await t.send("Set me up: a reading habit, a 50 mile month, and save my push day");
+
+    const habits = await body<HabitDto[]>(await t.request("/habits"));
+    const read = habits.find((h) => h.name === "Read")!;
+    expect(read).toMatchObject({ type: "counter", days: [0, 1, 2, 3, 4, 5, 6] });
+    expect(read.config).toMatchObject({ target: 20, unit: "pages" });
+    expect(read.links).toEqual([t.nodeId("Career")]);
+    expect(habits.filter((h) => h.name.toLowerCase() === "morning run")).toHaveLength(1);
+    const goals = await body<ObjectiveDto[]>(await t.request("/objectives"));
+    expect(goals.map((g) => [g.name, g.target, g.unit])).toEqual([["Run 50 miles", 50, "miles"]]);
+    const templates = await body<WorkoutTemplateDto[]>(await t.request("/workout-templates"));
+    expect(templates[0]!.name).toBe("Push Day");
+    // A template is a plan: blank numbers stay, nothing is done.
+    expect(templates[0]!.exercises.map((e) => [e.exerciseId, e.sets.length])).toEqual([
+      ["bench-press-barbell", 2],
+      ["dip", 1],
+    ]);
+    expect(templates[0]!.exercises[0]!.sets.every((x) => !x.done)).toBe(true);
+    const day = await body<DayDto>(await t.request("/days/today"));
+    expect(day.habits.find((h) => h.habit.name === "Read")!.entry).toEqual({ num: 12, text: null });
+
+    const prompt = JSON.stringify(
+      t.model.doGenerateCalls[t.model.doGenerateCalls.length - 2]!.prompt,
+    );
+    expect(prompt).toContain("already have a habit called Morning run");
+    expect(prompt).toContain("a reach goal needs a startValue");
+    const { message } = await action(t);
+    expect(message.actions.map((a) => a.kind)).toEqual([
+      "newHabit",
+      "newGoal",
+      "template",
+      "habit",
+    ]);
+
+    for (const i of [0, 1, 2]) {
+      const res = await t.request(`/coach/messages/${message.id}/actions/${i}/undo`, {
+        method: "POST",
+      });
+      expect(res.status).toBe(200);
+    }
+    expect((await body<HabitDto[]>(await t.request("/habits"))).map((h) => h.name)).toEqual([
+      "Morning run",
+    ]);
+    expect(await body(await t.request("/objectives"))).toEqual([]);
+    expect(await body(await t.request("/workout-templates"))).toEqual([]);
   });
 });

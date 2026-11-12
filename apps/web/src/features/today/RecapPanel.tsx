@@ -29,8 +29,9 @@ function hasContent(day: DayDto) {
 }
 
 /**
- * "End my day" before a recap; the recap itself after, with an update button if stale. The
- * first recap of a day opens the postgame interview when the coach is on (premium).
+ * "End my day" before a recap; the recap itself after, with an update button if stale. Every
+ * recap run from here opens the postgame interview when the coach is on (premium), and a
+ * recapped day can open it again.
  */
 export function RecapPanel({ day }: { day: DayDto }) {
   const talk = useTalk();
@@ -51,10 +52,9 @@ export function RecapPanel({ day }: { day: DayDto }) {
         variant="primary"
         className="px-6 py-3 text-base"
         disabled={!ready || !day.editable || endDay.isPending}
-        onClick={() => {
-          const first = !day.recap;
-          endDay.mutate(undefined, { onSuccess: () => first && postgameOn && setPostgame(true) });
-        }}
+        onClick={() =>
+          endDay.mutate(undefined, { onSuccess: () => postgameOn && setPostgame(true) })
+        }
       >
         {endDay.isPending ? WORKING[line] : label}
       </Button>
@@ -94,6 +94,17 @@ export function RecapPanel({ day }: { day: DayDto }) {
         </div>
       )}
       <RecapCard recap={day.recap} />
+      {postgameOn && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-court-700 bg-court-900/70 p-4">
+          <p className="text-sm text-court-300">
+            Talk the day over with the {talk.coach.toLowerCase()}: it asks what's missing and logs
+            it for you.
+          </p>
+          <Button variant="ghost" onClick={() => setPostgame(true)}>
+            Postgame
+          </Button>
+        </div>
+      )}
       <RecapDebug recapId={day.recap.id} />
       {modal}
     </section>

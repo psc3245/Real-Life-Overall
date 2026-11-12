@@ -347,12 +347,30 @@ const ACTION_LABEL: Record<CoachActionDto["kind"], string> = {
   workout: "Workout logged",
   habit: "Habit logged",
   goal: "Goal progress",
+  newHabit: "Habit created",
+  newGoal: "Goal created",
+  template: "Template saved",
 };
 
-/** Something the coach logged, with undo (it writes to the day log directly). */
+function receiptLink(a: CoachActionDto) {
+  switch (a.kind) {
+    case "workout":
+      return `/workouts/${a.workoutId}`;
+    case "template":
+      return `/workouts/templates/${a.templateId}`;
+    case "newHabit":
+      return "/habits/manage";
+    case "newGoal":
+      return "/goals";
+    default:
+      return `/log?date=${a.date}#${a.kind}s`;
+  }
+}
+
+/** Something the coach logged or made, with undo (it writes to the player's data directly). */
 function Receipt({ messageId, action: a }: { messageId: string; action: CoachActionDto }) {
   const undo = useUndoCoachAction();
-  const link = a.kind === "workout" ? `/workouts/${a.workoutId}` : `/log?date=${a.date}#${a.kind}s`;
+  const link = receiptLink(a);
   return (
     <li
       className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${a.undone ? "border-court-800 opacity-60" : "border-neon/40 bg-neon/5"}`}

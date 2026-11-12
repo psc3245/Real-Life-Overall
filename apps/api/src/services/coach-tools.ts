@@ -1,23 +1,32 @@
 import {
+  addDays,
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
   formatSet,
   fromDisplayDistance,
   fromDisplayWeight,
   HABIT_TYPE_LABELS,
+  HABIT_TYPES,
+  isValidDate,
   isAvoid,
   isEntryDone,
   MAX_COACH_ACTIONS,
+  MAX_HABIT_LINKS,
+  MAX_OBJECTIVE_DAYS,
+  MAX_OBJECTIVE_TARGET,
   MAX_SETS_PER_EXERCISE,
   MAX_WORKOUT_EXERCISES,
   TRACKING_FIELDS,
   TRACKING_LABELS,
+  normalizeHabitConfig,
+  WEEKDAY_SHORT,
   type CoachActionDto,
   type DayDto,
   type DayHabitDto,
   type ExerciseTracking,
   type HabitConfig,
   type HabitDto,
+  type HabitType,
   type SetField,
   type UnitSystem,
   type WorkoutExerciseDto,
@@ -28,7 +37,15 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Database } from "../db/client";
 import { getDay, saveEntry, saveObjective } from "./day-service";
-import { createExercise, loadLookup, logWorkout, type Lookup } from "./workout-service";
+import { createHabit } from "./habit-service";
+import { createObjective } from "./objective-service";
+import {
+  createExercise,
+  createTemplate,
+  loadLookup,
+  logWorkout,
+  type Lookup,
+} from "./workout-service";
 
 /**
  * The coach's tools (DESIGN.md §5.9): logging workouts, habits and goal progress the player
@@ -180,6 +197,11 @@ export interface CoachToolContext {
   units: UnitSystem;
   refs: CoachRefs;
   features: Record<string, boolean>;
+  /** Whether the day in focus can still be logged (creating things works either way). */
+  editable: boolean;
+  /** Tree refs (n3) to node ids, and the leaves habits and goals can build, by name. */
+  idByRef: Map<string, string>;
+  leaves: Map<string, string>;
   /** Receipts for what the tools logged, in order. */
   actions: CoachActionDto[];
 }
@@ -189,10 +211,97 @@ const dateField = z
   .nullable()
   .describe("YYYY-MM-DD the day it happened; null for the day in focus");
 
+const exercisesField = (units: UnitSystem) => {
+  const weight = units === "imperial" ? "lb" : "kg";
+  const distance = units === "imperial" ? "miles" : "km";
+  return z.array(
+    z.object({
+      exercise: z.string().describe("An id from the exercise library, or its name"),
+      newExercise: z
+        .object({ category: z.enum(EXERCISE_CATEGORIES), tracking: z.enum(EXERCISE_TRACKING) })
+        .nullable()
+        .describe("Only when nothing in the library fits: adds it as the user's own exercise"),
+      sets: z.array(
+        z.object({
+          weight: z.number().nullable().describe(`In ${weight}; weight_reps only`),
+          reps: z.number().nullable().describe("Reps, or makes for makes/attempts"),
+          seconds: z.number().nullable().describe("duration and distance+time only"),
+          distance: z.number().nullable().describe(`In ${distance}; distance+time only`),
+          attempts: z.number().nullable().describe("makes/attempts only"),
+        }),
+      ),
+    }),
+  );
+};
+type ExercisesInput = z.infer<ReturnType<typeof exercisesField>>;
+
+/**
+ * Exercises as stored, resolving names to the library (or adding the player's own). Sets with
+ * none of the numbers their exercise tracks are dropped, unless `keepEmpty` (a template's plan
+ * can leave numbers blank).
+ */
+async function buildExercises(
+  c: CoachToolContext,
+  input: ExercisesInput,
+  { done, keepEmpty }: { done: boolean; keepEmpty: boolean },
+): Promise<{ exercises: WorkoutExerciseDto[]; lookup: Lookup } | { error: string }> {
+  let lookup = await loadLookup(c.db, c.userId);
+  const exercises: WorkoutExerciseDto[] = [];
+  for (const e of input.slice(0, MAX_WORKOUT_EXERCISES)) {
+    const resolved = resolveExercise(lookup, e.exercise);
+    let match = resolved.match;
+    if (!match && e.newExercise) {
+      const created = await createExercise(c.db, c.userId, {
+        name: e.exercise.trim().slice(0, 60),
+        ...e.newExercise,
+      });
+      lookup = await loadLookup(c.db, c.userId);
+      match = lookup.get(created.id) ?? null;
+    }
+    if (!match) {
+      return {
+        error:
+          `"${e.exercise}" isn't in the library.` +
+          (resolved.close.length ? ` Closest: ${resolved.close.join(", ")}.` : "") +
+          " Use one of those, or pass newExercise to add it.",
+      };
+    }
+    const fields = TRACKING_FIELDS[match.tracking];
+    const sets = e.sets.slice(0, MAX_SETS_PER_EXERCISE).map((s): WorkoutSetDto => ({
+      kind: "normal",
+      weightKg: s.weight !== null ? fromDisplayWeight(s.weight, c.units) : null,
+      reps: s.reps !== null ? Math.round(s.reps) : null,
+      durationS: s.seconds !== null ? Math.round(s.seconds) : null,
+      distanceM: s.distance !== null ? fromDisplayDistance(s.distance, c.units) : null,
+      attempts: s.attempts !== null ? Math.round(s.attempts) : null,
+      done,
+    }));
+    exercises.push({
+      exerciseId: match.id,
+      notes: "",
+      restS: null,
+      sets: keepEmpty
+        ? sets
+        : sets.filter((s) => fields.some((f) => s[SET_FIELD_KEYS[f]] !== null)),
+    });
+  }
+  return { exercises, lookup };
+}
+
+/** "Squat (Barbell): 3 × 225 lb × 5 · Leg Press: 3 × 270 lb × 12" */
+function describeExercises(exercises: WorkoutExerciseDto[], lookup: Lookup, units: UnitSystem) {
+  return exercises
+    .map((x) => {
+      const info = lookup.get(x.exerciseId);
+      const last = x.sets.at(-1);
+      const shown = last && info ? formatSet(info.tracking, last, units) : "";
+      return `${info?.name ?? "Exercise"}: ${x.sets.length}${shown && shown !== "—" ? ` × ${shown}` : " sets"}`;
+    })
+    .join(" · ");
+}
+
 /** Tools for the parts of the app the player has switched on. */
 export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
-  const weight = c.units === "imperial" ? "lb" : "kg";
-  const distance = c.units === "imperial" ? "miles" : "km";
   const full = () =>
     c.actions.length >= MAX_COACH_ACTIONS
       ? { error: "That's all the logging for this turn; ask the user to send another message." }
@@ -206,7 +315,7 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
   };
   const tools: ToolSet = {};
 
-  if (c.features.workouts) {
+  if (c.features.workouts && c.editable) {
     tools.log_workout = tool({
       description:
         "Log a finished workout the user describes, with every set they did. Ask first if you " +
@@ -216,82 +325,20 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
         name: z.string().describe('Short name, e.g. "Leg Day"'),
         durationMinutes: z.number().nullable().describe("How long it took; null if unknown"),
         notes: z.string().nullable(),
-        exercises: z
-          .array(
-            z.object({
-              exercise: z.string().describe("An id from the exercise library, or its name"),
-              newExercise: z
-                .object({
-                  category: z.enum(EXERCISE_CATEGORIES),
-                  tracking: z.enum(EXERCISE_TRACKING),
-                })
-                .nullable()
-                .describe(
-                  "Only when nothing in the library fits: adds it as the user's own exercise",
-                ),
-              sets: z.array(
-                z.object({
-                  weight: z.number().nullable().describe(`In ${weight}; weight_reps only`),
-                  reps: z.number().nullable().describe("Reps, or makes for makes/attempts"),
-                  seconds: z.number().nullable().describe("duration and distance+time only"),
-                  distance: z.number().nullable().describe(`In ${distance}; distance+time only`),
-                  attempts: z.number().nullable().describe("makes/attempts only"),
-                }),
-              ),
-            }),
-          )
-          .describe("In the order they were done"),
+        exercises: exercisesField(c.units).describe("In the order they were done"),
       }),
       execute: (input) =>
         serial(async () => {
           if (full()) return full();
           try {
-            let lookup = await loadLookup(c.db, c.userId);
-            const exercises: WorkoutExerciseDto[] = [];
-            for (const e of input.exercises.slice(0, MAX_WORKOUT_EXERCISES)) {
-              const resolved = resolveExercise(lookup, e.exercise);
-              let match = resolved.match;
-              if (!match && e.newExercise) {
-                const created = await createExercise(c.db, c.userId, {
-                  name: e.exercise.trim().slice(0, 60),
-                  ...e.newExercise,
-                });
-                lookup = await loadLookup(c.db, c.userId);
-                match = lookup.get(created.id) ?? null;
-              }
-              if (!match) {
-                return {
-                  error:
-                    `"${e.exercise}" isn't in the library.` +
-                    (resolved.close.length ? ` Closest: ${resolved.close.join(", ")}.` : "") +
-                    " Use one of those, or pass newExercise to add it.",
-                };
-              }
-              const sets = e.sets.slice(0, MAX_SETS_PER_EXERCISE).map((s): WorkoutSetDto => ({
-                kind: "normal",
-                weightKg: s.weight !== null ? fromDisplayWeight(s.weight, c.units) : null,
-                reps: s.reps !== null ? Math.round(s.reps) : null,
-                durationS: s.seconds !== null ? Math.round(s.seconds) : null,
-                distanceM: s.distance !== null ? fromDisplayDistance(s.distance, c.units) : null,
-                attempts: s.attempts !== null ? Math.round(s.attempts) : null,
-                done: true,
-              }));
-              exercises.push({
-                exerciseId: match.id,
-                notes: "",
-                restS: null,
-                // A set with none of the numbers its exercise tracks says nothing; it's dropped
-                // (and so is an exercise left with none).
-                sets: sets.filter((s) =>
-                  TRACKING_FIELDS[match.tracking].some((f) => s[SET_FIELD_KEYS[f]] !== null),
-                ),
-              });
-            }
-            const sets = (x: WorkoutExerciseDto) => x.sets.length;
-            const durationS = Math.round(
-              (input.durationMinutes ??
-                Math.max(20, 3 * exercises.reduce((n, x) => n + sets(x), 0))) * 60,
-            );
+            const built = await buildExercises(c, input.exercises, {
+              done: true,
+              keepEmpty: false,
+            });
+            if ("error" in built) return built;
+            const { exercises, lookup } = built;
+            const sets = exercises.reduce((n, x) => n + x.sets.length, 0);
+            const durationS = Math.round((input.durationMinutes ?? Math.max(20, 3 * sets)) * 60);
             const workout = await logWorkout(c.db, c.userId, {
               name: input.name.trim().slice(0, 80) || "Workout",
               notes: (input.notes ?? "").trim().slice(0, 2000),
@@ -299,15 +346,7 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
               durationS,
               exercises,
             });
-            const detail = workout.exercises
-              .map((x) => {
-                const info = lookup.get(x.exerciseId);
-                const best = x.sets.at(-1);
-                return `${info?.name ?? "Exercise"}: ${x.sets.length} × ${
-                  best && info ? formatSet(info.tracking, best, c.units) : ""
-                }`;
-              })
-              .join(" · ");
+            const detail = describeExercises(workout.exercises, lookup, c.units);
             c.actions.push({
               index: c.actions.length,
               kind: "workout",
@@ -325,7 +364,50 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
     });
   }
 
-  if (c.features.habits) {
+  if (c.features.workouts) {
+    tools.create_workout_template = tool({
+      description:
+        "Save a workout template (a routine they can start from the Train page): its " +
+        "exercises with the planned sets. Leave numbers null where they haven't said.",
+      inputSchema: z.object({
+        name: z.string().describe('e.g. "Push Day"'),
+        notes: z.string().nullable(),
+        exercises: exercisesField(c.units).describe("In order; one entry per planned set"),
+      }),
+      execute: (input) =>
+        serial(async () => {
+          if (full()) return full();
+          try {
+            const built = await buildExercises(c, input.exercises, {
+              done: false,
+              keepEmpty: true,
+            });
+            if ("error" in built) return built;
+            if (!built.exercises.length) return { error: "A template needs an exercise" };
+            const template = await createTemplate(c.db, c.userId, {
+              name: input.name.trim().slice(0, 80) || "Routine",
+              notes: (input.notes ?? "").trim().slice(0, 2000),
+              exercises: built.exercises.map((e) => ({ ...e, restS: e.restS ?? null })),
+            });
+            const detail = describeExercises(template.exercises, built.lookup, c.units);
+            c.actions.push({
+              index: c.actions.length,
+              kind: "template",
+              templateId: template.id,
+              date: c.today,
+              title: template.name,
+              detail,
+              undone: false,
+            });
+            return { ok: true, created: `Template ${template.name}: ${detail}` };
+          } catch (error) {
+            return { error: message(error) };
+          }
+        }),
+    });
+  }
+
+  if (c.features.habits && c.editable) {
     tools.log_habit = tool({
       description:
         "Log one of the user's habits for a day when they tell you they did it (or slipped on " +
@@ -383,7 +465,7 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
     });
   }
 
-  if (c.features.goals) {
+  if (c.features.goals && c.editable) {
     tools.log_goal_progress = tool({
       description:
         "Add progress to one of the user's goals for a day. For a total goal, `amount` is what " +
@@ -421,6 +503,146 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
               undone: false,
             });
             return { ok: true, logged: `${goal.name} on ${date}: ${detail}` };
+          } catch (error) {
+            return { error: message(error) };
+          }
+        }),
+    });
+  }
+  const refs = z
+    .array(z.string())
+    .describe("Attribute refs (leaves, e.g. n3) it builds; [] if none fits");
+  const toLinks = (list: string[]) =>
+    [
+      ...new Set(list.map((r) => c.idByRef.get(r.trim())).filter((id) => id && c.leaves.has(id))),
+    ].slice(0, MAX_HABIT_LINKS) as string[];
+  const builds = (links: string[]) =>
+    links.length ? ` · builds ${links.map((id) => c.leaves.get(id)).join(", ")}` : "";
+
+  if (c.features.habits) {
+    tools.create_habit = tool({
+      description:
+        "Create a new habit when the user asks for one or agrees to one you proposed. Never " +
+        "duplicate an existing habit. Returns its ref so you can log it right away.",
+      inputSchema: z.object({
+        name: z.string().describe("Short, e.g. 'Read' or 'No soda'"),
+        type: z
+          .enum(HABIT_TYPES.filter((t) => t !== "group") as [HabitType, ...HabitType[]])
+          .describe("Prefer checkbox, counter or duration"),
+        days: z.array(z.number()).describe("Weekdays 0=Sunday..6=Saturday; [] for every day"),
+        target: z
+          .number()
+          .nullable()
+          .describe("counter: daily count; duration: daily minutes; avoid: the daily limit"),
+        unit: z.string().nullable().describe("counter only, e.g. 'pages'"),
+        avoid: z.boolean().describe("true for a habit to cut back on or quit"),
+        refs,
+      }),
+      execute: (input) =>
+        serial(async () => {
+          if (full()) return full();
+          const name = input.name.trim().slice(0, 60);
+          if (
+            [...c.refs.habits.values()].some((h) => h.name.toLowerCase() === name.toLowerCase())
+          ) {
+            return { error: `They already have a habit called ${name}` };
+          }
+          try {
+            const days = [
+              ...new Set(input.days.map(Math.round).filter((d) => d >= 0 && d <= 6)),
+            ].sort();
+            const habit = await createHabit(c.db, c.userId, {
+              name,
+              type: input.type,
+              config: normalizeHabitConfig(input.type, {
+                target: input.target,
+                unit: input.unit?.trim() || null,
+                direction: input.avoid ? "avoid" : "build",
+              }),
+              days: days.length ? days : [0, 1, 2, 3, 4, 5, 6],
+              links: toLinks(input.refs),
+            });
+            const ref = `h${c.refs.habits.size + 1}`;
+            c.refs.habits.set(ref, habit);
+            const schedule =
+              habit.days.length === 7
+                ? "every day"
+                : habit.days.map((d) => WEEKDAY_SHORT[d]).join(", ");
+            const detail =
+              `${HABIT_TYPE_LABELS[habit.type]}${isAvoid(habit.config) ? " (avoid)" : ""} · ` +
+              `${schedule}${builds(habit.links)}`;
+            c.actions.push({
+              index: c.actions.length,
+              kind: "newHabit",
+              habitId: habit.id,
+              date: c.today,
+              title: habit.name,
+              detail,
+              undone: false,
+            });
+            return { ok: true, created: `${habit.name} (${detail})`, ref };
+          } catch (error) {
+            return { error: message(error) };
+          }
+        }),
+    });
+  }
+
+  if (c.features.goals) {
+    tools.create_goal = tool({
+      description:
+        "Create a goal when the user asks for one or agrees to one you proposed. total: reach " +
+        "a total by the deadline ('Run 50 miles'). reach: move a number from where it is to a " +
+        "target ('Weigh 185', 'Pay the card down to 0'). Returns its ref.",
+      inputSchema: z.object({
+        name: z.string(),
+        kind: z.enum(["total", "reach"]),
+        target: z.number(),
+        unit: z.string().describe("What it counts, e.g. 'miles', 'lb', 'dollars'"),
+        startValue: z.number().nullable().describe("reach only: where they are now"),
+        deadline: z
+          .string()
+          .describe("YYYY-MM-DD, inclusive; 'this month' means the month's last day"),
+        refs,
+      }),
+      execute: (input) =>
+        serial(async () => {
+          if (full()) return full();
+          if (input.kind === "reach" && input.startValue === null) {
+            return { error: "Ask where they are now first; a reach goal needs a startValue" };
+          }
+          const last = addDays(c.today, MAX_OBJECTIVE_DAYS - 1);
+          if (!isValidDate(input.deadline) || input.deadline < c.today || input.deadline > last) {
+            return { error: `The deadline must be a date from ${c.today} to ${last}` };
+          }
+          try {
+            const goal = await createObjective(c.db, c.userId, {
+              name: input.name.trim().slice(0, 80),
+              kind: input.kind,
+              target: Math.min(MAX_OBJECTIVE_TARGET, input.target),
+              ...(input.kind === "reach" && { startValue: input.startValue! }),
+              unit: input.unit.trim().slice(0, 20),
+              startsOn: c.today,
+              endsOn: input.deadline,
+              source: "manual",
+              links: toLinks(input.refs),
+            });
+            const ref = `g${c.refs.goals.size + 1}`;
+            c.refs.goals.set(ref, goal);
+            const detail =
+              goal.kind === "reach"
+                ? `${goal.startValue} → ${goal.target} ${goal.unit} by ${goal.endsOn}${builds(goal.links)}`
+                : `${goal.target} ${goal.unit} by ${goal.endsOn}${builds(goal.links)}`;
+            c.actions.push({
+              index: c.actions.length,
+              kind: "newGoal",
+              objectiveId: goal.id,
+              date: c.today,
+              title: goal.name,
+              detail,
+              undone: false,
+            });
+            return { ok: true, created: `${goal.name}: ${detail}`, ref };
           } catch (error) {
             return { error: message(error) };
           }

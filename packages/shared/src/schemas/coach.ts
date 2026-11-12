@@ -83,6 +83,10 @@ export type CoachActionDto = {
       previous: { num: number | null; text: string | null } | null;
     }
   | { kind: "goal"; objectiveId: string; previous: number | null }
+  /** Created by the coach; undo archives the habit or goal, or deletes the template. */
+  | { kind: "newHabit"; habitId: string }
+  | { kind: "newGoal"; objectiveId: string }
+  | { kind: "template"; templateId: string }
 );
 
 export interface CoachMessageDto {

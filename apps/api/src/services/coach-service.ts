@@ -57,10 +57,10 @@ import {
 } from "./coach-tools";
 import { getDay, saveEntry, saveObjective } from "./day-service";
 import { renderScoutingReport } from "./evolution-service";
-import { createHabit, loadLeafContext, type LeafContext } from "./habit-service";
-import { createObjective, listObjectives } from "./objective-service";
+import { archiveHabit, createHabit, loadLeafContext, type LeafContext } from "./habit-service";
+import { archiveObjective, createObjective, listObjectives } from "./objective-service";
 import { currentFocus } from "./weekly-service";
-import { deleteWorkout, loadLookup } from "./workout-service";
+import { deleteTemplate, deleteWorkout, loadLookup } from "./workout-service";
 
 type Output = z.infer<typeof coachReplyOutputSchema>;
 
@@ -217,11 +217,20 @@ async function buildContext(db: Database, userId: string, date?: string) {
   };
 }
 
-/** Past turns for the model, with what the coach logged, so it never logs a thing twice. */
+const DONE: Record<CoachActionDto["kind"], string> = {
+  workout: "Logged workout",
+  habit: "Logged habit",
+  goal: "Logged goal progress",
+  newHabit: "Created habit",
+  newGoal: "Created goal",
+  template: "Saved template",
+};
+
+/** Past turns for the model, with what the coach did, so it never does a thing twice. */
 function toModelMessage(m: CoachMessageRow): ModelMessage {
   const actions = (m.actions as CoachActionDto[]).map(
     (a) =>
-      `[${a.undone ? "Logged, then undone by the user" : "Logged"}: ${a.title} on ${a.date}: ${a.detail}]`,
+      `[${DONE[a.kind]}${a.undone ? ", since undone by the user" : ""}: ${a.title} (${a.date}): ${a.detail}]`,
   );
   return { role: m.role, content: [m.content, ...actions].join("\n") };
 }
@@ -313,9 +322,21 @@ export async function sendMessage(
   const { context, ctx, idByRef, features, today, day, dayRefs, units } = built;
   const messages: ModelMessage[] = [...history.map(toModelMessage), { role: "user", content }];
   const actions: CoachActionDto[] = [];
-  const tools = day.editable
-    ? coachTools({ db, userId, today, units, refs: dayRefs, features, actions }, day.date)
-    : {};
+  const tools = coachTools(
+    {
+      db,
+      userId,
+      today,
+      units,
+      refs: dayRefs,
+      features,
+      editable: day.editable,
+      idByRef,
+      leaves: new Map(ctx?.nodes.filter((n) => ctx.leaves.has(n.id)).map((n) => [n.id, n.name])),
+      actions,
+    },
+    day.date,
+  );
   let output: Output;
   try {
     output = await llm.generateStructured({
@@ -417,8 +438,18 @@ export async function undoAction(
     });
   } else if (a.kind === "habit") {
     await saveEntry(db, userId, a.date, a.habitId, a.previous ?? { num: null, text: null });
-  } else {
+  } else if (a.kind === "goal") {
     await saveObjective(db, userId, a.date, a.objectiveId, a.previous);
+  } else {
+    // Already archived or deleted by hand: nothing left to undo.
+    const gone = (error: unknown) => {
+      if (!(error instanceof HTTPException && (error.status === 404 || error.status === 409))) {
+        throw error;
+      }
+    };
+    if (a.kind === "newHabit") await archiveHabit(db, userId, a.habitId).catch(gone);
+    else if (a.kind === "newGoal") await archiveObjective(db, userId, a.objectiveId).catch(gone);
+    else await deleteTemplate(db, userId, a.templateId).catch(gone);
   }
   await coachRepo.updateActions(
     db,
