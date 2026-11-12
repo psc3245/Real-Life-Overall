@@ -1,0 +1,1 @@
+ALTER TABLE "coach_messages" ADD COLUMN "actions" jsonb DEFAULT '[]'::jsonb NOT NULL;

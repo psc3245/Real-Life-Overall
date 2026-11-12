@@ -25,7 +25,7 @@ describe("sports talk voice", () => {
 
     await ask();
     expect(systemOf(t.model.doGenerateCalls.at(-1)!)).toContain("Voice: light sports framing");
-    expect(await lastVersion()).toBe("coach-v1+talk-normal");
+    expect(await lastVersion()).toBe("coach-v4+talk-normal");
 
     for (const [level, phrase] of [
       ["extra", "Voice: full sports"],
@@ -34,7 +34,7 @@ describe("sports talk voice", () => {
       await t.request("/me", { method: "PATCH", ...json({ preferences: { sportsTalk: level } }) });
       await ask();
       expect(systemOf(t.model.doGenerateCalls.at(-1)!)).toContain(phrase);
-      expect(await lastVersion()).toBe(`coach-v1+talk-${level}`);
+      expect(await lastVersion()).toBe(`coach-v4+talk-${level}`);
     }
   });
 

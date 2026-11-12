@@ -276,12 +276,16 @@ const KIND_LABEL: Record<CoachSuggestionDto["kind"], string> = {
   habit: "Habit",
   goal: "Goal",
   report: "Scouting Report",
+  workout: "Workout draft",
+  template: "Template draft",
 };
 
 const ADD_LABEL: Record<CoachSuggestionDto["kind"], string> = {
   habit: "Add habit",
   goal: "Add goal",
   report: "Add to report",
+  workout: "Save workout",
+  template: "Save template",
 };
 
 const SECTION_LABEL = {
@@ -291,7 +295,12 @@ const SECTION_LABEL = {
   constraint: "Constraint",
 } as const;
 
+/** One line per draft; workouts and templates are reviewed in detail on the web for now. */
 function describe(s: CoachSuggestionDto, names: Map<string, string>) {
+  if (s.kind === "workout" || s.kind === "template") {
+    const sets = s.exercises.reduce((n, e) => n + e.sets.length, 0);
+    return `${s.kind === "workout" ? `${s.date} · ${Math.round(s.durationS / 60)} min · ` : ""}${s.exercises.length} exercise${s.exercises.length === 1 ? "" : "s"}, ${sets} sets`;
+  }
   const nodes =
     s.kind !== "report" && s.nodeIds.length
       ? ` · ${s.nodeIds.map((id) => names.get(id) ?? "?").join(", ")}`
@@ -306,7 +315,9 @@ function describe(s: CoachSuggestionDto, names: Map<string, string>) {
     return `${HABIT_TYPE_LABELS[s.habitType]} · ${schedule}${goal}${nodes}`;
   }
   if (s.kind === "goal") {
-    return `${s.target} ${s.unit} in ${s.durationDays} day${s.durationDays === 1 ? "" : "s"}${nodes}`;
+    return s.endsOn
+      ? `${s.goalKind === "reach" ? `${s.startValue} → ` : ""}${s.target} ${s.unit} by ${s.endsOn}${nodes}`
+      : `${s.target} ${s.unit} in ${s.durationDays} day${s.durationDays === 1 ? "" : "s"}${nodes}`;
   }
   return `${SECTION_LABEL[s.section]}${
     s.importance ? ` · ${IMPORTANCE_LABELS[s.importance]}` : ""

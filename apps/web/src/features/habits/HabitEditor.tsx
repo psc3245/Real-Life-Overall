@@ -37,12 +37,27 @@ const AVOID_HELP: Partial<Record<HabitType, string>> = {
   journal: "Write down slips only. A day with nothing written counts as kept.",
 };
 
+/**
+ * Saving somewhere else than the usual create call: a coach draft, saved through the coach so
+ * the draft is marked as added.
+ */
+export interface EditorSubmit<T> {
+  onSubmit: (body: T) => void;
+  pending: boolean;
+  error: unknown;
+}
+
+/** A new habit's starting values (a coach draft). */
+export type HabitDraft = Pick<HabitDto, "name" | "type" | "config" | "days" | "links">;
+
 export function HabitEditor({
   habit,
   parent,
   nodes,
   today,
   onDone,
+  initial,
+  submit,
 }: {
   /** Omit to create a new habit. */
   habit?: HabitDto;
@@ -52,21 +67,24 @@ export function HabitEditor({
   /** The user's local date, the default start date. */
   today: string;
   onDone: () => void;
+  initial?: HabitDraft;
+  submit?: EditorSubmit<HabitDraft & { startsOn: string }>;
 }) {
-  const [name, setName] = useState(habit?.name ?? "");
-  const [type, setType] = useState<HabitType>(habit?.type ?? "checkbox");
+  const start = habit ?? initial;
+  const [name, setName] = useState(start?.name ?? "");
+  const [type, setType] = useState<HabitType>(start?.type ?? "checkbox");
   const [config, setConfig] = useState<HabitConfig>(
-    habit?.config ?? normalizeHabitConfig("checkbox"),
+    start?.config ?? normalizeHabitConfig("checkbox"),
   );
-  const [days, setDays] = useState<number[]>(habit?.days ?? ALL_DAYS);
-  const [links, setLinks] = useState<string[]>(habit?.links ?? []);
+  const [days, setDays] = useState<number[]>(start?.days ?? ALL_DAYS);
+  const [links, setLinks] = useState<string[]>(start?.links ?? []);
   const [startsOn, setStartsOn] = useState(habit?.startsOn ?? today);
   const [reason, setReason] = useState<string | null>(null);
   const create = useCreateHabit();
   const update = useUpdateHabit();
   const suggest = useSuggestLinks();
   const { premium } = useAccount();
-  const saving = create.isPending || update.isPending;
+  const saving = submit?.pending || create.isPending || update.isPending;
 
   const avoid = config.direction === "avoid";
   const changeType = (next: HabitType) => {
@@ -104,7 +122,8 @@ export function HabitEditor({
       ...(!parent && { days, startsOn }),
       links: type === "group" ? [] : links,
     };
-    if (habit) update.mutate({ id: habit.id, ...body }, { onSuccess: onDone });
+    if (submit) submit.onSubmit({ name: body.name, type, config, days, links, startsOn });
+    else if (habit) update.mutate({ id: habit.id, ...body }, { onSuccess: onDone });
     else
       create.mutate(
         { days, startsOn, ...body, type, ...(parent && { parentId: parent.id }) },
@@ -366,7 +385,7 @@ export function HabitEditor({
         </fieldset>
       )}
 
-      <ErrorNote error={create.error ?? update.error} />
+      <ErrorNote error={submit?.error ?? create.error ?? update.error} />
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onDone}>
           Cancel

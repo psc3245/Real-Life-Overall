@@ -36,7 +36,11 @@ const uuid = z.uuid();
  * missing one (rather than a database error).
  */
 export function idParam(c: Context, name: string, what: string): string {
-  const value = c.req.param(name);
+  return idParamValue(c.req.param(name), what);
+}
+
+/** An id from anywhere in the request (a param or a query); anything else is a 404. */
+export function idParamValue(value: string | undefined, what: string): string {
   if (!value || !uuid.safeParse(value).success) throw notFound(`${what} not found`);
   return value;
 }

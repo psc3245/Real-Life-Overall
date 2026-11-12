@@ -36,6 +36,24 @@ export function jsonResult(value: unknown) {
   };
 }
 
+/** A mock model result that calls tools: `[toolName, input]` pairs. */
+export function toolCallResult(...calls: [string, unknown][]) {
+  return {
+    content: calls.map(([toolName, input], i) => ({
+      type: "tool-call" as const,
+      toolCallId: `call-${toolName}-${i}`,
+      toolName,
+      input: JSON.stringify(input),
+    })),
+    finishReason: { unified: "tool-calls" as const, raw: "tool_use" },
+    usage: {
+      inputTokens: { total: 100, noCache: 100, cacheRead: 0, cacheWrite: 0 },
+      outputTokens: { total: 20, text: 20, reasoning: 0 },
+    },
+    warnings: [],
+  };
+}
+
 export function mockResolver(doGenerate: MockGenerate): {
   resolver: ModelResolver;
   model: MockLanguageModelV4;
