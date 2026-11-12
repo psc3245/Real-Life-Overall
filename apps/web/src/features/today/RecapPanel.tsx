@@ -1,7 +1,9 @@
 import { MAX_RECAPS_PER_DAY, type DayDto, type RecapDto } from "@rlo/shared";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { useAccount } from "../../api/account";
 import { useEndDay } from "../../api/days";
+import { usePreferences } from "../../api/preferences";
 import { Button } from "../../components/Button";
 import { EarnedBadges } from "../../components/BadgeChip";
 import { ChangeDelta, OverallMove } from "../../components/Delta";
@@ -11,6 +13,7 @@ import { DebugFacts, DebugJson } from "../../components/debug/Debug";
 import { useDebug } from "../../components/debug/debugMode";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { useTalk } from "../../lib/talk";
+import { PostgameModal } from "../coach/PostgameModal";
 
 const WORKING = ["Reading your day…", "Weighing the evidence…", "Updating your ratings…"];
 
@@ -25,10 +28,15 @@ function hasContent(day: DayDto) {
   );
 }
 
-/** "End my day" before a recap; the recap itself after, with an update button if stale. */
+/**
+ * "End my day" before a recap; the recap itself after, with an update button if stale. The
+ * first recap of a day opens the postgame interview when the coach is on (premium).
+ */
 export function RecapPanel({ day }: { day: DayDto }) {
   const talk = useTalk();
   const endDay = useEndDay(day.date);
+  const postgameOn = useAccount().premium && usePreferences().features.coach;
+  const [postgame, setPostgame] = useState(false);
   const [line, setLine] = useState(0);
   useEffect(() => {
     if (!endDay.isPending) return;
@@ -43,7 +51,10 @@ export function RecapPanel({ day }: { day: DayDto }) {
         variant="primary"
         className="px-6 py-3 text-base"
         disabled={!ready || !day.editable || endDay.isPending}
-        onClick={() => endDay.mutate()}
+        onClick={() => {
+          const first = !day.recap;
+          endDay.mutate(undefined, { onSuccess: () => first && postgameOn && setPostgame(true) });
+        }}
       >
         {endDay.isPending ? WORKING[line] : label}
       </Button>
@@ -51,6 +62,8 @@ export function RecapPanel({ day }: { day: DayDto }) {
       <ErrorNote error={endDay.error} />
     </div>
   );
+
+  const modal = <PostgameModal day={day} open={postgame} onClose={() => setPostgame(false)} />;
 
   if (!day.recap) {
     return (
@@ -64,6 +77,7 @@ export function RecapPanel({ day }: { day: DayDto }) {
         ) : (
           <p className="text-sm text-court-500">Not recapped.</p>
         )}
+        {modal}
       </section>
     );
   }
@@ -81,6 +95,7 @@ export function RecapPanel({ day }: { day: DayDto }) {
       )}
       <RecapCard recap={day.recap} />
       <RecapDebug recapId={day.recap.id} />
+      {modal}
     </section>
   );
 }

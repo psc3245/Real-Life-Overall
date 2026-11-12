@@ -1,4 +1,4 @@
-import { coachMessageBodySchema } from "@rlo/shared";
+import { coachMessageBodySchema, postgameBodySchema } from "@rlo/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
 import { badRequest } from "../errors";
@@ -12,6 +12,16 @@ export const coachRoutes = new Hono<AppEnv>()
   .post("/messages", async (c) => {
     const { content } = await parseJson(c, coachMessageBodySchema);
     return c.json(await coach.sendMessage(c.get("db"), c.get("llm"), c.get("userId"), content));
+  })
+  .post("/postgame", async (c) => {
+    const { date } = await parseJson(c, postgameBodySchema);
+    return c.json(await coach.startPostgame(c.get("db"), c.get("llm"), c.get("userId"), date));
+  })
+  .post("/messages/:id/actions/:index/undo", async (c) => {
+    const id = idParam(c, "id", "Message");
+    const index = Number(c.req.param("index"));
+    if (!Number.isInteger(index)) throw badRequest("Use an action index");
+    return c.json(await coach.undoAction(c.get("db"), c.get("userId"), id, index));
   })
   .post("/messages/:id/suggestions/:index/:action", async (c) => {
     const id = idParam(c, "id", "Message");

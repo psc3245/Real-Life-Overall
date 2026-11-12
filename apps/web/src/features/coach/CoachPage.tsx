@@ -4,6 +4,7 @@ import {
   IMPORTANCE_LABELS,
   MAX_COACH_MESSAGE,
   WEEKDAY_SHORT,
+  type CoachActionDto,
   type CoachMessageDto,
   type CoachSuggestionDto,
 } from "@rlo/shared";
@@ -21,12 +22,14 @@ import {
   useCoach,
   useResolveCoachSuggestion,
   useSendCoachMessage,
+  useUndoCoachAction,
 } from "../../api/coach";
 import { useRatings } from "../../api/ratings";
 import { Button } from "../../components/Button";
 import { DebugJson } from "../../components/debug/Debug";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { useTalk } from "../../lib/talk";
+import { weekdayDate } from "../../lib/format";
 
 export function CoachPage() {
   const talk = useTalk();
@@ -98,7 +101,8 @@ export function CoachPage() {
               <Link to="/scouting-report" className="text-neon hover:underline">
                 {talk.scoutingReport}
               </Link>
-              , and can suggest habits and goals you add with one tap.
+              , and can suggest habits and goals you add with one tap. Tell it what you did and it
+              logs workouts, habits and goal progress for you.
             </p>
             <div className="mt-3 grid w-full gap-2 sm:grid-cols-2">
               {COACH_STARTERS.map((s) => (
@@ -145,7 +149,7 @@ export function CoachPage() {
 }
 
 /** The message box: grows with its text, autocorrects, Enter sends and Shift+Enter breaks a line. */
-function Composer({
+export function Composer({
   value,
   onChange,
   onSubmit,
@@ -256,7 +260,7 @@ export function Starters({
 }
 
 /** The coach's badge: an OVR-style monogram on a neon disc. */
-function CoachAvatar({ size = "sm" }: { size?: "sm" | "lg" | "xl" }) {
+export function CoachAvatar({ size = "sm" }: { size?: "sm" | "lg" | "xl" }) {
   const sizes = { sm: "size-8 text-xs", lg: "size-12 text-base", xl: "size-16 text-xl" };
   return (
     <span
@@ -268,7 +272,7 @@ function CoachAvatar({ size = "sm" }: { size?: "sm" | "lg" | "xl" }) {
   );
 }
 
-function Bubble({
+export function Bubble({
   role,
   pending = false,
   time,
@@ -298,7 +302,7 @@ function Bubble({
 }
 
 /** Three dots that bounce in turn while the coach writes a reply. */
-function TypingBubble() {
+export function TypingBubble() {
   return (
     <div className="flex items-end gap-2" role="status" aria-label="The coach is typing">
       <CoachAvatar />
@@ -315,12 +319,19 @@ function TypingBubble() {
   );
 }
 
-function Message({ message: m }: { message: CoachMessageDto }) {
+export function Message({ message: m }: { message: CoachMessageDto }) {
   return (
     <div className="space-y-2">
       <Bubble role={m.role} time={m.createdAt}>
         {m.content}
       </Bubble>
+      {m.actions.length > 0 && (
+        <ul className="space-y-2 pl-10" aria-label="Logged by the coach">
+          {m.actions.map((a) => (
+            <Receipt key={a.index} messageId={m.id} action={a} />
+          ))}
+        </ul>
+      )}
       {m.suggestions.length > 0 && (
         <ul className="space-y-2 pl-10">
           {m.suggestions.map((s) => (
@@ -329,6 +340,49 @@ function Message({ message: m }: { message: CoachMessageDto }) {
         </ul>
       )}
     </div>
+  );
+}
+
+const ACTION_LABEL: Record<CoachActionDto["kind"], string> = {
+  workout: "Workout logged",
+  habit: "Habit logged",
+  goal: "Goal progress",
+};
+
+/** Something the coach logged, with undo (it writes to the day log directly). */
+function Receipt({ messageId, action: a }: { messageId: string; action: CoachActionDto }) {
+  const undo = useUndoCoachAction();
+  const link = a.kind === "workout" ? `/workouts/${a.workoutId}` : `/log?date=${a.date}#${a.kind}s`;
+  return (
+    <li
+      className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${a.undone ? "border-court-800 opacity-60" : "border-neon/40 bg-neon/5"}`}
+    >
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-wider text-neon">
+          {a.undone ? "Undone" : `✓ ${ACTION_LABEL[a.kind]}`} · {weekdayDate(a.date)}
+        </p>
+        <p className={`font-medium ${a.undone ? "line-through" : ""}`}>
+          {a.undone ? (
+            a.title
+          ) : (
+            <Link to={link} className="hover:text-neon">
+              {a.title}
+            </Link>
+          )}
+        </p>
+        <p className="text-sm text-court-300">{a.detail}</p>
+        <ErrorNote error={undo.error} />
+      </div>
+      {!a.undone && (
+        <Button
+          variant="ghost"
+          disabled={undo.isPending}
+          onClick={() => undo.mutate({ messageId, index: a.index })}
+        >
+          Undo
+        </Button>
+      )}
+    </li>
   );
 }
 

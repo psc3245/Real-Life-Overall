@@ -20,6 +20,7 @@ const chat: CoachStateDto = {
       role: "user",
       content: "What should I work on?",
       suggestions: [],
+      actions: [],
       createdAt: "2026-10-26T10:00:00Z",
     },
     {
@@ -50,6 +51,7 @@ const chat: CoachStateDto = {
           status: "accepted",
         },
       ],
+      actions: [],
       createdAt: "2026-10-26T10:00:01Z",
     },
   ],
@@ -117,5 +119,58 @@ describe("CoachPage", () => {
       }),
     );
     expect(mockedApi.mock.calls.filter(([p]) => p === "/coach/messages")).toHaveLength(1);
+  });
+
+  it("shows what the coach logged, with undo", async () => {
+    const logged: CoachStateDto = {
+      remaining: 30,
+      messages: [
+        {
+          id: "a2",
+          role: "assistant",
+          content: "Logged your leg day.",
+          suggestions: [],
+          actions: [
+            {
+              index: 0,
+              kind: "workout",
+              workoutId: "w1",
+              date: "2026-11-12",
+              title: "Leg Day",
+              detail: "Squat (Barbell): 3 × 225 lb × 5",
+              undone: false,
+            },
+            {
+              index: 1,
+              kind: "habit",
+              habitId: "h1",
+              previous: null,
+              date: "2026-11-12",
+              title: "Stretch",
+              detail: "Done",
+              undone: true,
+            },
+          ],
+          createdAt: "2026-11-12T20:00:00Z",
+        },
+      ],
+    };
+    setup(logged);
+    expect(await screen.findByRole("link", { name: "Leg Day" })).toHaveAttribute(
+      "href",
+      "/workouts/w1",
+    );
+    expect(screen.getByText("Squat (Barbell): 3 × 225 lb × 5")).toBeInTheDocument();
+    expect(screen.getByText(/✓ Workout logged/)).toBeInTheDocument();
+    expect(screen.getByText(/Undone/)).toBeInTheDocument();
+    // Only the live receipt can be undone.
+    const undo = screen.getAllByRole("button", { name: "Undo" });
+    expect(undo).toHaveLength(1);
+    fireEvent.click(undo[0]!);
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith("/coach/messages/a2/actions/0/undo", {
+        method: "POST",
+      }),
+    );
   });
 });

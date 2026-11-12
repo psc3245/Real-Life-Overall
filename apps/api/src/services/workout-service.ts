@@ -342,6 +342,45 @@ export async function finishWorkout(
   return one(db, userId, finished);
 }
 
+/**
+ * Records a workout that's already over, all sets done (the coach logging what the player
+ * describes). It counts for `localDate`; `startedAt` is the moment it was logged.
+ */
+export async function logWorkout(
+  db: Database,
+  userId: string,
+  input: {
+    name: string;
+    notes: string;
+    localDate: string;
+    durationS: number;
+    exercises: WorkoutExerciseDto[];
+  },
+): Promise<WorkoutDto> {
+  const user = await userOf(db, userId);
+  if (input.localDate > localDateIn(user.timezone)) {
+    throw badRequest("Workouts can't be in the future");
+  }
+  const lookup = await loadLookup(db, userId);
+  const exercises = normalizeExercises(input.exercises, lookup)
+    .map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s, done: true })) }))
+    .filter((e) => e.sets.length > 0);
+  if (!exercises.length) throw badRequest("A workout needs at least one set");
+  const startedAt = new Date();
+  const row = await workoutRepo.insert(db, {
+    userId,
+    name: input.name,
+    notes: input.notes,
+    localDate: input.localDate,
+    startedAt,
+    endedAt: new Date(startedAt.getTime() + input.durationS * 1000),
+    templateId: null,
+    exercises,
+  });
+  await touchDays(db, userId, row.localDate);
+  return one(db, userId, row);
+}
+
 /** Cancels a workout in progress, or deletes a finished one. */
 export async function deleteWorkout(db: Database, userId: string, id: string) {
   const row = await workoutRepo.findById(db, userId, id);

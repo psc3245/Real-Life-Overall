@@ -910,6 +910,8 @@ export const coachMessages = pgTable(
     role: coachRole().notNull(),
     content: text().notNull(),
     suggestions: jsonb().notNull().default([]),
+    /** What the coach logged with its tools this turn (CoachActionDto[]), for receipts and undo. */
+    actions: jsonb().notNull().default([]),
     createdAt: createdAt(),
   },
   (t) => [index().on(t.userId, t.createdAt)],

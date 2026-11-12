@@ -12,6 +12,7 @@ import {
   localDateIn,
   MAX_ASPIRATIONS,
   MAX_COACH_MESSAGES_PER_DAY,
+  MAX_COACH_STEPS,
   MAX_COACH_SUGGESTIONS,
   MAX_CONSTRAINTS,
   MAX_HABIT_LINKS,
@@ -24,6 +25,7 @@ import {
   normalizeHabitConfig,
   WEEKDAY_NAMES,
   WEEKDAY_SHORT,
+  type CoachActionDto,
   type CoachMessageDto,
   type CoachStateDto,
   type CoachSuggestionDto,
@@ -37,8 +39,8 @@ import { HTTPException } from "hono/http-exception";
 import type { z } from "zod";
 import type { Database } from "../db/client";
 import { badRequest, conflict, notFound } from "../errors";
-import type { LlmClient } from "../llm/client";
-import { coachPrompt } from "../llm/prompts/coach";
+import { LlmError, type LlmClient } from "../llm/client";
+import { coachPrompt, postgamePrompt } from "../llm/prompts/coach";
 import { refsFor, renderTree, toPromptNodes } from "../llm/prompts/tree";
 import * as coachRepo from "../repos/coach-repo";
 import type { CoachMessageRow } from "../repos/coach-repo";
@@ -46,10 +48,19 @@ import * as eventRepo from "../repos/rating-event-repo";
 import * as habitRepo from "../repos/habit-repo";
 import * as recapRepo from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
+import {
+  coachTools,
+  refsForDay,
+  renderDayLog,
+  renderExercises,
+  TRACKING_NOTE,
+} from "./coach-tools";
+import { getDay, saveEntry, saveObjective } from "./day-service";
 import { renderScoutingReport } from "./evolution-service";
 import { createHabit, loadLeafContext, type LeafContext } from "./habit-service";
 import { createObjective, listObjectives } from "./objective-service";
 import { currentFocus } from "./weekly-service";
+import { deleteWorkout, loadLookup } from "./workout-service";
 
 type Output = z.infer<typeof coachReplyOutputSchema>;
 
@@ -62,6 +73,7 @@ function toDto(row: CoachMessageRow): CoachMessageDto {
     role: row.role,
     content: row.content,
     suggestions: row.suggestions as CoachSuggestionDto[],
+    actions: row.actions as CoachActionDto[],
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -137,16 +149,20 @@ const renderGoals = (goals: ObjectiveDto[]) =>
     )
     .join("\n");
 
-/** Everything the coach knows, as the system prompt's second half. */
-async function buildContext(db: Database, userId: string) {
+/**
+ * Everything the coach knows, as the system prompt's second half. `date` is the day in focus
+ * (today, or the day a postgame is about): its log is shown in full for the tools.
+ */
+async function buildContext(db: Database, userId: string, date?: string) {
   const user = await userRepo.findById(db, userId);
   if (!user) throw notFound("User not found");
   const today = localDateIn(user.timezone);
+  const focusDate = date ?? today;
   const ctx = await loadLeafContext(db, userId);
   const { features } = user.preferences;
   const refs = ctx ? refsFor(ctx.nodes) : { refById: new Map(), idByRef: new Map() };
 
-  const [profile, report, focus, goals, recaps, habits, events] = await Promise.all([
+  const [profile, report, focus, goals, recaps, habits, events, day, lookup] = await Promise.all([
     userRepo.findProfileSummary(db, userId),
     userRepo.findScoutingReport(db, userId),
     currentFocus(db, userId),
@@ -154,7 +170,10 @@ async function buildContext(db: Database, userId: string) {
     recapRepo.findRecentDaily(db, userId, addDays(today, -7), addDays(today, 1)),
     features.habits ? renderHabits(db, userId, today, ctx) : "",
     ctx ? eventRepo.findActiveBySeason(db, ctx.season.id) : [],
+    getDay(db, userId, focusDate),
+    features.workouts ? loadLookup(db, userId) : null,
   ]);
+  const dayRefs = refsForDay(day);
   const values = ctx ? computeNodeValues(ctx.nodes, leafValuesFromEvents(events)) : new Map();
   const growth =
     ctx?.season.mode === "growth"
@@ -180,10 +199,31 @@ async function buildContext(db: Database, userId: string) {
     `This week's focus from the weekly review:\n${focus.map((f) => `- ${f.title}: ${f.detail}`).join("\n") || "(none)"}`,
     `Recent days:\n${recaps.map((r) => `- ${r.periodStart}: ${r.narrative}`).join("\n") || "(no recaps this week)"}`,
     off.length ? `Switched off by the user: ${off.join(", ")}. Don't suggest those.` : "",
+    renderDayLog(day, dayRefs, features),
+    lookup &&
+      `Exercise library (id: name [tracking]; sets record ${TRACKING_NOTE}):\n${renderExercises(lookup)}`,
   ]
     .filter(Boolean)
     .join("\n\n");
-  return { context, ctx, idByRef: refs.idByRef as Map<string, string>, features, today };
+  return {
+    context,
+    ctx,
+    idByRef: refs.idByRef as Map<string, string>,
+    features,
+    today,
+    day,
+    dayRefs,
+    units: user.unitSystem,
+  };
+}
+
+/** Past turns for the model, with what the coach logged, so it never logs a thing twice. */
+function toModelMessage(m: CoachMessageRow): ModelMessage {
+  const actions = (m.actions as CoachActionDto[]).map(
+    (a) =>
+      `[${a.undone ? "Logged, then undone by the user" : "Logged"}: ${a.title} on ${a.date}: ${a.detail}]`,
+  );
+  return { role: m.role, content: [m.content, ...actions].join("\n") };
 }
 
 /** Keeps suggestions that make sense: real refs, no duplicate habits, sane numbers. */
@@ -265,24 +305,38 @@ export async function sendMessage(
       message: `You've sent ${MAX_COACH_MESSAGES_PER_DAY} messages to the coach in the last day. Try again later.`,
     });
   }
-  const [{ context, ctx, idByRef, features }, history, habits] = await Promise.all([
+  const [built, history, habits] = await Promise.all([
     buildContext(db, userId),
     coachRepo.findRecent(db, userId, COACH_HISTORY_MESSAGES),
     habitRepo.findAllByUser(db, userId),
   ]);
-  const messages: ModelMessage[] = [
-    ...history.map((m) => ({ role: m.role, content: m.content })),
-    { role: "user", content },
-  ];
-  const output = await llm.generateStructured({
-    purpose: "coach.chat",
-    userId,
-    schema: coachReplyOutputSchema,
-    system: `${coachPrompt.system}\n\n---\n\n${context}`,
-    prompt: messages,
-    promptVersion: coachPrompt.version,
-    maxOutputTokens: 2048,
-  });
+  const { context, ctx, idByRef, features, today, day, dayRefs, units } = built;
+  const messages: ModelMessage[] = [...history.map(toModelMessage), { role: "user", content }];
+  const actions: CoachActionDto[] = [];
+  const tools = day.editable
+    ? coachTools({ db, userId, today, units, refs: dayRefs, features, actions }, day.date)
+    : {};
+  let output: Output;
+  try {
+    output = await llm.generateStructured({
+      purpose: "coach.chat",
+      userId,
+      schema: coachReplyOutputSchema,
+      system: `${coachPrompt.system}\n\n---\n\n${context}`,
+      prompt: messages,
+      promptVersion: coachPrompt.version,
+      maxOutputTokens: 2048,
+      tools,
+      maxSteps: MAX_COACH_STEPS,
+    });
+  } catch (error) {
+    // Things already logged stay logged, so their receipts (and undo) have to be kept.
+    if (!(error instanceof LlmError) || !actions.length) throw error;
+    output = {
+      reply: "I logged that, but couldn't finish my reply. Check it below.",
+      suggestions: [],
+    };
+  }
   const suggestions = normalizeSuggestions(
     output,
     ctx,
@@ -298,10 +352,79 @@ export async function sendMessage(
       role: "assistant",
       content: output.reply.trim() || "Sorry, I don't have an answer for that.",
       suggestions,
+      actions,
       // A millisecond later, so the pair always reads in order.
       createdAt: new Date(now + 1),
     },
   ]);
+  return getCoach(db, userId);
+}
+
+/**
+ * The postgame interview: right after a day's recap the coach opens with a line on the day and
+ * questions about what the log is missing. The player answers in the chat as usual.
+ */
+export async function startPostgame(
+  db: Database,
+  llm: LlmClient,
+  userId: string,
+  date: string,
+): Promise<CoachStateDto> {
+  const { context, day } = await buildContext(db, userId, date);
+  if (!day.recap) throw conflict("End the day first");
+  const history = await coachRepo.findRecent(db, userId, COACH_HISTORY_MESSAGES);
+  const output = await llm.generateStructured({
+    purpose: "coach.chat",
+    userId,
+    schema: coachReplyOutputSchema,
+    system: `${coachPrompt.system}\n\n---\n\n${context}\n\n---\n\n${postgamePrompt.instruction}`,
+    // The model needs a user turn to answer; this one isn't stored.
+    prompt: [
+      ...history.map(toModelMessage),
+      { role: "user", content: `I just ended ${date === day.today ? "my day" : date}.` },
+    ],
+    promptVersion: `${coachPrompt.version}+${postgamePrompt.version}`,
+    maxOutputTokens: 1024,
+  });
+  await coachRepo.insertMany(db, [
+    {
+      userId,
+      role: "assistant",
+      content: output.reply.trim() || "How did the day go?",
+      suggestions: [],
+    },
+  ]);
+  return getCoach(db, userId);
+}
+
+/** Takes back one thing the coach logged: deletes the workout, or restores the old entry. */
+export async function undoAction(
+  db: Database,
+  userId: string,
+  messageId: string,
+  index: number,
+): Promise<CoachStateDto> {
+  const row = await coachRepo.findById(db, userId, messageId);
+  if (!row || row.role !== "assistant") throw notFound("Message not found");
+  const actions = row.actions as CoachActionDto[];
+  const a = actions.find((x) => x.index === index);
+  if (!a) throw notFound("Nothing to undo there");
+  if (a.undone) throw conflict("Already undone");
+  if (a.kind === "workout") {
+    // Deleted by hand already: nothing left to undo.
+    await deleteWorkout(db, userId, a.workoutId).catch((error: unknown) => {
+      if (!(error instanceof HTTPException && error.status === 404)) throw error;
+    });
+  } else if (a.kind === "habit") {
+    await saveEntry(db, userId, a.date, a.habitId, a.previous ?? { num: null, text: null });
+  } else {
+    await saveObjective(db, userId, a.date, a.objectiveId, a.previous);
+  }
+  await coachRepo.updateActions(
+    db,
+    row.id,
+    actions.map((x) => (x.index === index ? { ...x, undone: true } : x)),
+  );
   return getCoach(db, userId);
 }
 

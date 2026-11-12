@@ -1,5 +1,12 @@
 import { isPremiumRole, parsePreferences, type SeasonMode, type SportsTalk } from "@rlo/shared";
-import { APICallError, generateText, Output, type ModelMessage } from "ai";
+import {
+  APICallError,
+  generateText,
+  Output,
+  stepCountIs,
+  type ModelMessage,
+  type ToolSet,
+} from "ai";
 import { and, eq, gte, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Database } from "../db/client";
@@ -27,6 +34,13 @@ export interface StructuredRequest<T extends z.ZodType> {
   promptVersion: string;
   /** Raise for long structured outputs (e.g. a full questionnaire) to avoid truncation. */
   maxOutputTokens?: number;
+  /**
+   * Tools the model may call before it answers (the coach logging for the player). Tools have
+   * side effects, so a call that ran one is never retried.
+   */
+  tools?: ToolSet;
+  /** With tools: model steps allowed, tool rounds plus the final answer. */
+  maxSteps?: number;
 }
 
 export interface LlmCallRecord {
@@ -128,6 +142,21 @@ export class LlmClient {
     }
     const { spec, provider, modelId, model } = resolved;
     let lastError: unknown;
+    let toolRan = false;
+    const tools =
+      req.tools &&
+      Object.fromEntries(
+        Object.entries(req.tools).map(([name, t]) => [
+          name,
+          {
+            ...t,
+            execute: async (...args: Parameters<NonNullable<typeof t.execute>>) => {
+              toolRan = true;
+              return t.execute!(...args);
+            },
+          },
+        ]),
+      );
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const started = Date.now();
@@ -146,8 +175,10 @@ export class LlmClient {
           output: Output.object({ schema: req.schema }),
           maxOutputTokens: req.maxOutputTokens ?? 4096,
           maxRetries: 1,
+          ...(tools && { tools, stopWhen: stepCountIs(req.maxSteps ?? 4) }),
         });
-        const { inputTokens, outputTokens } = result.usage;
+        // Every step's tokens, not just the last one's.
+        const { inputTokens, outputTokens } = result.totalUsage;
         await this.recordCall({
           ...base,
           inputTokens: inputTokens ?? null,
@@ -167,6 +198,11 @@ export class LlmClient {
           latencyMs: Date.now() - started,
           error: error instanceof Error ? error.message.slice(0, 1000) : String(error),
         });
+        if (toolRan) {
+          throw new LlmError(`LLM call failed after a tool ran: ${String(error)}`, req.purpose, {
+            cause: error,
+          });
+        }
         // Auth and configuration errors won't fix themselves; surface them immediately.
         if (APICallError.isInstance(error) && !error.isRetryable) {
           throw new LlmError(`LLM request rejected: ${error.message}`, req.purpose, {

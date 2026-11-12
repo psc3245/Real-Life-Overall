@@ -1,7 +1,7 @@
 import type { OnboardingStateDto } from "@rlo/shared";
-import { createTestApp, jsonResult } from "./helpers";
+import { createTestApp, jsonResult, toolCallResult } from "./helpers";
 
-type Response = ReturnType<typeof jsonResult>;
+type Response = ReturnType<typeof jsonResult> | ReturnType<typeof toolCallResult>;
 
 // Refs by depth then order: Fitness n1, Career n2, Cardio n3, Strength n4.
 // Rated leaves: Career (n2), Cardio (n3), Strength (n4).

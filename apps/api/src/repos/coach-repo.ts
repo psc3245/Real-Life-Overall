@@ -49,6 +49,10 @@ export async function updateSuggestions(db: Executor, id: string, suggestions: u
   await db.update(coachMessages).set({ suggestions }).where(eq(coachMessages.id, id));
 }
 
+export async function updateActions(db: Executor, id: string, actions: unknown) {
+  await db.update(coachMessages).set({ actions }).where(eq(coachMessages.id, id));
+}
+
 export async function deleteAll(db: Executor, userId: string) {
   await db.delete(coachMessages).where(eq(coachMessages.userId, userId));
 }
