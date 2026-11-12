@@ -95,7 +95,7 @@ describe("badges", () => {
         weightShifts: [],
         treeChange: null,
       });
-    const t = await createRatedApp([review("Ten-K Club")]);
+    const t = await createRatedApp([review("Ten-K Club"), review("Ten-K Club")]);
     await t.db.update(ratingEvents).set({ createdAt: new Date(Date.now() - 14 * 86_400_000) });
     const state = await body<WeeklyStateDto>(await t.request("/weekly/run", { method: "POST" }));
     const names = state.review!.badges.map((b) => b.name);
