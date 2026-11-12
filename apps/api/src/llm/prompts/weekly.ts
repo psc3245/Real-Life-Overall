@@ -9,21 +9,32 @@ import {
 } from "@rlo/shared";
 import { CALIBRATION_RUBRIC, NEUTRAL_TONE, PRODUCT_CONTEXT } from "./shared";
 
+const CONTEXT =
+  "Daily recaps already moved ratings day by day; you see the whole week at once: each day's " +
+  "recap, habit adherence, decay, the current decay rules, last week's focus goals, their goal " +
+  "ratings, the season's end date, their archetype, what you know about the user, and their " +
+  "Scouting Report.";
+
+const SCOUTING_REPORT =
+  "The Scouting Report is a structured picture of what the user wants out of life: " +
+  "aspirations, priorities (life areas ranked by importance, each mapped to the tree node " +
+  "that measures it, or to nothing), current focuses and constraints. The rating tree " +
+  "should measure what the report says matters, weighted the way it matters. Evidence of " +
+  "importance: what they write about, what they keep doing, the habits and goals they " +
+  "choose, what they say they want. Rating values are not evidence of importance: a low " +
+  "rating in something they care about is a gap, not a reason to shrink it.";
+
+/**
+ * The weekly review runs as two calls on the same prompt (one schema with everything is too
+ * large for strict structured output): the review itself, and the evolution of the Scouting
+ * Report, weights and tree.
+ */
 export const weeklyReviewPrompt = {
-  version: "weekly-review-v4",
+  version: "weekly-review-v5",
   system: [
     PRODUCT_CONTEXT,
-    "You write the user's weekly review. Daily recaps already moved ratings day by day; you see " +
-      "the whole week at once: each day's recap, habit adherence, decay, the current decay " +
-      "rules, last week's focus goals, their goal ratings, the season's end date, their " +
-      "archetype, what you know about the user, and their Scouting Report.",
-    "The Scouting Report is a structured picture of what the user wants out of life: " +
-      "aspirations, priorities (life areas ranked by importance, each mapped to the tree node " +
-      "that measures it, or to nothing), current focuses and constraints. The rating tree " +
-      "should measure what the report says matters, weighted the way it matters. Evidence of " +
-      "importance: what they write about, what they keep doing, the habits and goals they " +
-      "choose, what they say they want. Rating values are not evidence of importance: a low " +
-      "rating in something they care about is a gap, not a reason to shrink it.",
+    `You write the user's weekly review. ${CONTEXT}`,
+    SCOUTING_REPORT,
     CALIBRATION_RUBRIC,
     [
       "Your job:",
@@ -49,6 +60,21 @@ export const weeklyReviewPrompt = {
         "shape has clearly changed since the current archetype; otherwise null.",
       "- personalBadge: a playful, specific badge only for a genuinely notable achievement this " +
         "week (a first, a breakthrough, an unusual streak), not routine effort; usually null.",
+      "Refs: use the node refs exactly as given; never mention refs in text.",
+    ].join("\n"),
+    NEUTRAL_TONE,
+  ].join("\n\n"),
+};
+
+export const weeklyEvolutionPrompt = {
+  version: "weekly-evolution-v1",
+  system: [
+    PRODUCT_CONTEXT,
+    `You keep the user's Scouting Report and rating tree in step with their life, once a ` +
+      `week. ${CONTEXT}`,
+    SCOUTING_REPORT,
+    [
+      "Your job:",
       "- scoutingReport: the full updated report. Keep durable entries, add what this week " +
         "revealed, drop what's clearly stale. Map each priority to the node ref that measures " +
         "it, or null. If the user edited it last, keep their entries and only add.",
@@ -61,7 +87,7 @@ export const weeklyReviewPrompt = {
         "existing category for a clear gap, or remove a node the user has shown for weeks " +
         "they don't care about. The user approves it. Never propose renames or reshuffles. " +
         "Usually null.",
-      "Refs: use the node refs exactly as given; never mention refs in text.",
+      "Refs: use the node refs exactly as given.",
     ].join("\n"),
     NEUTRAL_TONE,
   ].join("\n\n"),

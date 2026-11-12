@@ -20,6 +20,7 @@ import {
   MAX_PROFILE_SUMMARY,
   normalizeHabitConfig,
   WEEKLY_DELTA_CAP,
+  weeklyEvolutionOutputSchema,
   weeklyReviewOutputSchema,
   type DecayRevisionDto,
   type EarnedBadgeDto,
@@ -41,7 +42,7 @@ import { badRequest, conflict, isUniqueViolation, notFound } from "../errors";
 import type { LlmClient } from "../llm/client";
 import { refsFor, renderTree, toPromptNodes } from "../llm/prompts/tree";
 import { GROWTH_PROJECTIONS_NOTE } from "../llm/prompts/shared";
-import { weeklyReviewPrompt } from "../llm/prompts/weekly";
+import { weeklyEvolutionPrompt, weeklyReviewPrompt } from "../llm/prompts/weekly";
 import * as decayRepo from "../repos/decay-repo";
 import * as evolutionRepo from "../repos/evolution-repo";
 import * as dayRepo from "../repos/day-repo";
@@ -515,48 +516,61 @@ export async function runWeeklyReview(
     { before: week.start },
   );
 
-  const output = await llm.generateStructured({
-    purpose: "recap.weekly",
-    userId,
-    schema: weeklyReviewOutputSchema,
-    system: weeklyReviewPrompt.system,
-    prompt: [
-      `What you know about the user:\n${profile || "(nothing yet)"}`,
-      "Current ratings (Overall is the implicit root):",
-      renderTree(toPromptNodes(ctx.nodes, refById, nodeValues), true),
-      ...(growthMode
-        ? [
-            GROWTH_PROJECTIONS_NOTE,
-            "Points gained this season:",
-            renderTree(
-              toPromptNodes(
-                ctx.nodes,
-                refById,
-                computeNodeValues(ctx.nodes, leafGrowthFromEvents(events)),
-              ),
-              true,
+  // Both calls read the same facts; renderWeek hits the database, so it runs once.
+  const prompt = [
+    `What you know about the user:\n${profile || "(nothing yet)"}`,
+    "Current ratings (Overall is the implicit root):",
+    renderTree(toPromptNodes(ctx.nodes, refById, nodeValues), true),
+    ...(growthMode
+      ? [
+          GROWTH_PROJECTIONS_NOTE,
+          "Points gained this season:",
+          renderTree(
+            toPromptNodes(
+              ctx.nodes,
+              refById,
+              computeNodeValues(ctx.nodes, leafGrowthFromEvents(events)),
             ),
-          ]
-        : []),
-      await renderWeek(db, userId, ctx, week, refById, events),
-      `Last week's focus goals:\n${lastFocus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
-      `The user's ${growthMode ? "growth targets (points to gain by season end)" : ctx.season.mode === "souls" ? "level targets (stat levels 1-99, not ratings)" : "goal ratings"}:\n${goalLines.join("\n") || "(none set)"}`,
-      `Season: ${ctx.season.label}, ends ${ctx.season.endsOn} (${daysBetween(week.end, ctx.season.endsOn)} days after this week).`,
-      `Current archetype: ${archetype ? `${archetype.name}: ${archetype.description}` : "(none)"}`,
-      `Related older days:\n${renderMemories(memories) || "(none)"}`,
-      `Scouting Report:\n${renderScoutingReport(report, ctx, refById)}`,
-      `Importance weights (share of parent):\n${renderWeights(ctx.nodes, seasonStart, refById)}`,
-      `Days with gains in the last 4 weeks:\n${renderEngagement(ctx, events, week.end, refById)}`,
-      adaptive
-        ? "Weight shifts: allowed."
-        : "Weight shifts: switched off by the user. Return weightShifts: [].",
-      treeOpen
-        ? "Tree change: allowed this week, if clearly warranted."
-        : "Tree change: not allowed this week. Return treeChange: null.",
-    ].join("\n\n"),
-    promptVersion: weeklyReviewPrompt.version,
-    maxOutputTokens: 16_000,
-  });
+            true,
+          ),
+        ]
+      : []),
+    await renderWeek(db, userId, ctx, week, refById, events),
+    `Last week's focus goals:\n${lastFocus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
+    `The user's ${growthMode ? "growth targets (points to gain by season end)" : ctx.season.mode === "souls" ? "level targets (stat levels 1-99, not ratings)" : "goal ratings"}:\n${goalLines.join("\n") || "(none set)"}`,
+    `Season: ${ctx.season.label}, ends ${ctx.season.endsOn} (${daysBetween(week.end, ctx.season.endsOn)} days after this week).`,
+    `Current archetype: ${archetype ? `${archetype.name}: ${archetype.description}` : "(none)"}`,
+    `Related older days:\n${renderMemories(memories) || "(none)"}`,
+    `Scouting Report:\n${renderScoutingReport(report, ctx, refById)}`,
+    `Importance weights (share of parent):\n${renderWeights(ctx.nodes, seasonStart, refById)}`,
+    `Days with gains in the last 4 weeks:\n${renderEngagement(ctx, events, week.end, refById)}`,
+    adaptive
+      ? "Weight shifts: allowed."
+      : "Weight shifts: switched off by the user. Return weightShifts: [].",
+    treeOpen
+      ? "Tree change: allowed this week, if clearly warranted."
+      : "Tree change: not allowed this week. Return treeChange: null.",
+  ].join("\n\n");
+  const [output, evolution] = await Promise.all([
+    llm.generateStructured({
+      purpose: "recap.weekly",
+      userId,
+      schema: weeklyReviewOutputSchema,
+      system: weeklyReviewPrompt.system,
+      prompt,
+      promptVersion: weeklyReviewPrompt.version,
+      maxOutputTokens: 8_000,
+    }),
+    llm.generateStructured({
+      purpose: "recap.weekly",
+      userId,
+      schema: weeklyEvolutionOutputSchema,
+      system: weeklyEvolutionPrompt.system,
+      prompt,
+      promptVersion: weeklyEvolutionPrompt.version,
+      maxOutputTokens: 8_000,
+    }),
+  ]);
   const normalized = normalizeOutput(
     output,
     ctx,
@@ -565,11 +579,13 @@ export async function runWeeklyReview(
     habits.filter((h) => !h.archivedAt).map((h) => h.name),
   );
   const shifts = adaptive
-    ? planWeightShifts(output.weightShifts, ctx.nodes, seasonStart, idByRef)
+    ? planWeightShifts(evolution.weightShifts, ctx.nodes, seasonStart, idByRef)
     : [];
   const treeChanges =
-    treeOpen && output.treeChange ? normalizeTreeChange(output.treeChange, ctx.nodes, idByRef) : [];
-  const scoutingReport = reportFromOutput(output.scoutingReport, ctx, idByRef);
+    treeOpen && evolution.treeChange
+      ? normalizeTreeChange(evolution.treeChange, ctx.nodes, idByRef)
+      : [];
+  const scoutingReport = reportFromOutput(evolution.scoutingReport, ctx, idByRef);
 
   let recapId: string | null = null;
   try {
@@ -652,7 +668,7 @@ export async function runWeeklyReview(
           userId,
           seasonId: ctx.season.id,
           recapId: recap.id,
-          reason: output.treeChange!.reason.trim(),
+          reason: evolution.treeChange!.reason.trim(),
           changes: treeChanges,
         });
       }

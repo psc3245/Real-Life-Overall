@@ -69,7 +69,7 @@ const review = (over: Record<string, unknown> = {}) =>
 
 const body = async <T>(res: Response) => (await res.json()) as T;
 
-async function setup(responses = [review()], daysAgo = 14) {
+async function setup(responses = [review(), review()], daysAgo = 14) {
   const t = await createRatedApp(responses);
   await t.db.update(ratingEvents).set({ createdAt: new Date(Date.now() - daysAgo * 86_400_000) });
   await t.request("/habits", {
@@ -191,7 +191,7 @@ describe("weekly review", () => {
 
   it("feeds the profile and focus goals into later daily recaps", async () => {
     const daily = jsonResult({ changes: [], narrative: "Ok.", flags: [], nextPrompts: [] });
-    const { request, run, model } = await setup([review(), daily]);
+    const { request, run, model } = await setup([review(), review(), daily]);
     await run();
     expect(await body(await request("/weekly/focus"))).toEqual([
       expect.objectContaining({ title: "Run twice" }),
@@ -224,7 +224,7 @@ describe("weekly review", () => {
 
 describe("weekly memory", () => {
   it("matches older days on the week's journals, even without recaps", async () => {
-    const t = await createRatedApp([review()]);
+    const t = await createRatedApp([review(), review()]);
     await t.db.update(ratingEvents).set({ createdAt: new Date(Date.now() - 21 * 86_400_000) });
     const week = (await body<WeeklyStateDto>(await t.request("/weekly"))).week!;
     const me = await body<{ id: string }>(await t.request("/me"));
@@ -273,11 +273,10 @@ describe("potential", () => {
   });
 
   it("renames the archetype when the review says the shape changed", async () => {
-    const t = await setup([
-      review({
-        archetype: { name: "Two-Way Grinder", description: "Balanced work and training." },
-      }),
-    ]);
+    const archetype = review({
+      archetype: { name: "Two-Way Grinder", description: "Balanced work and training." },
+    });
+    const t = await setup([archetype, archetype]);
     const state = (await (await t.run()).json()) as WeeklyStateDto;
     expect(state.review!.archetypeChange).toEqual({
       from: "Desk Athlete",

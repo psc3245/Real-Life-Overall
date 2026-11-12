@@ -78,7 +78,7 @@ const newLeafRatings = jsonResult({
 
 const body = async <T>(res: Response) => (await res.json()) as T;
 
-async function setup(responses = [review()]) {
+async function setup(responses = [review(), review()]) {
   const t = await createRatedApp(responses);
   await t.db.update(ratingEvents).set({ createdAt: new Date(Date.now() - 14 * 86_400_000) });
   // Keep proposals allowed whatever the real date (none in a season's last two weeks).
@@ -184,7 +184,7 @@ describe("adaptive weights", () => {
 
 describe("tree proposals", () => {
   it("proposes validated changes that apply on accept and rate new attributes", async () => {
-    const t = await setup([review(), newLeafRatings]);
+    const t = await setup([review(), review(), newLeafRatings]);
     const proposal = (await t.run()).review!.treeProposal!;
     expect(proposal.status).toBe("pending");
     expect(proposal.changes).toEqual([

@@ -163,6 +163,14 @@ export const weeklyReviewOutputSchema = z.object({
     })
     .nullable()
     .describe("Only for a genuinely notable, specific achievement this week; usually null"),
+});
+
+/**
+ * The weekly review's second call: how the player's life picture and tree evolve (DESIGN.md
+ * §4.5). Split from the review because one schema with both compiles to a structured-output
+ * grammar the provider rejects as too large.
+ */
+export const weeklyEvolutionOutputSchema = z.object({
   scoutingReport: scoutingReportOutputSchema.describe(
     "The updated Scouting Report: keep what still holds, add what this week revealed",
   ),
