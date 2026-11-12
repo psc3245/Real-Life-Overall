@@ -28,6 +28,7 @@ import { dayLabel } from "@/lib/format";
 import { colors, space } from "@/lib/theme";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useAccount } from "@/api/account";
+import { useCoachDraft, useResolveCoachSuggestion } from "@/api/coach";
 import { PremiumBadge } from "@/components/Premium";
 
 /** What "kept" means for an avoid habit, by how it's logged. */
@@ -42,14 +43,59 @@ const AVOID_HELP: Partial<Record<HabitType, string>> = {
   journal: "Write down slips only. A day with nothing written counts as kept.",
 };
 
-/** New habit, new sub-habit (`?parent=`) or edit (`?id=`), as a modal. */
+/**
+ * New habit, new sub-habit (`?parent=`), edit (`?id=`), or review one the coach drafted
+ * (`?thread=&message=&index=`, saved through the coach), as a modal.
+ */
 function EditHabitScreen() {
-  const { id, parent: parentId } = useLocalSearchParams<{ id?: string; parent?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    parent?: string;
+    thread?: string;
+    message?: string;
+    index?: string;
+  }>();
+  const { id, parent: parentId } = params;
   const habits = useHabits();
   const ratings = useRatings();
   const today = useDay(null).data?.today;
+  const coachDraft = useCoachDraft(params.thread, params.message, Number(params.index));
 
   if (habits.isPending || ratings.isPending || !today) return <Loading />;
+  if (params.message) {
+    if (coachDraft.isPending) return <Loading />;
+    const d = coachDraft.draft;
+    if (d?.kind !== "habit" || d.status !== "pending") {
+      return (
+        <Screen>
+          <Muted>This draft was already saved or discarded.</Muted>
+        </Screen>
+      );
+    }
+    return (
+      <>
+        <Stack.Screen options={{ title: "Review habit" }} />
+        <HabitEditor
+          nodes={ratings.data?.nodes ?? []}
+          today={today}
+          onDone={() => router.back()}
+          draft={{
+            messageId: params.message,
+            index: d.index,
+            name: d.name,
+            type: d.habitType,
+            config: normalizeHabitConfig(d.habitType, {
+              target: d.target,
+              unit: d.unit,
+              direction: d.avoid ? "avoid" : "build",
+            }),
+            days: d.days,
+            links: d.nodeIds,
+          }}
+        />
+      </>
+    );
+  }
   const habit = id ? habits.data?.find((h) => h.id === id) : undefined;
   const parentKey = habit?.parentId ?? parentId;
   const parent = parentKey ? habits.data?.find((h) => h.id === parentKey) : undefined;
@@ -76,27 +122,35 @@ function HabitEditor({
   nodes,
   today,
   onDone,
+  draft,
 }: {
   habit?: HabitDto;
   parent?: HabitDto;
   nodes: RatedNodeDto[];
   today: string;
   onDone: () => void;
+  /** A coach draft to review: saved through the coach instead of created directly. */
+  draft?: Pick<HabitDto, "name" | "type" | "config" | "days" | "links"> & {
+    messageId: string;
+    index: number;
+  };
 }) {
-  const [name, setName] = useState(habit?.name ?? "");
-  const [type, setType] = useState<HabitType>(habit?.type ?? "checkbox");
+  const start = habit ?? draft;
+  const [name, setName] = useState(start?.name ?? "");
+  const [type, setType] = useState<HabitType>(start?.type ?? "checkbox");
   const [config, setConfig] = useState<HabitConfig>(
-    habit?.config ?? normalizeHabitConfig("checkbox"),
+    start?.config ?? normalizeHabitConfig("checkbox"),
   );
-  const [days, setDays] = useState<number[]>(habit?.days ?? ALL_DAYS);
-  const [links, setLinks] = useState<string[]>(habit?.links ?? []);
+  const [days, setDays] = useState<number[]>(start?.days ?? ALL_DAYS);
+  const [links, setLinks] = useState<string[]>(start?.links ?? []);
   const [startsOn, setStartsOn] = useState(habit?.startsOn ?? today);
   const [reason, setReason] = useState<string | null>(null);
   const create = useCreateHabit();
   const update = useUpdateHabit();
+  const accept = useResolveCoachSuggestion();
   const suggest = useSuggestLinks();
   const { premium } = useAccount();
-  const saving = create.isPending || update.isPending;
+  const saving = create.isPending || update.isPending || accept.isPending;
 
   const avoid = config.direction === "avoid";
   const changeType = (next: HabitType) => {
@@ -133,7 +187,17 @@ function HabitEditor({
       ...(!parent && { days, startsOn }),
       links: type === "group" ? [] : links,
     };
-    if (habit) update.mutate({ id: habit.id, ...body }, { onSuccess: onDone });
+    if (draft) {
+      accept.mutate(
+        {
+          messageId: draft.messageId,
+          index: draft.index,
+          action: "accept",
+          edits: { name: body.name, type, config, days, links, startsOn },
+        },
+        { onSuccess: onDone },
+      );
+    } else if (habit) update.mutate({ id: habit.id, ...body }, { onSuccess: onDone });
     else {
       create.mutate(
         { days, startsOn, ...body, type, ...(parent && { parentId: parent.id }) },
@@ -322,7 +386,7 @@ function HabitEditor({
           </Card>
         )}
 
-        <ErrorNote error={create.error ?? update.error} />
+        <ErrorNote error={accept.error ?? create.error ?? update.error} />
         <Button
           title={
             saving

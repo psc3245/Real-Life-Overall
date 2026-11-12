@@ -632,6 +632,8 @@ describe("claimsWork", () => {
       "Done. I created the habit Read 20 pages.",
       "Got it. Saved your push day.",
       "Check it and save it from the card.",
+      "The chest work is written down as a card. Does the card look right?",
+      "Your run has been logged.",
     ]) {
       expect(claimsWork(done), done).toBe(true);
     }

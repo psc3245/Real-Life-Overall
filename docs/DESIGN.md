@@ -159,7 +159,7 @@ The tree should measure what the player actually cares about, weighted the way t
 - **Leaderboards** (`?mode=rating|growth`, default your own mode) rank only the players in that mode this season; the page has a Rating / Growth switch and says which board you're on. Compare shows ratings when both players are in rating mode, otherwise growth for both (every card carries growth).
 - **The model:** voiced calls for a growth player get a growth note (`GROWTH_MODE`, prompt version `+growth`): talk about gains, don't quote ratings, keep deltas honest. Weekly reviews also see the growth tree and project season growth; projections store their mode so old rating projections don't show as growth.
 - Rating-only parts stay as they are: decay rules, archetypes, the rails (§5.6), badges' rule engine and the Scouting Report.
-- iOS doesn't know about modes yet: in a growth season it shows growth numbers as if they were ratings.
+- iOS shows modes the same way (picker, growth display, growth boards).
 
 ### 4.7 Souls mode (added 2026-11-06, in testing)
 The progression flips from "the model sets your ratings" to "the model decides what you earn, you decide what to level". A third `seasons.mode`, `souls`, picked like the others (§4.6) and locked after setup. Only dev and admin accounts can pick it (`assertSeasonModeAllowed`; the picker hides it from everyone else), and rollover turns a Souls season into Rating (or Growth for Free) for an account that's lost tester access. The rating ledger keeps running underneath, untouched.
@@ -355,7 +355,8 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 - **Postgame** (added 2026-11-12): every "End my day" and "Update recap" opens a postgame interview on the web (premium, coach on), and a recapped day has a Postgame button to open it again: the coach reacts to the day in a line and asks at most two questions about what the log is missing (training the journal mentions, blank scheduled habits, goals with nothing logged), or one about tomorrow. `POST /coach/postgame {date}` starts its own thread ("Postgame: Wed 2026-11-11", `focus_date` that day, so the tools log to it) and stores just the opener (no player message is spent); answers continue in that thread, and what it logs makes the recap stale, so the panel offers "Update recap".
 - **Limits:** 1,000 characters per message, 30 player messages per rolling 24 hours (429 after). Nothing is stored when the model call fails (unless it already logged something); the web puts the text back in the box.
 - **Boundaries** in the prompt: not a doctor, therapist, dietitian or financial advisor; never judges body weight; for crisis or risk of harm it responds with care, points to people they trust, emergency services or a crisis line, and makes no suggestions.
-- The `coach` configuration switch hides the page, nav link and Today card. iOS doesn't have the coach yet.
+- The `coach` configuration switch hides the page, nav link and Today card.
+- **iOS** (2026-11-13) has all of it: threads ("Chats" in the header switches or deletes them, the compose button starts one), receipts with Undo, and draft cards whose *Review and tweak* opens the app's own editors (habit, goal, template, and a workout-draft screen with day, minutes and sets) prefilled, saving through the coach. End my day and Update recap open the coach on that day's postgame (`/coach?postgame=<date>`), and a recapped day has a Postgame button.
 
 ---
 
@@ -467,7 +468,7 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 - One setting, `preferences.sportsTalk`: **none**, **normal** (default, the app as designed) or **extra**. It sits on the Personalize modal's Look tab.
 - **The app's words:** `TALK` in `packages/shared/src/talk.ts` holds the terms that change (the scout, Scouting Report, Coach, OVR, player card, archetype, nav labels, weekly review, End my day, onboarding's scouting step and reveal); the web reads them with `useTalk()`. None turns them plain (the AI, Life priorities, Assistant, Overall, Workouts, Rankings, Questions); extra turns them up (Game day, Film room, Practice, Standings, Film session, Final whistle, Combine, Draft night, Undrafted). Routes, ids and data never change.
 - **The model's words:** the LLM client appends a voice section (`llm/prompts/voice.ts`) to every call that writes text the player reads (onboarding chat, questions and rationales, daily recaps, weekly reviews, new-attribute ratings, report write-ups, the coach), read from the player's preference per call; the logged prompt version gets `+talk-<level>`. Calls that only produce names, weights or links (attribute suggestions, weights, habit links) aren't voiced, so attribute names never pick up slang. Every level keeps numbers exact, never renames the player's nodes, and drops the playful framing for health, grief, mental health, money or distress. None also makes archetypes plain profile labels; extra makes them bold 2K builds.
-- Past text (recaps, archetype names) keeps the voice it was written in. iOS doesn't read the setting yet.
+- Past text (recaps, archetype names) keeps the voice it was written in. iOS reads the setting too.
 
 ---
 
@@ -794,7 +795,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Scouting Report and an evolving tree: automatic capped weight shifts with undo, rare tree change proposals the player accepts (§4.5, §5.8)
 - [x] Coach chat: advice grounded in your data, with one-tap habit, goal and Scouting Report suggestions; a Today card (§5.9)
 - [x] Coach drafts and logging: tell the coach what you did or ask for something, and it drafts workouts, templates, habits and goals as cards you review, tweak and save; habit check-ins and goal amounts log instantly with undo; conversations in threads; a postgame interview after every recap (§5.9)
-- [ ] iOS: coach receipts with undo, and the postgame interview
+- [x] iOS: coach threads, receipts with undo, draft cards with review and tweak, and the postgame interview
+- [x] iOS: the front office (search and filter accounts, sign a player, sign-in fixes, release a player)
 - [x] Sports talk: none / normal / extra for the app's wording and every AI-written text (§7.10)
 - [x] Season modes: Rating or Growth ("Most Improved") picked each season, growth boards, the rating hidden but revealable by its owner (§4.6)
 - [x] iOS: season modes (picker, growth display, growth boards)

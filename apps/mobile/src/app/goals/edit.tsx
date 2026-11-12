@@ -27,6 +27,7 @@ import { AttributePicker } from "@/components/AttributePicker";
 import { Chip, DateStepper, FormRow, NumberField } from "@/components/controls";
 import { Button, ErrorNote, Field, Loading, Muted, Screen } from "@/components/ui";
 import { space } from "@/lib/theme";
+import { useCoachDraft, useResolveCoachSuggestion } from "@/api/coach";
 import { FeatureGate } from "@/components/FeatureGate";
 
 const SOURCE_DETAIL: Record<ObjectiveSource, string> = {
@@ -49,14 +50,53 @@ function deadlinePresets(today: string, weekStart: number) {
   ];
 }
 
-/** New goal (no id) or edit one, as a sheet over the goals list. */
+/**
+ * New goal (no id), edit one, or review one the coach drafted (`?thread=&message=&index=`,
+ * saved through the coach), as a sheet over the goals list.
+ */
 function GoalEditScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    thread?: string;
+    message?: string;
+    index?: string;
+  }>();
+  const { id } = params;
   const objectives = useObjectives();
   const habits = useHabits();
   const me = useMe();
   const today = useDay(null).data?.today;
+  const coachDraft = useCoachDraft(params.thread, params.message, Number(params.index));
   if ((id && objectives.isPending) || habits.isPending || !me.data || !today) return <Loading />;
+  if (params.message) {
+    if (coachDraft.isPending) return <Loading />;
+    const d = coachDraft.draft;
+    if (d?.kind !== "goal" || d.status !== "pending") {
+      return (
+        <Screen>
+          <Muted>This draft was already saved or discarded.</Muted>
+        </Screen>
+      );
+    }
+    return (
+      <Editor
+        habits={habits.data ?? []}
+        today={today}
+        me={me.data}
+        draft={{
+          messageId: params.message,
+          index: d.index,
+          name: d.name,
+          kind: d.goalKind ?? "total",
+          target: d.target,
+          unit: d.unit,
+          startValue: d.startValue ?? null,
+          endsOn: d.endsOn ?? addDays(today, d.durationDays - 1),
+          links: d.nodeIds,
+        }}
+      />
+    );
+  }
   const objective = id ? objectives.data?.find((o) => o.id === id) : undefined;
   if (id && !objective) {
     return (
@@ -73,29 +113,35 @@ function Editor({
   habits,
   today,
   me,
+  draft,
 }: {
   objective?: ObjectiveDto;
   habits: NonNullable<ReturnType<typeof useHabits>["data"]>;
   today: string;
   me: MeDto;
+  /** A coach draft to review (a manual goal): saved through the coach. */
+  draft?: Pick<
+    ObjectiveDto,
+    "name" | "kind" | "target" | "unit" | "startValue" | "endsOn" | "links"
+  > & { messageId: string; index: number };
 }) {
   const { weekStart, trackWeight } = me;
   const nodes = useRatings().data?.nodes ?? [];
-  const [name, setName] = useState(objective?.name ?? "");
-  const [kind, setKind] = useState<ObjectiveKind>(objective?.kind ?? "total");
+  const start = objective ?? draft;
+  const [name, setName] = useState(start?.name ?? "");
+  const [kind, setKind] = useState<ObjectiveKind>(start?.kind ?? "total");
   const [source, setSource] = useState<ObjectiveSource>(objective?.source ?? "manual");
-  const [startValue, setStartValue] = useState<number | null>(objective?.startValue ?? null);
+  const [startValue, setStartValue] = useState<number | null>(start?.startValue ?? null);
   const [habitId, setHabitId] = useState(objective?.habitId ?? "");
-  const [target, setTarget] = useState<number | null>(objective?.target ?? null);
-  const [unit, setUnit] = useState(objective?.unit ?? "");
+  const [target, setTarget] = useState<number | null>(start?.target ?? null);
+  const [unit, setUnit] = useState(start?.unit ?? "");
   const [startsOn, setStartsOn] = useState(objective?.startsOn ?? today);
-  const [endsOn, setEndsOn] = useState(
-    objective?.endsOn ?? statPeriod("week", today, weekStart).end,
-  );
-  const [links, setLinks] = useState<string[]>(objective?.links ?? []);
+  const [endsOn, setEndsOn] = useState(start?.endsOn ?? statPeriod("week", today, weekStart).end);
+  const [links, setLinks] = useState<string[]>(start?.links ?? []);
   const create = useCreateObjective();
   const update = useUpdateObjective();
-  const saving = create.isPending || update.isPending;
+  const accept = useResolveCoachSuggestion();
+  const saving = create.isPending || update.isPending || accept.isPending;
 
   // Habits that can be counted: anything but groups (their sub-habits count instead).
   const countable = habits.filter((h) => h.type !== "group");
@@ -142,7 +188,17 @@ function Editor({
       ...(reach && startValue !== null && { startValue }),
     };
     const done = { onSuccess: () => router.back() };
-    if (objective) update.mutate({ id: objective.id, ...body }, done);
+    if (draft) {
+      accept.mutate(
+        {
+          messageId: draft.messageId,
+          index: draft.index,
+          action: "accept",
+          edits: { ...body, kind, source: "manual" },
+        },
+        done,
+      );
+    } else if (objective) update.mutate({ id: objective.id, ...body }, done);
     else create.mutate({ ...body, kind, source, ...(source === "habit" && { habitId }) }, done);
   };
 
@@ -271,7 +327,7 @@ function Editor({
         </FormRow>
       )}
 
-      <ErrorNote error={create.error ?? update.error} />
+      <ErrorNote error={accept.error ?? create.error ?? update.error} />
       <Button
         title={saving ? "Saving…" : objective ? "Save goal" : "Add goal"}
         disabled={

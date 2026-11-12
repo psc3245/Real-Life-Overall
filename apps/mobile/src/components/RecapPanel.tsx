@@ -1,8 +1,10 @@
 import { MAX_RECAPS_PER_DAY, type DayDto, type RecapDto } from "@rlo/shared";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useAccount } from "@/api/account";
 import { useEndDay } from "@/api/days";
+import { usePreferences } from "@/api/preferences";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
 import { EarnedBadges } from "./badges";
 import { useTalk } from "@/lib/talk";
@@ -24,10 +26,17 @@ function hasContent(day: DayDto) {
   );
 }
 
-/** "End my day" before a recap; the recap itself after, with an update button if stale. */
+/**
+ * "End my day" before a recap; the recap itself after, with an update button if stale. Every
+ * recap run from here opens the coach's postgame interview when the coach is on (premium), and
+ * a recapped day can open it again.
+ */
 export function RecapPanel({ day }: { day: DayDto }) {
   const talk = useTalk();
   const endDay = useEndDay(day.date);
+  const postgameOn = useAccount().premium && usePreferences().features.coach;
+  const postgame = () =>
+    router.push({ pathname: "/coach", params: { postgame: day.date, thread: "new" } });
   const [line, setLine] = useState(0);
   useEffect(() => {
     if (!endDay.isPending) return;
@@ -41,7 +50,7 @@ export function RecapPanel({ day }: { day: DayDto }) {
       <Button
         title={endDay.isPending ? WORKING[line]! : label}
         disabled={!ready || !day.editable || endDay.isPending}
-        onPress={() => endDay.mutate()}
+        onPress={() => endDay.mutate(undefined, { onSuccess: () => postgameOn && postgame() })}
       />
       {!ready && <Muted>Log something first.</Muted>}
       <ErrorNote error={endDay.error} />
@@ -73,6 +82,15 @@ export function RecapPanel({ day }: { day: DayDto }) {
         </Card>
       )}
       <RecapCard recap={day.recap} />
+      {postgameOn && (
+        <Card style={{ gap: space.sm }}>
+          <Muted>
+            Talk the day over with the {talk.coach.toLowerCase()}: it asks what&apos;s missing and
+            logs or drafts it for you.
+          </Muted>
+          <Button title="Postgame" variant="ghost" onPress={postgame} />
+        </Card>
+      )}
     </View>
   );
 }
