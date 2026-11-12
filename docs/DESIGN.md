@@ -31,7 +31,8 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | What drives ratings | **The LLM decides** stat changes from daily/weekly inputs. Tracked activity (habits) is one input. |
 | Relation to Habit Tracker | **Fresh codebase**, borrow patterns and code where useful. |
 | Hierarchy | **2K-style by default** (Overall → Category → Attribute), with nesting allowed up to **3 levels below Overall**. |
-| Scale | **0–100 with decimals** (e.g. 74.3). |
+| Scale | **25–100 with decimals** (e.g. 74.3). A typical adult is 60; the league is calibrated at each season rollover without taking back earned gains (§4.8). |
+| Age | **Adults only; under 18 nothing is shared** (decided 2026-11-12, §4.9). Ratings are judged against adults of the player's age. |
 | Overall calculation | Weighted roll-up. **User and LLM collaborate** on weights: the LLM proposes and the user adjusts. |
 | Categories | **Templates + custom.** |
 | Category edits | **Mostly at season start.** Mid-season the tree changes only through weekly-review proposals the user accepts (at most one every 4 weeks), decided 2026-10-26 (§4.5). |
@@ -92,6 +93,8 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | **Weekly review** | An LLM pass over the week that produces a narrative, corrective deltas, decay-rule revisions, focus goals, habit proposals and a potential projection. |
 | **Decay rule** | An LLM-authored, code-executed rule for how a leaf drops when neglected. |
 | **Season** | A calendar quarter. It sets the structure lock, the recalibration point and the archive boundary. |
+| **Ratings Update** | The league calibration applied at season rollover: a `ratings_update` event per leaf, with a reason (§4.8). |
+| **Elite Club** | Players with a verified rating of 90+ in an attribute (§4.8). |
 | **Pause** | A user-declared period (vacation or injury) during which decay doesn't apply. |
 | **Archetype** | The LLM-assigned build label for the user's attribute profile. |
 | **Potential** | The user's goal rating plus the LLM's projected end-of-season rating (in a growth season: a growth target and projected season growth). |
@@ -121,10 +124,10 @@ Overall (depth 0, computed)
 - **The structure is mostly locked during a season.** Renames and free-form edits only happen during season setup (first onboarding or a new season). Mid-season, weekly reviews may propose adding or removing a category or attribute, which applies only if the user accepts it (§4.5). *Open question: are typo-only renames allowed mid-season? (§13)*
 
 ### 4.2 Values
-- Scale is **0–100**, stored as `numeric(5,2)`. Display rules:
+- Scale is **25–100** (§4.8), stored as `numeric(5,2)`. Display rules:
   - Detail views show one decimal (`74.3`).
   - The player card shows the rounded integer for the big OVR and one decimal elsewhere. *(Confirm in UI design.)*
-- **A leaf's value is derived from its event ledger**: `value = clamp(0, 100, Σ deltas)`, where the onboarding event sets the initial value. A cached current value is kept for reads.
+- **A leaf's value is derived from its event ledger**: `value = clamp(25, 100, Σ deltas)`, where the onboarding event sets the initial value. A cached current value is kept for reads.
 - **A parent's value** is the weighted mean of its non-archived children. It's computed on read or on cache refresh, never stored as a source of truth.
 
 ### 4.3 Weights
@@ -180,6 +183,62 @@ The progression flips from "the model sets your ratings" to "the model decides w
   - **iOS:** the same words, tab labels and a flame tab icon right away; the ash palette and Baskerville headings from the next launch after the mode changes (`soulsLook` in `lib/theme.ts`, read from the remembered mode before any styles are built).
 - **Not yet:** the change feed still lists rating changes; iOS has no death banner.
 
+### 4.8 League calibration and Ratings Updates (decided 2026-11-12)
+The league sets what the numbers mean; your own work decides where you sit on that scale. Calibration fixes the scale and never takes back a climb the player earned.
+
+**The scale**
+- Ratings run **25-100** (`RATING_MIN = 25`): every rating, decay floor (the scout's and the Combine's) and Combine score is clamped there.
+- **A typical adult is 60.** Most players should sit between 50 and 70, so the rating feels fair to people starting out; 90+ is truly elite and under 50 is a real gap. The rubric (§5.1, `CALIBRATION_RUBRIC`): 25 the floor (nothing happening in this area), 40 well below typical, 50 below average with real gaps, 60 a typical adult, 70 clearly above average, 80 top ~15%, 85 top ~5%, 90 top ~1% by real-world standards for the domain, 95+ elite or professional with clear evidence. Ratings are judged against **adults of the player's age** (§4.9).
+- **Tiers** (`RATING_TIERS`) follow the new center: Developing (under 50), Solid (50), Strong (70), All-Star (80), Elite (90). A typical player is Solid, not on the edge of Developing, and Elite means the same thing as the Elite Club.
+- **One-time conversion.** Existing ratings move with one curve through 0 → 25, 50 → 60 and 90 → 90, straight between (30 → 46, 40 → 53, 70 → 75, 80 → 82.5); 90 and above are unchanged. It's a `ratings_update` event per leaf ("Scale update: a typical adult is now 60 and the floor is 25."). Decay floors, the Combine's answer scores, goal ratings and rating-based badge thresholds (Well-Rounded, Elite) convert with the same curve.
+
+**The climb**
+- **Gains get smaller near the top** (`CLIMB_CURVE`, in code): positive deltas from daily recaps and weekly corrections keep 100% under 70, 60% at 80, 35% at 90 and 15% at 95+, interpolated between (starting values, to tune). Losses are never scaled. The prompt tells the model to give the change the evidence warrants and that code applies the curve, so it doesn't make up for it.
+- **99 is reachable**, through several seasons of sustained, evidenced work. That's the grind the app advertises.
+- **90+ is measured against the real world, not the league.** Crossing 90 needs evidence that meets the domain's real-world standard (the top ~1% of adults at it), judged from what was actually logged. The league curve never bends anything above 90, so a strong league can't make 90 cheap and a small one can't put it out of reach.
+- **Decay keeps it honest** (§5.4): a high rating has to be kept up. Rollover already carries every leaf into the next season (`recalibration` events), so the climb spans seasons.
+
+**Who the league is**
+- **Eligible:** players who pass the global-board evidence rules (§7.3: at least `LEADERBOARD_MIN_RECAPPED_DAYS` recapped days, not sitting out for flagged days), in every season mode (the rating runs underneath all of them), minors included (calibration only reads numbers; nothing is shown).
+- **Groups:** each template attribute (everyone's Cardio). Custom attributes join the group of their **skill tag**: when a custom attribute is created, the model gives it a canonical tag ("Chess", "Lockpicking") so differently named versions of the same skill land together. Below `LEAGUE_MIN_POOL = 30` eligible players a group is blended with the next one up (skill tag → template category → all leaves) in proportion to its size; if even the all-leaves group is under 30, calibration is off and only the floor, rubric and climb curve apply. A tag group that reaches 30 is a candidate for a new template attribute.
+- **A player whose whole tree is obscure** uses the all-leaves pace and is never compared head to head; their ratings rest on the model's real-world standards, which is the point of the 90+ rule.
+- **Snapshot:** leaf ratings are recorded nightly (`leaf_snapshots`: user, season, lineage, group, rating, season-start rating, gains this season, recapped days). Calibration reads these, not ledgers.
+
+**When: Ratings Updates happen only at season rollover**
+- At quarter end the league is measured once per group and frozen in `league_calibrations` (season, group, seed shift, gain factor, sample size, medians). Each player takes it when their season rolls over (`ensureCurrentSeason`), so everyone gets the same numbers whenever they return.
+- **No mid-season updates.** A manual update only the owner can trigger is noted for later and not built (not other admins).
+
+**What a Ratings Update does**
+1. **Starting-rating check.** If the median starting rating of first-season players in a group is outside **57-63**, next season's new players' starting ratings in that group pass through a curve (25 and 90 fixed) that moves the median back toward 60, by at most **±3** a season. Players already in the league aren't touched. "Typical adult = 60" holds at entry; veterans are free to climb above it.
+2. **Pace check** (how inflation is told apart from real improvement). The group's median gain per recapped day this season (after the climb curve) is compared with `PACE_BUDGET`, the gain a day of steady, real work should earn. More than 5% over: every player's gains in that group this season are trimmed by the excess, at most **15%**. More than 5% under: credited by the shortfall, at most **15%**. Within ±5%, nothing.
+3. **Limits.** A trim never takes a leaf below its season-start rating and never touches an earlier season. Everyone in a group gets the same percentage, in proportion to what they earned, so order within a group never changes. Ineligible players (provisional, sitting out) get their group's factor too, so being left out can't be gamed.
+
+**Transparency**
+- Every update is a `ratings_update` ledger event per leaf with a reason ("Ratings Update: league Cardio recaps ran 8% generous this season; your +12.0 counts as +11.0", "League recaps were stingy this season; +0.9 credited").
+- Each rollover posts one league note (groups updated, their medians, what changed), and the change feed, the new season's reveal and the season card show the update.
+
+**Modes**
+- **Growth:** `ratings_update` events count 0, like `recalibration` and decay. The climb curve applies, so high-rated players gain growth more slowly.
+- **Souls:** levels never change; souls are earned from gains after the climb curve.
+- **Boards:** order within a group never changes; Overall boards can shift slightly, since groups get different factors.
+
+**Honesty: the honor system, model pushback and occasional checks**
+Ratings are self-reported, so verification scales with the stakes, meaning how many people see a rating:
+- **Private:** the honor system plus model skepticism (§5.6). Lying here only cheats yourself. The daily caps and the climb curve mean a lie has to be kept up for months to matter.
+- **Global boards:** the evidence floor and flagged-days rule (§7.3), plus **unusual-gain flags**: a player whose gains run far above their group's pace, or who hits the daily cap day after day, sits out global boards until a review clears it.
+- **Scout checks:** now and then, mostly after big gains, the coach asks one pointed, specific question ("What was your 5K split Saturday?"). Vague or inconsistent answers count toward flags. A question a scout would ask, never an accusation.
+- **The Elite Club** (90+): a leaf at 90 or above is **verified** only with evidence: a connected source (later), workout logs with records, a photo, or a passed scout check. Unverified 90+ ratings stay on the owner's card; shared cards and boards show them as 89.9 with an "unverified" note. Verified 90+ players form the Elite Club, shown publicly (a club page and a card mark) once the league is big enough to make it mean something.
+- No player reports for now; they tend to turn into fights between friends.
+
+**Watch, don't fight:** if the whole league really improves over the years, the veteran median ends above 60 and fewer than 60% may sit between 50 and 70. That's the grind working, not a fault to correct. The admin page shows each group's starting median, veteran median, share in 50-70 and pace against budget.
+
+**Open:** `PACE_BUDGET`'s value (no pace check until the first real season's data is in); tuning `CLIMB_CURVE` against real recap deltas.
+
+### 4.9 Age (decided 2026-11-12)
+- **The app is for adults.** Sign-up says so, and every player gives a **date of birth** (`users.birth_date`) at sign-up; existing players are asked on their next visit, and sharing waits until they answer. All we know is what players tell us, so the date is taken at their word.
+- **Ratings are age-relative:** prompts get the player's age band (18-24, 25-34, 35-44, 45-54, 55-64, 65+) and the rubric judges against adults of that age. League groups don't split by age yet; the admin page shows each group's medians by band, and a group splits once every band has 30 players on its own.
+- **Under 18, nothing is shared.** Visibility is locked to `private` (friends and public can't be picked), no leaderboard opt-in, no public card or profile; the player still counts toward league calibration. **At 18 the card can go public**, still opt-in like everyone else. What else minors can do is open (§13).
+
 ---
 
 ## 5. The LLM Engine
@@ -210,12 +269,12 @@ All LLM work lives behind one internal module, `apps/api/src/llm/`, with a **pro
 
 **The Combine** (added 2026-11-04): starting ratings without the AI, for Free accounts (the only path they get) and any Premium player who'd rather skip the scout. Step 3 offers both: the scout or the Combine (`POST /onboarding/questionnaire` with `method`; `onboarding_sessions.method` remembers it).
 - **Questions** (`packages/shared/src/combine.ts`): two hand-written, behavior-anchored `single_choice` questions for every template attribute, each option carrying a fixed score on the calibration rubric below; custom attributes get three generic ones ("days you worked on it in the last two weeks", "compared with a typical adult", a half-weight trend question). Ids are `c1…cN`; a leaf's questions line up with its bank entries by order.
-- **Scoring:** a leaf's rating is the weighted mean of its answers (50 with none), confidence `medium` for template attributes and `low` for custom ones, and the rationale lists the answers. No follow-up chat: submitting goes straight to rating.
+- **Scoring:** a leaf's rating is the weighted mean of its answers (60 with none), confidence `medium` for template attributes and `low` for custom ones, and the rationale lists the answers. No follow-up chat: submitting goes straight to rating.
 - **Decay** comes from per-category defaults (e.g. Fitness: 3 grace days, 0.25/day; Finance: 14 days, 0.05/day), floored 15 below the start; weekly reviews revise them like the scout's. **Archetype** is rule-based: the top category's noun with the runner-up's modifier ("Cerebral Athlete"), "Two-Way" when they're within 2 points, "Balanced All-Rounder" when three or more are within 4.
 - The scout's AI steps (discovery, the drafted template, attribute and weight suggestions, its questionnaire, follow-up and ratings) are Premium (§8.9). Free accounts start at "Build your roster" instead of the discovery chat.
-- **New attributes later** (season setup, accepted tree proposals) are rated by the model for Premium; for Free they start at their parent's current rating (50 without one), with Combine decay.
+- **New attributes later** (season setup, accepted tree proposals) are rated by the model for Premium; for Free they start at their parent's current rating (60 without one), with Combine decay.
 
-**Calibration guidance for the prompt.** The prompt must define what the numbers mean, or ratings will cluster at 70–85. For example: 50 = typical adult, 70 = clearly above average, 85 = top ~5% among peers, 95+ = elite or professional. Store this rubric as a versioned prompt asset and test it with evals.
+**Calibration guidance for the prompt.** The prompt must define what the numbers mean, or ratings will cluster at 70–85. The rubric is in §4.8: 25 is the floor, 60 a typical adult of the player's age, 70 clearly above average, 85 the top ~5%, 90 the top ~1% by real-world standards, 95+ elite or professional. Store this rubric as a versioned prompt asset and test it with evals.
 
 ### 5.2 Daily recap (Phase 2)
 - **Trigger:** the user hits **"End my day"**, or, if they don't, it runs **automatically at 04:00 the next morning, user-local** (cron, §8.6).
@@ -269,7 +328,7 @@ All LLM work lives behind one internal module, `apps/api/src/llm/`, with a **pro
 ### 5.6 Guardrails & anti-gaming
 The LLM decides deltas. **Code only enforces:**
 1. **Schema validity**: output parses; `nodeId`s are existing, active **leaves** in the current season.
-2. **Range**: values are clamped to 0–100.
+2. **Range**: values are clamped to 25–100 (§4.8).
 3. **Wide sanity caps**, as anti-abuse rails rather than scoring logic. For example, |delta| ≤ 3.0 per leaf per daily recap and ≤ 5.0 per leaf per weekly review. All caps are config. *Open: confirm this doesn't conflict with "LLM fully decides" (§13).*
 4. **Skepticism prompting**: the prompt tells the LLM to weigh implausible or unverifiable claims lightly, prefer consistency over single big claims, and emit `flags`.
 5. **Rate limits**: one daily recap per day (re-runs aside), plus limits on re-runs.
@@ -347,7 +406,7 @@ The weekly review rewrites it each week alongside the profile summary. When the 
   - Social limits: 20 pending sent requests, 200 friends; reserved usernames; hidden profiles answer 404.
   - *Later:* report a player, username change cooldown, and moving ranking into SQL once boards grow (ranking is in memory today).
 - **Privacy model** (decided 2026-10-22):
-  - Each player picks a **visibility**: `private` (default: nobody else), `friends` (accepted friends) or `public` (anyone with the link, signed in or not).
+  - Each player picks a **visibility**: `private` (default: nobody else), `friends` (accepted friends) or `public` (anyone with the link, signed in or not). Under 18 it's locked to `private`, with no leaderboard opt-in (§4.9).
   - Visibility covers the **card only**: Overall, archetype, season label, **category** values, recapped-day count and the highest tier of each **catalog** badge.
   - **Never shared:** journals, guided answers, recaps and narratives, the model's rationales, **attribute names and values** (they can be personal, e.g. "Sobriety"), personal badges (written by the LLM from journals), goals and projections. Photos and voice (Phase 5) follow the same rule.
   - Hidden profiles answer 404, the same as missing ones, so settings don't reveal who has an account.
@@ -760,3 +819,4 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 13. ~~**Global leaderboard comparability**~~ Decided: boards are Overall plus template categories only (§7.3). Overall still mixes different trees; revisit if it feels unfair.
 14. **Data export and account deletion** (should be in place before launch).
 15. **Content safety:** journals may contain sensitive topics (mental health, etc.). Define how the LLM responds to distressing content, what data goes to providers, and the provider data-retention settings.
+16. **Minors:** what can players under 18 do beyond a private account (friends, boards), and is there a minimum age (13, for COPPA and the app stores)? Check the law before launch.
