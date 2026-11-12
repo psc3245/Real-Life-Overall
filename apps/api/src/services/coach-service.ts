@@ -168,10 +168,21 @@ export function claimsWork(reply: string) {
     new RegExp(`\\bI(?:'ve| have)?\\s+(?:just\\s+|also\\s+)?(?:${done})\\b`, "i"),
     // A sentence that opens with it: "Logged Wednesday as Chest Day."
     new RegExp(`(?:^|[.!?:]\\s+)(?:${done})\\b`, "i"),
+    // Passive: "It's written down as a card", "has been logged"
+    new RegExp(
+      `\\b(?:is|are|was|were|it's|has been|have been)\\s+(?:now\\s+)?(?:${done}|written down)\\b`,
+      "i",
+    ),
     // "Here's the draft", "check the card"
     /\bhere(?:'s| is) (?:the|a|your) draft\b|\b(?:on|in|from) the card\b/i,
   ].some((re) => re.test(reply));
 }
+
+/**
+ * Looser: any talk of a card or draft. Without a draft that's worth a second look by the model,
+ * though only `claimsWork` is sure enough to overrule its reply.
+ */
+const mentionsDraft = (reply: string) => /\b(?:card|draft)s?\b/i.test(reply);
 
 /** Habits with how often they were done over the last two weeks. */
 async function renderHabits(db: Database, userId: string, today: string, ctx: LeafContext | null) {
@@ -458,7 +469,11 @@ export async function sendMessage(
     // Models sometimes say they logged something without calling the tool. Nothing logged
     // plus a reply that claims otherwise gets one correction; then it's said plainly.
     const nothingDone = () => !actions.length && !drafts.length;
-    if (nothingDone() && Object.keys(tools).length && claimsWork(output.reply)) {
+    if (
+      nothingDone() &&
+      Object.keys(tools).length &&
+      (claimsWork(output.reply) || mentionsDraft(output.reply))
+    ) {
       output = await ask([
         ...messages,
         { role: "assistant", content: output.reply },

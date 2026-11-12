@@ -1,12 +1,14 @@
 import type {
+  AccountAction,
   AdminOverviewDto,
   AdminUserDto,
   LlmCallDto,
+  CreateAccountBody,
   RecapDebugDto,
   SeasonMode,
   UserRole,
 } from "@rlo/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { useAuthState } from "./session";
 import { useMe } from "./hooks";
@@ -35,10 +37,54 @@ export function useLlmCalls(filter: { errorsOnly?: boolean; userId?: string; lim
   });
 }
 
-export function useAdminUsers() {
+export function useAdminUsers(filter: { q?: string; role?: UserRole } = {}) {
+  const params = new URLSearchParams();
+  if (filter.q) params.set("q", filter.q);
+  if (filter.role) params.set("role", filter.role);
   return useQuery({
-    queryKey: [...adminKey, "users"],
-    queryFn: () => api<AdminUserDto[]>("/admin/users"),
+    queryKey: [...adminKey, "users", filter],
+    queryFn: () => api<AdminUserDto[]>(`/admin/users?${params}`),
+    // Keep the list while a new search loads, so typing doesn't flash it empty.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** After any account change: the user list and the overview's counts. */
+function useInvalidateAccounts() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: adminKey });
+}
+
+/** "Sign a player": an email + password account made by hand (DESIGN.md §8.7). */
+export function useCreateAccount() {
+  const onSuccess = useInvalidateAccounts();
+  return useMutation({
+    mutationFn: (body: CreateAccountBody) =>
+      api<AdminUserDto>("/admin/users", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess,
+  });
+}
+
+/** Deletes an account and everything in it; `confirm` is the username typed back. */
+export function useDeleteAccount() {
+  const onSuccess = useInvalidateAccounts();
+  return useMutation({
+    mutationFn: ({ id, confirm }: { id: string; confirm: string }) =>
+      api<null>(`/admin/users/${id}`, { method: "DELETE", body: JSON.stringify({ confirm }) }),
+    onSuccess,
+  });
+}
+
+/** Sign-in fixes: confirm the email, resend confirmation, password reset, sign out everywhere. */
+export function useAccountAction() {
+  const onSuccess = useInvalidateAccounts();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: AccountAction }) =>
+      api<null>(`/admin/users/${id}/actions`, {
+        method: "POST",
+        body: JSON.stringify({ action }),
+      }),
+    onSuccess,
   });
 }
 

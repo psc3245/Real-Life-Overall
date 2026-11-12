@@ -86,6 +86,10 @@ function RootStack() {
             name="workouts/template"
             options={{ ...pushedOptions, presentation: "modal" }}
           />
+          <Stack.Screen
+            name="workouts/draft"
+            options={{ ...pushedOptions, presentation: "modal" }}
+          />
           <Stack.Screen name="workouts/exercises/index" options={pushedOptions} />
           <Stack.Screen name="workouts/exercises/[id]" options={pushedOptions} />
           <Stack.Screen name="body" options={pushedOptions} />

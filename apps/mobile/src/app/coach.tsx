@@ -1,16 +1,23 @@
 import {
+  formatDuration,
+  formatSet,
   HABIT_TYPE_LABELS,
   IMPORTANCE_LABELS,
   MAX_COACH_MESSAGE,
   WEEKDAY_SHORT,
+  type CoachActionDto,
   type CoachMessageDto,
   type CoachSuggestionDto,
+  type ExerciseDto,
+  type UnitSystem,
+  type WorkoutExerciseDto,
 } from "@rlo/shared";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  ActionSheetIOS,
   Alert,
   Animated,
   KeyboardAvoidingView,
@@ -24,11 +31,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  useClearCoach,
   useCoach,
+  useCoachThreads,
+  useDeleteCoachThread,
   useResolveCoachSuggestion,
   useSendCoachMessage,
+  useStartPostgame,
+  useUndoCoachAction,
 } from "@/api/coach";
+import { useExercises } from "@/api/workouts";
+import { weekdayDate } from "@/lib/format";
+import { useUnits } from "@/lib/workouts";
 import { useRatings } from "@/api/ratings";
 import { Starters } from "@/components/CoachStarters";
 import { Body, Button, ErrorNote, Loading, Muted, Screen } from "@/components/ui";
@@ -36,40 +49,100 @@ import { useTalk } from "@/lib/talk";
 import { colors, fonts, space } from "@/lib/theme";
 import { FeatureGate } from "@/components/FeatureGate";
 
-/** The coach chat (web /coach). `?ask=` sends one question on open (Today's coach card). */
+/**
+ * The coach chat (web /coach), one thread at a time: "Chats" switches or deletes them, the
+ * compose button starts a new one. `?ask=` sends one question in a new chat (Today's coach
+ * card), `?thread=` opens one, and `?postgame=<date>` starts that day's postgame interview.
+ */
 function CoachScreen() {
   const talk = useTalk();
-  const coach = useCoach();
+  const params = useLocalSearchParams<{ ask?: string; thread?: string; postgame?: string }>();
+  const [ref, setRef] = useState(params.thread || "latest");
+  const coach = useCoach(ref);
+  const threads = useCoachThreads();
   const send = useSendCoachMessage();
-  const clear = useClearCoach();
+  const remove = useDeleteCoachThread();
+  const postgame = useStartPostgame();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const { ask } = useLocalSearchParams<{ ask?: string }>();
   const [draft, setDraft] = useState("");
-  const asked = useRef(false);
+  const started = useRef(false);
   const scroll = useRef<ScrollViewInstance>(null);
-  const messages = coach.data?.messages ?? [];
+  const fresh = ref === "new";
+  const thread = fresh ? null : (coach.data?.thread ?? null);
+  const messages = fresh ? [] : (coach.data?.messages ?? []);
   const remaining = coach.data?.remaining ?? 0;
+  const busy = send.isPending || postgame.isPending;
 
-  const submit = (text: string) => {
+  const submit = (text: string, threadId = thread?.id ?? null) => {
     const message = text.trim();
     if (!message || send.isPending) return;
     // Clear right away so it reads as sent; restore it if sending fails.
     setDraft("");
-    send.mutate(message, { onError: () => setDraft((current) => current || message) });
+    send.mutate(
+      { content: message, threadId },
+      {
+        onSuccess: (state) => state.thread && setRef(state.thread.id),
+        onError: () => setDraft((current) => current || message),
+      },
+    );
   };
 
+  // A link to another thread while this screen is open switches to it.
   useEffect(() => {
-    if (!ask || asked.current || !coach.data) return;
-    asked.current = true;
-    router.setParams({ ask: "" });
-    submit(ask);
+    if (params.thread) setRef(params.thread);
+  }, [params.thread]);
+
+  // Opened with a question or for a postgame: do it once.
+  useEffect(() => {
+    if (started.current || !coach.data) return;
+    if (params.ask) {
+      started.current = true;
+      router.setParams({ ask: "" });
+      setRef("new");
+      submit(params.ask, null);
+    } else if (params.postgame) {
+      started.current = true;
+      const date = params.postgame;
+      router.setParams({ postgame: "" });
+      postgame.mutate(date, { onSuccess: (state) => state.thread && setRef(state.thread.id) });
+    }
   });
 
   useEffect(() => {
     const id = setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
     return () => clearTimeout(id);
-  }, [messages.length, send.isPending]);
+  }, [messages.length, busy]);
+
+  const openChats = () => {
+    const list = (threads.data ?? []).slice(0, 12);
+    const options = [
+      ...list.map((t) => `${t.id === thread?.id ? "✓ " : ""}${t.title}`),
+      ...(thread ? ["Delete this chat"] : []),
+      "Cancel",
+    ];
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: "Conversations",
+        options,
+        cancelButtonIndex: options.length - 1,
+        ...(thread && { destructiveButtonIndex: list.length }),
+      },
+      (i) => {
+        if (i < list.length) setRef(list[i]!.id);
+        else if (thread && i === list.length) {
+          Alert.alert("Delete this conversation?", thread.title, [
+            { text: "Keep", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => remove.mutate(thread.id, { onSuccess: () => setRef("latest") }),
+            },
+          ]);
+        }
+      },
+    );
+  };
 
   if (coach.isPending) return <Loading title={talk.coach} />;
   if (coach.isError) {
@@ -88,24 +161,28 @@ function CoachScreen() {
     >
       <Stack.Screen
         options={{
-          title: talk.coach,
-          headerRight:
-            messages.length > 0
-              ? () => (
-                  <Text
-                    accessibilityRole="button"
-                    style={{ color: colors.flare, fontSize: 16 }}
-                    onPress={() =>
-                      Alert.alert("Clear the whole conversation?", undefined, [
-                        { text: "Keep", style: "cancel" },
-                        { text: "Clear", style: "destructive", onPress: () => clear.mutate() },
-                      ])
-                    }
-                  >
-                    Clear
-                  </Text>
-                )
-              : undefined,
+          title: thread?.title ?? talk.coach,
+          headerRight: () => (
+            <View style={{ flexDirection: "row", gap: space.lg, alignItems: "center" }}>
+              {(threads.data?.length ?? 0) > 0 && (
+                <Text
+                  accessibilityRole="button"
+                  style={{ color: colors.neon, fontSize: 16 }}
+                  onPress={openChats}
+                >
+                  Chats
+                </Text>
+              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="New chat"
+                hitSlop={8}
+                onPress={() => setRef("new")}
+              >
+                <SymbolView name="square.and.pencil" tintColor={colors.neon} size={20} />
+              </Pressable>
+            </View>
+          ),
         }}
       />
       <ScrollView
@@ -114,7 +191,7 @@ function CoachScreen() {
         contentContainerStyle={styles.list}
         keyboardDismissMode="interactive"
       >
-        {messages.length === 0 && !send.isPending ? (
+        {messages.length === 0 && !busy ? (
           <View style={styles.empty}>
             <CoachAvatar size={56} />
             <Text style={styles.eyebrow}>{talk.coachTagline}</Text>
@@ -124,25 +201,24 @@ function CoachScreen() {
               <Text style={{ color: colors.neon }} onPress={() => router.push("/scouting-report")}>
                 {talk.scoutingReport}
               </Text>
-              , and can suggest habits and goals you add with one tap.
+              . Tell it what you did and it logs habits and drafts workouts; ask and it drafts
+              habits, goals and templates for you to check.
             </Muted>
           </View>
         ) : null}
         {messages.map((m) => (
-          <Message key={m.id} message={m} />
+          <Message key={m.id} message={m} threadId={thread?.id ?? null} />
         ))}
         {send.isPending && (
-          <>
-            <Bubble role="user" pending>
-              {send.variables}
-            </Bubble>
-            <TypingBubble />
-          </>
+          <Bubble role="user" pending>
+            {send.variables?.content}
+          </Bubble>
         )}
-        <ErrorNote error={send.error ?? clear.error} />
+        {busy && <TypingBubble />}
+        <ErrorNote error={send.error ?? remove.error ?? postgame.error} />
       </ScrollView>
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, space.sm) }]}>
-        {messages.length === 0 && !send.isPending && (
+        {messages.length === 0 && !busy && (
           <Starters onPick={submit} disabled={remaining === 0} inset={space.md} />
         )}
         <View style={styles.inputRow}>
@@ -166,12 +242,9 @@ function CoachScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Send"
-            disabled={!draft.trim() || send.isPending || remaining === 0}
+            disabled={!draft.trim() || busy || remaining === 0}
             onPress={() => submit(draft)}
-            style={[
-              styles.send,
-              (!draft.trim() || send.isPending || remaining === 0) && { opacity: 0.4 },
-            ]}
+            style={[styles.send, (!draft.trim() || busy || remaining === 0) && { opacity: 0.4 }]}
           >
             <SymbolView name="arrow.up" tintColor={colors.court950} size={18} weight="bold" />
           </Pressable>
@@ -261,32 +334,204 @@ function TypingBubble() {
   );
 }
 
-function Message({ message: m }: { message: CoachMessageDto }) {
+function Message({ message: m, threadId }: { message: CoachMessageDto; threadId: string | null }) {
   return (
     <View style={{ gap: space.sm }}>
       <Bubble role={m.role}>{m.content}</Bubble>
-      {m.suggestions.map((s) => (
-        <Suggestion key={s.index} messageId={m.id} suggestion={s} />
+      {m.actions.map((a) => (
+        <Receipt key={`a${a.index}`} messageId={m.id} action={a} />
       ))}
+      {m.suggestions.map((s) =>
+        s.kind === "report" ? (
+          <ReportLine key={`s${s.index}`} messageId={m.id} suggestion={s} />
+        ) : (
+          <DraftCard key={`s${s.index}`} messageId={m.id} threadId={threadId} draft={s} />
+        ),
+      )}
     </View>
   );
 }
 
-const KIND_LABEL: Record<CoachSuggestionDto["kind"], string> = {
-  habit: "Habit",
-  goal: "Goal",
-  report: "Scouting Report",
-  workout: "Workout draft",
-  template: "Template draft",
+const ACTION_LABEL: Record<CoachActionDto["kind"], string> = {
+  workout: "Workout logged",
+  habit: "Habit logged",
+  goal: "Goal progress",
+  newHabit: "Habit created",
+  newGoal: "Goal created",
+  template: "Template saved",
 };
 
-const ADD_LABEL: Record<CoachSuggestionDto["kind"], string> = {
+/** Something the coach logged, with undo (it writes to the day log directly). */
+function Receipt({ messageId, action: a }: { messageId: string; action: CoachActionDto }) {
+  const undo = useUndoCoachAction();
+  return (
+    <View
+      style={[
+        styles.suggestion,
+        !a.undone && { borderColor: colors.neon },
+        a.undone && { opacity: 0.6 },
+      ]}
+    >
+      <Text style={styles.kind}>
+        {a.undone ? "Undone" : `✓ ${ACTION_LABEL[a.kind]}`} · {weekdayDate(a.date)}
+      </Text>
+      <Body style={[{ fontWeight: "600" }, a.undone && { textDecorationLine: "line-through" }]}>
+        {a.title}
+      </Body>
+      <Muted style={{ fontSize: 13 }}>{a.detail}</Muted>
+      <ErrorNote error={undo.error} />
+      {!a.undone && (
+        <Button
+          title="Undo"
+          variant="ghost"
+          disabled={undo.isPending}
+          onPress={() => undo.mutate({ messageId, index: a.index })}
+        />
+      )}
+    </View>
+  );
+}
+
+type Draft = Exclude<CoachSuggestionDto, { kind: "report" }>;
+
+const DRAFT_LABEL: Record<Draft["kind"], string> = {
+  workout: "Workout",
+  template: "Workout template",
+  habit: "Habit",
+  goal: "Goal",
+};
+
+const SAVE_LABEL: Record<Draft["kind"], string> = {
+  workout: "Looks right, save it",
+  template: "Save template",
   habit: "Add habit",
   goal: "Add goal",
-  report: "Add to report",
-  workout: "Save workout",
-  template: "Save template",
 };
+
+/** Lines describing a draft: its day and sets, schedule, or target. */
+function draftFacts(
+  d: Draft,
+  names: Map<string, string>,
+  library: ExerciseDto[],
+  units: UnitSystem,
+) {
+  const byId = new Map(library.map((e) => [e.id, e]));
+  const exercises = (list: WorkoutExerciseDto[]) =>
+    list.map((e) => {
+      const info = byId.get(e.exerciseId);
+      const last = e.sets.findLast((x) => x.weightKg ?? x.reps ?? x.durationS ?? x.distanceM);
+      const shown = last && info ? formatSet(info.tracking, last, units) : "";
+      return `${info?.name ?? "Exercise"}: ${e.sets.length} set${e.sets.length === 1 ? "" : "s"}${shown ? ` · ${shown}` : ""}`;
+    });
+  const builds = (ids: string[]) => {
+    const list = ids.map((id) => names.get(id)).filter(Boolean);
+    return list.length ? [`Builds ${list.join(", ")}`] : [];
+  };
+  switch (d.kind) {
+    case "workout":
+      return [`${weekdayDate(d.date)} · ${formatDuration(d.durationS)}`, ...exercises(d.exercises)];
+    case "template":
+      return exercises(d.exercises);
+    case "habit": {
+      const schedule =
+        d.days.length === 7 ? "Every day" : d.days.map((x) => WEEKDAY_SHORT[x]).join(", ");
+      const amount =
+        d.target !== null
+          ? ` · ${d.avoid ? "at most" : "goal"} ${d.target} ${d.habitType === "duration" ? "min" : (d.unit ?? "")}`
+          : "";
+      return [
+        `${HABIT_TYPE_LABELS[d.habitType]}${d.avoid ? " (avoid)" : ""} · ${schedule}${amount}`,
+        ...builds(d.nodeIds),
+      ];
+    }
+    case "goal":
+      return [
+        d.endsOn
+          ? `${d.goalKind === "reach" ? `${d.startValue} → ` : ""}${d.target} ${d.unit} by ${weekdayDate(d.endsOn)}`
+          : `${d.target} ${d.unit} in ${d.durationDays} days`,
+        ...builds(d.nodeIds),
+      ];
+  }
+}
+
+/** Where a draft opens to be tweaked: the app's own editor, saving through the coach. */
+function reviewHref(d: Draft, threadId: string | null, messageId: string) {
+  const draft = { thread: threadId ?? "", message: messageId, index: String(d.index) };
+  switch (d.kind) {
+    case "habit":
+      return { pathname: "/habits/edit", params: draft } as const;
+    case "goal":
+      return { pathname: "/goals/edit", params: draft } as const;
+    case "template":
+      return { pathname: "/workouts/template", params: draft } as const;
+    case "workout":
+      return { pathname: "/workouts/draft", params: draft } as const;
+  }
+}
+
+/**
+ * Something the coach drafted (web DraftCard): its details, and nothing saved until the
+ * player saves it as is or after tweaking it.
+ */
+function DraftCard({
+  messageId,
+  threadId,
+  draft: d,
+}: {
+  messageId: string;
+  threadId: string | null;
+  draft: Draft;
+}) {
+  const resolve = useResolveCoachSuggestion();
+  const ratings = useRatings();
+  const library = useExercises().data ?? [];
+  const units = useUnits();
+  const names = new Map((ratings.data?.nodes ?? []).map((n) => [n.id, n.name]));
+  const pending = d.status === "pending";
+  return (
+    <View style={[styles.suggestion, pending && { borderColor: colors.neon }]}>
+      <Text style={styles.kind}>
+        {DRAFT_LABEL[d.kind]}
+        {pending ? " · draft, not saved" : d.status === "accepted" ? " · ✓ saved" : " · discarded"}
+      </Text>
+      <Body style={{ fontWeight: "600", fontSize: 17 }}>{d.name}</Body>
+      {draftFacts(d, names, library, units).map((f, i) => (
+        <Muted key={i} style={{ fontSize: 13 }}>
+          {f}
+        </Muted>
+      ))}
+      {d.reason ? <Muted style={{ fontSize: 13 }}>{d.reason}</Muted> : null}
+      <ErrorNote error={resolve.error} />
+      {pending && (
+        <View style={{ gap: space.xs }}>
+          <Button
+            title={SAVE_LABEL[d.kind]}
+            disabled={resolve.isPending}
+            onPress={() => resolve.mutate({ messageId, index: d.index, action: "accept" })}
+          />
+          <View style={{ flexDirection: "row", gap: space.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Review and tweak"
+                variant="ghost"
+                disabled={resolve.isPending}
+                onPress={() => router.push(reviewHref(d, threadId, messageId))}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Discard"
+                variant="ghost"
+                disabled={resolve.isPending}
+                onPress={() => resolve.mutate({ messageId, index: d.index, action: "dismiss" })}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
 
 const SECTION_LABEL = {
   aspiration: "Aspiration",
@@ -295,41 +540,13 @@ const SECTION_LABEL = {
   constraint: "Constraint",
 } as const;
 
-/** One line per draft; workouts and templates are reviewed in detail on the web for now. */
-function describe(s: CoachSuggestionDto, names: Map<string, string>) {
-  if (s.kind === "workout" || s.kind === "template") {
-    const sets = s.exercises.reduce((n, e) => n + e.sets.length, 0);
-    return `${s.kind === "workout" ? `${s.date} · ${Math.round(s.durationS / 60)} min · ` : ""}${s.exercises.length} exercise${s.exercises.length === 1 ? "" : "s"}, ${sets} sets`;
-  }
-  const nodes =
-    s.kind !== "report" && s.nodeIds.length
-      ? ` · ${s.nodeIds.map((id) => names.get(id) ?? "?").join(", ")}`
-      : "";
-  if (s.kind === "habit") {
-    const schedule =
-      s.days.length === 7 ? "every day" : s.days.map((d) => WEEKDAY_SHORT[d]).join(", ");
-    const goal =
-      s.target !== null
-        ? ` · goal ${s.target} ${s.habitType === "duration" ? "min" : (s.unit ?? "")}`
-        : "";
-    return `${HABIT_TYPE_LABELS[s.habitType]} · ${schedule}${goal}${nodes}`;
-  }
-  if (s.kind === "goal") {
-    return s.endsOn
-      ? `${s.goalKind === "reach" ? `${s.startValue} → ` : ""}${s.target} ${s.unit} by ${s.endsOn}${nodes}`
-      : `${s.target} ${s.unit} in ${s.durationDays} day${s.durationDays === 1 ? "" : "s"}${nodes}`;
-  }
-  return `${SECTION_LABEL[s.section]}${
-    s.importance ? ` · ${IMPORTANCE_LABELS[s.importance]}` : ""
-  }${s.nodeId ? ` · ${names.get(s.nodeId) ?? "?"}` : ""}`;
-}
-
-function Suggestion({
+/** A line the coach offers for the Scouting Report; everything else comes as a DraftCard. */
+function ReportLine({
   messageId,
   suggestion: s,
 }: {
   messageId: string;
-  suggestion: CoachSuggestionDto;
+  suggestion: Extract<CoachSuggestionDto, { kind: "report" }>;
 }) {
   const talk = useTalk();
   const resolve = useResolveCoachSuggestion();
@@ -337,18 +554,20 @@ function Suggestion({
   const names = new Map((ratings.data?.nodes ?? []).map((n) => [n.id, n.name]));
   return (
     <View style={styles.suggestion}>
-      <Text style={styles.kind}>
-        {s.kind === "report" ? talk.scoutingReport : KIND_LABEL[s.kind]}
-      </Text>
-      <Body style={{ fontWeight: "600" }}>{s.kind === "report" ? s.text : s.name}</Body>
-      <Muted style={{ fontSize: 13, color: colors.court500 }}>{describe(s, names)}</Muted>
+      <Text style={styles.kind}>{talk.scoutingReport}</Text>
+      <Body style={{ fontWeight: "600" }}>{s.text}</Body>
+      <Muted style={{ fontSize: 13, color: colors.court500 }}>
+        {SECTION_LABEL[s.section]}
+        {s.importance ? ` · ${IMPORTANCE_LABELS[s.importance]}` : ""}
+        {s.nodeId ? ` · ${names.get(s.nodeId) ?? "?"}` : ""}
+      </Muted>
       {s.reason ? <Muted style={{ fontSize: 13 }}>{s.reason}</Muted> : null}
       <ErrorNote error={resolve.error} />
       {s.status === "pending" ? (
         <View style={{ flexDirection: "row", gap: space.sm }}>
           <View style={{ flex: 1 }}>
             <Button
-              title={ADD_LABEL[s.kind]}
+              title="Add to report"
               disabled={resolve.isPending}
               onPress={() => resolve.mutate({ messageId, index: s.index, action: "accept" })}
             />

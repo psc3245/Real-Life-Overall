@@ -1,30 +1,36 @@
 import {
+  ADMIN_MIN_PASSWORD,
+  ROLE_DETAILS,
   ROLE_LABELS,
   SEASON_MODE_LABELS,
   SEASON_MODES,
   seasonModeAllowed,
   USER_ROLES,
+  type AccountAction,
   type AdminUserDto,
   type LlmCallDto,
   type UsageRowDto,
   type UserRole,
 } from "@rlo/shared";
 import { Redirect } from "expo-router";
-import { useState } from "react";
-import { ActionSheetIOS, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActionSheetIOS, Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useBugReports, useSetBugReportStatus } from "@/api/bugReports";
 import {
+  useAccountAction,
   useAdminOverview,
   useAdminUsers,
+  useCreateAccount,
+  useDeleteAccount,
   useIsAdmin,
   useLlmCalls,
   useSetRole,
   useSetSeasonMode,
 } from "@/api/admin";
 import { useMe } from "@/api/hooks";
-import { Segmented } from "@/components/controls";
+import { Chip, Segmented } from "@/components/controls";
 import { StatGrid, StatTile } from "@/components/StatTile";
-import { Card, ErrorNote, Label, Loading, Muted, Screen } from "@/components/ui";
+import { Button, Card, ErrorNote, Field, Label, Loading, Muted, Screen } from "@/components/ui";
 import { colors, space, tierColor } from "@/lib/theme";
 
 const roleColor = (role: UserRole) =>
@@ -274,11 +280,113 @@ function BugReports() {
   );
 }
 
+/** What each sign-in fix did, for the confirmation. */
+const ACTION_DONE: Record<AccountAction, string> = {
+  "verify-email": "Email marked confirmed. They can sign in now.",
+  "resend-verification": "Confirmation email sent.",
+  "send-password-reset": "Password reset email sent (the link lasts an hour).",
+  "sign-out-everywhere": "Signed out on every device.",
+};
+
+/** A search that waits for a pause in typing. */
+function useDebounced(value: string, ms = 250) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
+}
+
+/**
+ * Accounts (web Front Office, DESIGN.md §8.7): search and filter, sign a player, change the
+ * type or season mode, fix sign-in and release (delete) an account.
+ */
 function Users({ myId }: { myId: string }) {
-  const users = useAdminUsers();
+  const [q, setQ] = useState("");
+  const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
+  const [signing, setSigning] = useState(false);
+  const search = useDebounced(q.trim());
+  const users = useAdminUsers({ q: search || undefined, role: roleFilter || undefined });
   const setRole = useSetRole();
   const setMode = useSetSeasonMode();
+  const action = useAccountAction();
+  const remove = useDeleteAccount();
   if (users.isPending) return <Loading />;
+
+  /** Sign-in fixes and release for one account, from a sheet. */
+  const manage = (u: AdminUserDto) => {
+    const fixes: { label: string; action: AccountAction }[] =
+      u.emailVerified === null
+        ? []
+        : [
+            ...(u.emailVerified === false
+              ? [
+                  { label: "Confirm email", action: "verify-email" as const },
+                  { label: "Resend confirmation", action: "resend-verification" as const },
+                ]
+              : []),
+            ...(u.signIn.length > 0
+              ? [
+                  {
+                    label: u.signIn.includes("credential")
+                      ? "Send password reset"
+                      : "Email a set-password link",
+                    action: "send-password-reset" as const,
+                  },
+                ]
+              : []),
+            { label: "Sign out everywhere", action: "sign-out-everywhere" as const },
+          ];
+    const canDelete = u.id !== myId;
+    const options = [
+      ...fixes.map((f) => f.label),
+      ...(canDelete ? ["Delete account…"] : []),
+      "Cancel",
+    ];
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: `@${u.username}`,
+        message:
+          u.emailVerified === null ? "A dev-mode player with no sign-in to manage." : undefined,
+        options,
+        cancelButtonIndex: options.length - 1,
+        ...(canDelete && { destructiveButtonIndex: fixes.length }),
+        userInterfaceStyle: "dark",
+      },
+      (idx) => {
+        const fix = fixes[idx];
+        if (fix) {
+          action.mutate(
+            { id: u.id, action: fix.action },
+            { onSuccess: () => Alert.alert("Done", ACTION_DONE[fix.action]) },
+          );
+        } else if (canDelete && idx === fixes.length) {
+          Alert.prompt(
+            `Delete @${u.username}?`,
+            `Deletes the account, its sign-in and every season, habit, log and rating. This can't be undone. Type ${u.username} to confirm.`,
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: (typed?: string) => {
+                  if ((typed ?? "").trim().toLowerCase() !== u.username) {
+                    Alert.alert("Not deleted", "The username didn't match.");
+                    return;
+                  }
+                  remove.mutate({ id: u.id, confirm: typed ?? "" });
+                },
+              },
+            ],
+            "plain-text",
+            "",
+            "default",
+          );
+        }
+      },
+    );
+  };
 
   /** Picks another mode for the account's running season, then confirms (goals are cleared). */
   const pickMode = (u: AdminUserDto) => {
@@ -307,13 +415,44 @@ function Users({ myId }: { myId: string }) {
   };
   return (
     <View style={{ gap: space.sm }}>
+      <Field
+        value={q}
+        onChangeText={setQ}
+        placeholder="Search name, username or email"
+        accessibilityLabel="Search accounts"
+        autoCapitalize="none"
+        autoCorrect={false}
+        clearButtonMode="while-editing"
+      />
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
+        <Chip label="All" selected={roleFilter === ""} onPress={() => setRoleFilter("")} />
+        {USER_ROLES.map((r) => (
+          <Chip
+            key={r}
+            label={ROLE_LABELS[r]}
+            selected={roleFilter === r}
+            onPress={() => setRoleFilter(r)}
+          />
+        ))}
+      </View>
+      {signing ? (
+        <SignPlayer onDone={() => setSigning(false)} />
+      ) : (
+        <Button title="Sign a player" variant="ghost" onPress={() => setSigning(true)} />
+      )}
       <Label>Users {users.data ? `(${users.data.length})` : ""}</Label>
-      <ErrorNote error={users.error ?? setRole.error ?? setMode.error} />
+      <ErrorNote
+        error={users.error ?? setRole.error ?? setMode.error ?? action.error ?? remove.error}
+      />
       <Card style={{ padding: 0 }}>
+        {users.data?.length === 0 && (
+          <Muted style={{ padding: space.md }}>No accounts match.</Muted>
+        )}
         {users.data?.map((u, i) => (
           <View key={u.id} style={[styles.row, i > 0 && styles.border]}>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ color: colors.court100, fontSize: 16 }}>{u.displayName}</Text>
+              <SignInChips user={u} />
               <Muted style={{ fontSize: 12 }}>
                 @{u.username} · {u.email} · {u.timezone}
               </Muted>
@@ -367,11 +506,121 @@ function Users({ myId }: { myId: string }) {
                   {u.seasonMode ? SEASON_MODE_LABELS[u.seasonMode] : "No season"}
                 </Text>
               </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Manage ${u.username}`}
+                disabled={action.isPending || remove.isPending}
+                onPress={() => manage(u)}
+                style={styles.role}
+              >
+                <Text style={{ color: colors.neon, fontSize: 12 }}>Manage</Text>
+              </Pressable>
             </View>
           </View>
         ))}
       </Card>
     </View>
+  );
+}
+
+/** "No sign-in" (dev-mode players), "Unconfirmed" email, or a Google sign-in. */
+function SignInChips({ user: u }: { user: AdminUserDto }) {
+  const chips = [
+    ...(u.emailVerified === null ? [{ label: "No sign-in", color: colors.court500 }] : []),
+    ...(u.emailVerified === false ? [{ label: "Unconfirmed", color: tierColor(65) }] : []),
+    ...(u.signIn.includes("google") ? [{ label: "Google", color: colors.court300 }] : []),
+  ];
+  if (!chips.length) return null;
+  return (
+    <View style={{ flexDirection: "row", gap: 4 }}>
+      {chips.map((c) => (
+        <Text key={c.label} style={[styles.chip, { color: c.color, borderColor: c.color }]}>
+          {c.label}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Creates an email + password account by hand. The admin sets the password to pass on (the
+ * player can change it in Settings).
+ */
+function SignPlayer({ onDone }: { onDone: () => void }) {
+  const create = useCreateAccount();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("user");
+  const [verified, setVerified] = useState(true);
+  const [created, setCreated] = useState<{ user: AdminUserDto; verified: boolean } | null>(null);
+
+  const submit = () =>
+    create.mutate(
+      { name, email, password, role, verified },
+      {
+        onSuccess: (user) => {
+          setCreated({ user, verified });
+          setName("");
+          setEmail("");
+          setPassword("");
+        },
+      },
+    );
+
+  return (
+    <Card style={{ gap: space.sm }}>
+      <Label>Sign a player</Label>
+      <Field value={name} onChangeText={setName} placeholder="Name" maxLength={60} />
+      <Field
+        value={email}
+        onChangeText={setEmail}
+        placeholder="Email"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <Field
+        value={password}
+        onChangeText={setPassword}
+        placeholder={`Password (at least ${ADMIN_MIN_PASSWORD} characters)`}
+        autoCapitalize="none"
+        autoCorrect={false}
+        textContentType="newPassword"
+      />
+      <Muted style={{ fontSize: 12 }}>
+        Shown so you can pass it on. They can change it in Settings.
+      </Muted>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
+        {USER_ROLES.map((r) => (
+          <Chip key={r} label={ROLE_LABELS[r]} selected={role === r} onPress={() => setRole(r)} />
+        ))}
+      </View>
+      <Muted style={{ fontSize: 12 }}>{ROLE_DETAILS[role]}</Muted>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+        <Switch value={verified} onValueChange={setVerified} />
+        <Muted style={{ flex: 1, fontSize: 13 }}>
+          Email already confirmed (no confirmation email; they can sign in straight away)
+        </Muted>
+      </View>
+      <ErrorNote error={create.error} />
+      {created && (
+        <Text style={{ color: colors.neon }}>
+          Signed @{created.user.username} ({ROLE_LABELS[created.user.role]}).{" "}
+          {created.verified
+            ? "They can sign in now."
+            : `A confirmation email went to ${created.user.email}.`}
+        </Text>
+      )}
+      <Button
+        title={create.isPending ? "Creating…" : "Create account"}
+        disabled={
+          create.isPending || !name.trim() || !email.trim() || password.length < ADMIN_MIN_PASSWORD
+        }
+        onPress={submit}
+      />
+      <Button title="Done" variant="ghost" onPress={onDone} />
+    </Card>
   );
 }
 
@@ -393,6 +642,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   border: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.court800 },
+  chip: {
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    overflow: "hidden",
+  },
   mono: { color: colors.court100, fontFamily: "Menlo", fontSize: 12 },
   value: { color: colors.court100, fontSize: 14, fontVariant: ["tabular-nums"] },
   role: {
