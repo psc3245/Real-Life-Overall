@@ -5,7 +5,7 @@ import { habitsKey } from "./days";
 import { scoutingReportKey } from "./evolution";
 import { objectivesKey } from "./objectives";
 import { ratingsKey } from "./ratings";
-import { exercisesKey, workoutsKey } from "./workouts";
+import { exercisesKey, templatesKey, workoutsKey } from "./workouts";
 
 export const coachKey = ["coach"] as const;
 export const coachThreadsKey = ["coach", "threads"] as const;
@@ -110,20 +110,23 @@ export function useResolveCoachSuggestion() {
       messageId,
       index,
       action,
+      edits,
     }: {
       messageId: string;
       index: number;
       action: "accept" | "dismiss";
+      /** The player's version of a draft; left out, the draft is saved as proposed. */
+      edits?: unknown;
     }) =>
       api<{ state: CoachStateDto; habit: HabitDto | null; goal: ObjectiveDto | null }>(
         `/coach/messages/${messageId}/suggestions/${index}/${action}`,
-        { method: "POST" },
+        { method: "POST", ...(edits !== undefined && { body: JSON.stringify({ edits }) }) },
       ),
     onSuccess: async ({ state }) => {
       await storeThread(queryClient, state);
       await Promise.all(
-        [habitsKey, objectivesKey, scoutingReportKey, ["day"]].map((queryKey) =>
-          queryClient.invalidateQueries({ queryKey }),
+        [habitsKey, objectivesKey, scoutingReportKey, ["day"], workoutsKey, templatesKey].map(
+          (queryKey) => queryClient.invalidateQueries({ queryKey }),
         ),
       );
     },

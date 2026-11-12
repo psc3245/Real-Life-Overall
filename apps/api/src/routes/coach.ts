@@ -1,4 +1,8 @@
-import { coachMessageBodySchema, postgameBodySchema } from "@rlo/shared";
+import {
+  acceptSuggestionBodySchema,
+  coachMessageBodySchema,
+  postgameBodySchema,
+} from "@rlo/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
 import { badRequest } from "../errors";
@@ -42,5 +46,12 @@ export const coachRoutes = new Hono<AppEnv>()
     if ((action !== "accept" && action !== "dismiss") || !Number.isInteger(index)) {
       throw badRequest("Use /accept or /dismiss with a suggestion index");
     }
-    return c.json(await coach.resolveSuggestion(c.get("db"), c.get("userId"), id, index, action));
+    // Accepting may carry the player's edits; an empty body takes the proposal as it is.
+    const { edits } =
+      action === "accept" && c.req.header("content-type")?.includes("json")
+        ? await parseJson(c, acceptSuggestionBodySchema)
+        : { edits: undefined };
+    return c.json(
+      await coach.resolveSuggestion(c.get("db"), c.get("userId"), id, index, action, edits),
+    );
   });

@@ -1,6 +1,10 @@
 import {
   addDays,
   coachReplyOutputSchema,
+  createHabitBodySchema,
+  createObjectiveBodySchema,
+  logWorkoutBodySchema,
+  templateBodySchema,
   COACH_HISTORY_MESSAGES,
   COACH_PAGE_MESSAGES,
   COACH_THREAD_LIST,
@@ -63,7 +67,13 @@ import { renderScoutingReport } from "./evolution-service";
 import { archiveHabit, createHabit, loadLeafContext, type LeafContext } from "./habit-service";
 import { archiveObjective, createObjective, listObjectives } from "./objective-service";
 import { currentFocus } from "./weekly-service";
-import { deleteTemplate, deleteWorkout, loadLookup } from "./workout-service";
+import {
+  createTemplate,
+  deleteTemplate,
+  deleteWorkout,
+  loadLookup,
+  logWorkout,
+} from "./workout-service";
 
 type Output = z.infer<typeof coachReplyOutputSchema>;
 
@@ -147,8 +157,21 @@ export function threadTitle(text: string) {
   return `${cut.slice(0, cut.lastIndexOf(" ") > 20 ? cut.lastIndexOf(" ") : cut.length)}…`;
 }
 
-/** Words a reply uses when it says it did something. */
-const CLAIMS = /\b(logged|saved|created|added|recorded|marked|set up|made)\b/i;
+/**
+ * Whether a reply says it already did something (logged, saved, drafted...), as opposed to
+ * offering to ("I'll draft it once you tell me the sets").
+ */
+export function claimsWork(reply: string) {
+  const done = "logged|saved|created|added|recorded|marked|set up|made|drafted";
+  return [
+    // "I've logged…", "I created…"
+    new RegExp(`\\bI(?:'ve| have)?\\s+(?:just\\s+|also\\s+)?(?:${done})\\b`, "i"),
+    // A sentence that opens with it: "Logged Wednesday as Chest Day."
+    new RegExp(`(?:^|[.!?:]\\s+)(?:${done})\\b`, "i"),
+    // "Here's the draft", "check the card"
+    /\bhere(?:'s| is) (?:the|a|your) draft\b|\b(?:on|in|from) the card\b/i,
+  ].some((re) => re.test(reply));
+}
 
 /** Habits with how often they were done over the last two weeks. */
 async function renderHabits(db: Database, userId: string, today: string, ctx: LeafContext | null) {
@@ -288,8 +311,19 @@ function toModelMessage(m: CoachMessageRow): ModelMessage {
     (a) =>
       `[${DONE[a.kind]}${a.undone ? ", since undone by the user" : ""}: ${a.title} (${a.date}): ${a.detail}]`,
   );
-  return { role: m.role, content: [m.content, ...actions].join("\n") };
+  // Drafts and ideas: what the player did with each, so the coach doesn't redo or re-offer them.
+  const proposals = (m.suggestions as CoachSuggestionDto[]).map(
+    (x) =>
+      `[${x.kind === "report" ? "Scouting Report line" : `Draft ${x.kind}`} "${x.kind === "report" ? x.text : x.name}": ${STATUS[x.status]}]`,
+  );
+  return { role: m.role, content: [m.content, ...actions, ...proposals].join("\n") };
 }
+
+const STATUS: Record<CoachSuggestionDto["status"], string> = {
+  pending: "waiting for the user to review it, not saved",
+  accepted: "saved by the user (maybe with their own tweaks)",
+  dismissed: "turned down by the user",
+};
 
 /** Keeps suggestions that make sense: real refs, no duplicate habits, sane numbers. */
 function normalizeSuggestions(
@@ -387,6 +421,8 @@ export async function sendMessage(
     { role: "user", content },
   ];
   const actions: CoachActionDto[] = [];
+  const drafts: CoachSuggestionDto[] = [];
+  const habitNames = habits.filter((h) => !h.archivedAt).map((h) => h.name);
   const tools = coachTools(
     {
       db,
@@ -399,6 +435,8 @@ export async function sendMessage(
       idByRef,
       leaves: new Map(ctx?.nodes.filter((n) => ctx.leaves.has(n.id)).map((n) => [n.id, n.name])),
       actions,
+      drafts,
+      habitNames,
     },
     day.date,
   );
@@ -419,42 +457,44 @@ export async function sendMessage(
     output = await ask(messages);
     // Models sometimes say they logged something without calling the tool. Nothing logged
     // plus a reply that claims otherwise gets one correction; then it's said plainly.
-    if (!actions.length && Object.keys(tools).length && CLAIMS.test(output.reply)) {
+    const nothingDone = () => !actions.length && !drafts.length;
+    if (nothingDone() && Object.keys(tools).length && claimsWork(output.reply)) {
       output = await ask([
         ...messages,
         { role: "assistant", content: output.reply },
         {
           role: "user",
           content:
-            "[From the app, not the user: no tool ran, so nothing was logged, created or " +
-            "saved. If they asked for something, call the tool now. Then reply again to the " +
-            "user without claiming anything the tools didn't confirm.]",
+            "[From the app, not the user: no tool ran, so nothing was logged, drafted or " +
+            "saved, and the user never saw that reply. If they asked for something, call " +
+            "the tool now. Then write the reply they'll see, as if for the first time, " +
+            "claiming only what the tools confirmed.]",
         },
       ]);
-      if (!actions.length && CLAIMS.test(output.reply)) {
+      if (nothingDone() && claimsWork(output.reply)) {
         output = {
           reply:
-            "I didn't manage to log or save anything that time. Tell me again and I'll " +
+            "I didn't manage to log, draft or save anything that time. Tell me again and I'll " +
             "add it, or add it from the day log.",
           suggestions: [],
         };
       }
     }
   } catch (error) {
-    // Things already logged stay logged, so their receipts (and undo) have to be kept.
-    if (!(error instanceof LlmError) || !actions.length) throw error;
+    // Things already logged stay logged, so their receipts (and undo) have to be kept; drafts
+    // are worth keeping too.
+    if (!(error instanceof LlmError) || (!actions.length && !drafts.length)) throw error;
     output = {
-      reply: "I logged that, but couldn't finish my reply. Check it below.",
+      reply: "I got that started, but couldn't finish my reply. Check it below.",
       suggestions: [],
     };
   }
-  const suggestions = normalizeSuggestions(
-    output,
-    ctx,
-    idByRef,
-    habits.filter((h) => !h.archivedAt).map((h) => h.name),
-    features,
-  );
+  // Drafts from the tools first, then ideas from the reply; the coach can't draft a habit twice.
+  const drafted = new Set(drafts.flatMap((d) => (d.kind === "habit" ? [d.name] : [])));
+  const suggestions = [
+    ...drafts,
+    ...normalizeSuggestions(output, ctx, idByRef, [...habitNames, ...drafted], features),
+  ].map((x, i) => ({ ...x, index: i }));
   const now = Date.now();
   const saved = await db.transaction(async (tx) => {
     const t = thread ?? (await coachRepo.insertThread(tx, { userId, title: threadTitle(content) }));
@@ -601,14 +641,67 @@ function addToReport(
   return next;
 }
 
-/** Accepting creates the habit or goal, or updates the Scouting Report. */
+/** The coach's proposal as a create body, with links to attributes removed since dropped. */
+function proposedBody(
+  s: Exclude<CoachSuggestionDto, { kind: "report" }>,
+  today: string,
+  live: (nodeId: string) => boolean,
+) {
+  switch (s.kind) {
+    case "habit":
+      return {
+        name: s.name,
+        type: s.habitType,
+        config: normalizeHabitConfig(s.habitType, {
+          target: s.target,
+          unit: s.unit,
+          direction: s.avoid ? "avoid" : "build",
+        }),
+        days: s.days,
+        links: s.nodeIds.filter(live),
+      };
+    case "goal":
+      return {
+        name: s.name,
+        kind: s.goalKind ?? "total",
+        target: s.target,
+        ...(s.goalKind === "reach" && s.startValue != null && { startValue: s.startValue }),
+        unit: s.unit,
+        startsOn: today,
+        endsOn: s.endsOn && s.endsOn >= today ? s.endsOn : addDays(today, s.durationDays - 1),
+        source: "manual",
+        links: s.nodeIds.filter(live),
+      };
+    case "workout":
+      return {
+        name: s.name,
+        notes: s.notes,
+        localDate: s.date,
+        durationS: s.durationS,
+        exercises: s.exercises,
+      };
+    case "template":
+      return { name: s.name, notes: s.notes, exercises: s.exercises };
+  }
+}
+
+/**
+ * Accepting creates the habit, goal, workout or template (the player's `edits` if they changed
+ * it, as the matching create body) or updates the Scouting Report.
+ */
 export async function resolveSuggestion(
   db: Database,
   userId: string,
   messageId: string,
   index: number,
   action: "accept" | "dismiss",
-): Promise<{ state: CoachStateDto; habit: HabitDto | null; goal: ObjectiveDto | null }> {
+  edits?: unknown,
+): Promise<{
+  state: CoachStateDto;
+  habit: HabitDto | null;
+  goal: ObjectiveDto | null;
+  createdId: string | null;
+}> {
   const row = await coachRepo.findById(db, userId, messageId);
   if (!row || row.role !== "assistant") throw notFound("Message not found");
   const suggestions = row.suggestions as CoachSuggestionDto[];
@@ -618,10 +711,9 @@ export async function resolveSuggestion(
 
   let habit: HabitDto | null = null;
   let goal: ObjectiveDto | null = null;
+  let createdId: string | null = null;
   if (action === "accept") {
     const ctx = await loadLeafContext(db, userId);
-    // Links to attributes removed since the suggestion are dropped.
-    const links = s.kind === "report" ? [] : s.nodeIds.filter((id) => ctx?.leaves.has(id));
     const wrap = (error: unknown) => {
       throw error instanceof HTTPException
         ? error
@@ -629,38 +721,37 @@ export async function resolveSuggestion(
           ? badRequest(`Couldn't add it: ${error.message}`)
           : error;
     };
-    if (s.kind === "habit") {
-      habit = await createHabit(db, userId, {
-        name: s.name,
-        type: s.habitType,
-        config: normalizeHabitConfig(s.habitType, { target: s.target, unit: s.unit }),
-        days: s.days,
-        links,
-      }).catch(wrap);
-    } else if (s.kind === "goal") {
-      const user = await userRepo.findById(db, userId);
-      const today = localDateIn(user?.timezone ?? "UTC");
-      goal = await createObjective(db, userId, {
-        name: s.name,
-        kind: "total",
-        target: s.target,
-        unit: s.unit,
-        startsOn: today,
-        endsOn: addDays(today, s.durationDays - 1),
-        source: "manual",
-        links,
-      }).catch(wrap);
-    } else {
+    if (s.kind === "report") {
       const report = await userRepo.findScoutingReport(db, userId);
       await userRepo.setScoutingReport(db, userId, addToReport(report, s, ctx));
+    } else {
+      const user = await userRepo.findById(db, userId);
+      const body =
+        edits ??
+        proposedBody(s, localDateIn(user?.timezone ?? "UTC"), (id) => !!ctx?.leaves.has(id));
+      if (s.kind === "habit") {
+        habit = await createHabit(db, userId, createHabitBodySchema.parse(body)).catch(wrap);
+        createdId = habit.id;
+      } else if (s.kind === "goal") {
+        goal = await createObjective(db, userId, createObjectiveBodySchema.parse(body)).catch(wrap);
+        createdId = goal.id;
+      } else if (s.kind === "workout") {
+        const w = await logWorkout(db, userId, logWorkoutBodySchema.parse(body)).catch(wrap);
+        createdId = w.id;
+      } else {
+        const t = await createTemplate(db, userId, templateBodySchema.parse(body)).catch(wrap);
+        createdId = t.id;
+      }
     }
   }
   await coachRepo.updateSuggestions(
     db,
     row.id,
     suggestions.map((x) =>
-      x.index === index ? { ...x, status: action === "accept" ? "accepted" : "dismissed" } : x,
+      x.index === index
+        ? { ...x, status: action === "accept" ? "accepted" : "dismissed", createdId }
+        : x,
     ),
   );
-  return { state: await getCoach(db, userId, row.threadId), habit, goal };
+  return { state: await getCoach(db, userId, row.threadId), habit, goal, createdId };
 }

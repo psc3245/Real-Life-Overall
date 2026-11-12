@@ -11,6 +11,7 @@ import {
 } from "@rlo/shared";
 import { describe, expect, it } from "vitest";
 import { coachMessages, coachThreads, users } from "../src/db/schema";
+import { claimsWork } from "../src/services/coach-service";
 import { createRatedApp, json } from "./flows";
 import { jsonResult, toolCallResult } from "./helpers";
 
@@ -223,37 +224,53 @@ describe("coach logging", () => {
     return { message: state.messages.at(-1)!, action: state.messages.at(-1)!.actions[i]! };
   };
 
-  it("logs a workout the player describes, with a receipt that undo takes back", async () => {
-    const t = await setup([toolCallResult(["log_workout", legDay]), done]);
-    const res = await t.send("Hit legs: squats 2x5 at 225, leg press 300 for 10. 50 min.");
-    expect(res.status).toBe(200);
-    const history = await body<WorkoutHistoryDto>(await t.request("/workouts"));
-    expect(history.workouts).toHaveLength(1);
-    const w = history.workouts[0]!;
-    expect(w).toMatchObject({ name: "Leg Day", endedAt: expect.any(String) });
-    expect(w.exercises.map((e) => [e.exerciseId, e.sets.length])).toEqual([
+  it("drafts a workout the player describes; nothing is saved until they accept it", async () => {
+    const drafted = jsonResult({ reply: "Here's your leg day; look right?", suggestions: [] });
+    const t = await setup([toolCallResult(["draft_workout", legDay]), drafted]);
+    expect(
+      (await t.send("Hit legs: squats 2x5 at 225, leg press 300 for 10. 50 min.")).status,
+    ).toBe(200);
+    expect((await body<WorkoutHistoryDto>(await t.request("/workouts"))).workouts).toEqual([]);
+
+    const { message } = await action(t);
+    const draft = message.suggestions[0]!;
+    expect(draft).toMatchObject({ kind: "workout", name: "Leg Day", status: "pending" });
+    if (draft.kind !== "workout") throw new Error("not a workout");
+    expect(draft.durationS).toBe(3000);
+    expect(draft.exercises.map((e) => [e.exerciseId, e.sets.length])).toEqual([
       ["squat-barbell", 2],
       ["leg-press", 1],
     ]);
-    expect(w.exercises[0]!.sets[0]!.weightKg).toBeCloseTo(102.06, 1); // 225 lb
-    expect(w.summary.durationS).toBe(3000);
+    expect(draft.exercises[0]!.sets[0]!.weightKg).toBeCloseTo(102.06, 1); // 225 lb
 
-    const { message, action: a } = await action(t);
-    expect(message.content).toBe("Logged it.");
-    expect(a).toMatchObject({ kind: "workout", title: "Leg Day", undone: false });
-    // The receipt rides along in later turns so the coach doesn't log it twice.
-    expect(JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt)).toContain("Leg Day on ");
-
-    const undo = await t.request(`/coach/messages/${message.id}/actions/0/undo`, {
+    // The player fixes a weight before saving.
+    const edits = {
+      name: "Leg Day",
+      notes: "",
+      localDate: draft.date,
+      durationS: 3000,
+      exercises: draft.exercises.map((e, i) =>
+        i === 1 ? { ...e, sets: e.sets.map((x) => ({ ...x, weightKg: 140 })) } : e,
+      ),
+    };
+    const res = await t.request(`/coach/messages/${message.id}/suggestions/0/accept`, {
       method: "POST",
+      ...json({ edits }),
     });
-    expect(undo.status).toBe(200);
-    expect((await body<WorkoutHistoryDto>(await t.request("/workouts"))).workouts).toEqual([]);
-    expect((await action(t)).action.undone).toBe(true);
-    const again = await t.request(`/coach/messages/${message.id}/actions/0/undo`, {
-      method: "POST",
+    expect(res.status).toBe(200);
+    const { createdId } = await body<{ createdId: string }>(res);
+    const w = (await body<WorkoutHistoryDto>(await t.request("/workouts"))).workouts[0]!;
+    expect(w.id).toBe(createdId);
+    expect(w.exercises[1]!.sets[0]!.weightKg).toBe(140);
+    expect((await action(t)).message.suggestions[0]).toMatchObject({
+      status: "accepted",
+      createdId,
     });
-    expect(again.status).toBe(409);
+    // Later turns know it was saved.
+    await t.request("/coach/messages", { method: "POST", ...json({ content: "Thanks" }) });
+    expect(JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt)).toContain(
+      'Draft workout \\"Leg Day\\": saved by the user',
+    );
   });
 
   it("tells the model when an exercise isn't in the library, or adds it as asked", async () => {
@@ -272,8 +289,8 @@ describe("coach logging", () => {
       ],
     };
     const t = await setup([
-      toolCallResult(["log_workout", unknown]),
-      toolCallResult(["log_workout", added]),
+      toolCallResult(["draft_workout", unknown]),
+      toolCallResult(["draft_workout", added]),
       done,
     ]);
     await t.send("Did sled pushes");
@@ -281,9 +298,11 @@ describe("coach logging", () => {
       t.model.doGenerateCalls[t.model.doGenerateCalls.length - 2]!.prompt,
     );
     expect(second).toContain("isn't in the library");
-    const w = (await body<WorkoutHistoryDto>(await t.request("/workouts"))).workouts[0]!;
-    expect(w.exercises[0]!.sets[0]!.durationS).toBe(40);
-    expect((await action(t)).message.actions).toHaveLength(1);
+    const { message } = await action(t);
+    expect(message.suggestions).toHaveLength(1);
+    const draft = message.suggestions[0]!;
+    if (draft.kind !== "workout") throw new Error("not a workout");
+    expect(draft.exercises[0]!.sets[0]!.durationS).toBe(40);
   });
 
   it("logs habits and goal progress, and undo restores what was there", async () => {
@@ -384,10 +403,12 @@ describe("coach logging", () => {
 
     // Still a false claim after the correction: the reply says so instead.
     const state = await body<CoachStateDto>(await t.send("And I stretched"));
-    expect(state.messages.at(-1)!.content).toMatch(/^I didn't manage to log or save anything/);
+    expect(state.messages.at(-1)!.content).toMatch(
+      /^I didn't manage to log, draft or save anything/,
+    );
     expect(state.messages.at(-1)!.actions).toEqual([]);
   });
-  it("creates habits, goals and templates, logs to a new habit in the same turn, and undoes them", async () => {
+  it("drafts habits, goals and templates the player reviews and saves", async () => {
     const plan = {
       name: "Push Day",
       notes: null,
@@ -400,34 +421,23 @@ describe("coach logging", () => {
         { exercise: "dip", newExercise: null, sets: [set(null, 10)] },
       ],
     };
+    const habit = (name: string, refs: string[]) => ({
+      name,
+      type: "counter",
+      days: [],
+      target: 20,
+      unit: "pages",
+      avoid: false,
+      refs,
+      reason: "You said you want to read more.",
+    });
     const t = await setup([
       toolCallResult(
+        ["draft_habit", habit("Read", ["n2", "n9"])],
+        ["draft_habit", habit("Morning run", [])],
+        ["draft_habit", habit("read", [])],
         [
-          "create_habit",
-          {
-            name: "Read",
-            type: "counter",
-            days: [],
-            target: 20,
-            unit: "pages",
-            avoid: false,
-            refs: ["n2", "n9"],
-          },
-        ],
-        [
-          "create_habit",
-          {
-            name: "Morning run",
-            type: "checkbox",
-            days: [],
-            target: null,
-            unit: null,
-            avoid: false,
-            refs: [],
-          },
-        ],
-        [
-          "create_goal",
+          "draft_goal",
           {
             name: "Run 50 miles",
             kind: "total",
@@ -436,10 +446,11 @@ describe("coach logging", () => {
             startValue: null,
             deadline: addDays(new Date().toISOString().slice(0, 10), 29),
             refs: ["n3"],
+            reason: "Builds your base.",
           },
         ],
         [
-          "create_goal",
+          "draft_goal",
           {
             name: "Weigh 185",
             kind: "reach",
@@ -448,24 +459,65 @@ describe("coach logging", () => {
             startValue: null,
             deadline: "2026-01-01",
             refs: [],
+            reason: "",
           },
         ],
-        ["create_workout_template", plan],
+        ["draft_workout_template", plan],
       ),
-      // The new habit's ref (after Morning run's h1) is h2.
-      toolCallResult(["log_habit", { habit: "h2", date: null, num: 12, text: null }]),
-      done,
+      jsonResult({ reply: "Three drafts below; tweak anything.", suggestions: [] }),
     ]);
     await t.send("Set me up: a reading habit, a 50 mile month, and save my push day");
+    // Nothing exists yet.
+    expect((await body<HabitDto[]>(await t.request("/habits"))).map((h) => h.name)).toEqual([
+      "Morning run",
+    ]);
+    expect(await body(await t.request("/objectives"))).toEqual([]);
+    expect(await body(await t.request("/workout-templates"))).toEqual([]);
+    const prompt = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
+    expect(prompt).toContain("already have a habit called Morning run");
+    expect(prompt).toContain("already have a habit called read");
+    expect(prompt).toContain("a reach goal needs a startValue");
 
-    const habits = await body<HabitDto[]>(await t.request("/habits"));
-    const read = habits.find((h) => h.name === "Read")!;
-    expect(read).toMatchObject({ type: "counter", days: [0, 1, 2, 3, 4, 5, 6] });
-    expect(read.config).toMatchObject({ target: 20, unit: "pages" });
-    expect(read.links).toEqual([t.nodeId("Career")]);
-    expect(habits.filter((h) => h.name.toLowerCase() === "morning run")).toHaveLength(1);
+    const { message } = await action(t);
+    expect(message.suggestions.map((x) => [x.index, x.kind])).toEqual([
+      [0, "habit"],
+      [1, "goal"],
+      [2, "template"],
+    ]);
+    expect(message.suggestions[0]).toMatchObject({
+      name: "Read",
+      habitType: "counter",
+      target: 20,
+      unit: "pages",
+      nodeIds: [t.nodeId("Career")],
+      reason: "You said you want to read more.",
+    });
+    const accept = (i: number, edits?: unknown) =>
+      t.request(`/coach/messages/${message.id}/suggestions/${i}/accept`, {
+        method: "POST",
+        ...(edits !== undefined && json({ edits })),
+      });
+
+    // The habit, tweaked: weekdays and 10 pages.
+    const tweaked = {
+      name: "Read",
+      type: "counter",
+      config: { target: 10, unit: "pages" },
+      days: [1, 2, 3, 4, 5],
+      links: [t.nodeId("Career")],
+    };
+    expect((await accept(0, tweaked)).status).toBe(200);
+    const read = (await body<HabitDto[]>(await t.request("/habits"))).find(
+      (h) => h.name === "Read",
+    )!;
+    expect(read).toMatchObject({ days: [1, 2, 3, 4, 5], config: { target: 10 } });
+    // The goal and template as proposed.
+    expect((await accept(1)).status).toBe(200);
     const goals = await body<ObjectiveDto[]>(await t.request("/objectives"));
-    expect(goals.map((g) => [g.name, g.target, g.unit])).toEqual([["Run 50 miles", 50, "miles"]]);
+    expect(goals.map((g) => [g.name, g.target, g.unit, g.links])).toEqual([
+      ["Run 50 miles", 50, "miles", [t.nodeId("Cardio")]],
+    ]);
+    expect((await accept(2)).status).toBe(200);
     const templates = await body<WorkoutTemplateDto[]>(await t.request("/workout-templates"));
     expect(templates[0]!.name).toBe("Push Day");
     // A template is a plan: blank numbers stay, nothing is done.
@@ -474,33 +526,36 @@ describe("coach logging", () => {
       ["dip", 1],
     ]);
     expect(templates[0]!.exercises[0]!.sets.every((x) => !x.done)).toBe(true);
-    const day = await body<DayDto>(await t.request("/days/today"));
-    expect(day.habits.find((h) => h.habit.name === "Read")!.entry).toEqual({ num: 12, text: null });
 
-    const prompt = JSON.stringify(
-      t.model.doGenerateCalls[t.model.doGenerateCalls.length - 2]!.prompt,
-    );
-    expect(prompt).toContain("already have a habit called Morning run");
-    expect(prompt).toContain("a reach goal needs a startValue");
+    // Each draft saves once.
+    expect((await accept(0, tweaked)).status).toBe(409);
+  });
+
+  it("refuses invalid edits and keeps the draft", async () => {
+    const t = await setup([
+      toolCallResult([
+        "draft_habit",
+        {
+          name: "Stretch",
+          type: "checkbox",
+          days: [],
+          target: null,
+          unit: null,
+          avoid: false,
+          refs: [],
+          reason: "",
+        },
+      ]),
+      jsonResult({ reply: "Drafted a stretch habit; look right?", suggestions: [] }),
+    ]);
+    await t.send("Suggest a habit");
     const { message } = await action(t);
-    expect(message.actions.map((a) => a.kind)).toEqual([
-      "newHabit",
-      "newGoal",
-      "template",
-      "habit",
-    ]);
-
-    for (const i of [0, 1, 2]) {
-      const res = await t.request(`/coach/messages/${message.id}/actions/${i}/undo`, {
-        method: "POST",
-      });
-      expect(res.status).toBe(200);
-    }
-    expect((await body<HabitDto[]>(await t.request("/habits"))).map((h) => h.name)).toEqual([
-      "Morning run",
-    ]);
-    expect(await body(await t.request("/objectives"))).toEqual([]);
-    expect(await body(await t.request("/workout-templates"))).toEqual([]);
+    const res = await t.request(`/coach/messages/${message.id}/suggestions/0/accept`, {
+      method: "POST",
+      ...json({ edits: { name: "", type: "checkbox" } }),
+    });
+    expect(res.status).toBe(400);
+    expect((await action(t)).message.suggestions[0]!.status).toBe("pending");
   });
 });
 
@@ -565,5 +620,28 @@ describe("coach threads", () => {
         })
       ).status,
     ).toBe(404);
+  });
+});
+
+describe("claimsWork", () => {
+  it("tells claims of work done from offers to do it", () => {
+    for (const done of [
+      "Logged Wednesday (Nov 11) as Chest Day: Bench Press 3 × 8.",
+      "Here's the draft: Leg Day on today's date, 45 minutes.",
+      "I've drafted Leg Day for you. Does it look right?",
+      "Done. I created the habit Read 20 pages.",
+      "Got it. Saved your push day.",
+      "Check it and save it from the card.",
+    ]) {
+      expect(claimsWork(done), done).toBe(true);
+    }
+    for (const offer of [
+      "Nice work. What did you do? Tell me the sets and I'll draft the workout for you to check.",
+      "Once you confirm, I'll log the whole day.",
+      "Want me to set up a reading habit?",
+      "How many reps did you do per set?",
+    ]) {
+      expect(claimsWork(offer), offer).toBe(false);
+    }
   });
 });

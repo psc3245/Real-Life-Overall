@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidDate } from "../dates";
 import { HABIT_TYPES, type HabitType } from "./habits";
+import type { WorkoutExerciseDto } from "./workouts";
 
 /**
  * The coach (DESIGN.md §5.9): a chat with the scout that knows the player's ratings, habits,
@@ -33,6 +34,8 @@ interface SuggestionBase {
   index: number;
   reason: string;
   status: CoachSuggestionStatus;
+  /** Once accepted: the habit, goal, workout or template it made. */
+  createdId?: string | null;
 }
 
 export type CoachSuggestionDto = SuggestionBase &
@@ -42,20 +45,36 @@ export type CoachSuggestionDto = SuggestionBase &
         name: string;
         habitType: HabitType;
         days: number[];
-        /** counter/duration goal. */
+        /** counter/duration goal (the daily limit for an avoid habit). */
         target: number | null;
         unit: string | null;
         nodeIds: string[];
+        /** A habit to cut back on (missing on older suggestions: build). */
+        avoid?: boolean;
       }
     | {
         kind: "goal";
         name: string;
         target: number;
         unit: string;
-        /** Days from the day it's added to the deadline. */
+        /** Days from the day it's added to the deadline (older suggestions; see `endsOn`). */
         durationDays: number;
         nodeIds: string[];
+        /** Drafts: total or reach, where a reach goal starts, and the deadline itself. */
+        goalKind?: "total" | "reach";
+        startValue?: number | null;
+        endsOn?: string | null;
       }
+    | {
+        /** A finished workout the player described, not saved until they accept it. */
+        kind: "workout";
+        name: string;
+        date: string;
+        durationS: number;
+        notes: string;
+        exercises: WorkoutExerciseDto[];
+      }
+    | { kind: "template"; name: string; notes: string; exercises: WorkoutExerciseDto[] }
     | {
         kind: "report";
         section: CoachReportSection;
@@ -125,6 +144,12 @@ export const coachMessageBodySchema = z.object({
   /** The thread to continue; null starts a new one; left out continues the latest. */
   threadId: z.uuid().nullable().optional(),
 });
+
+/**
+ * Accepting a suggestion or draft; `edits` replaces what the coach proposed with the player's
+ * version (validated as the matching create body: habit, goal, logged workout or template).
+ */
+export const acceptSuggestionBodySchema = z.object({ edits: z.unknown().optional() });
 
 /** The postgame interview after a day's recap: the coach opens with questions about it. */
 export const postgameBodySchema = z.object({

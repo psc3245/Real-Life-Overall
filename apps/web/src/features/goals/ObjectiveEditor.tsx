@@ -23,6 +23,7 @@ import { useCreateObjective, useUpdateObjective } from "../../api/objectives";
 import { AttributePicker } from "../../components/AttributePicker";
 import { Button } from "../../components/Button";
 import { compactFieldClass } from "../../components/form";
+import type { EditorSubmit } from "../habits/HabitEditor";
 import { ErrorNote } from "../onboarding/ErrorNote";
 
 const label = "block text-xs uppercase tracking-wider text-court-300";
@@ -47,6 +48,12 @@ function deadlinePresets(today: string, weekStart: number) {
   ];
 }
 
+/** A new goal's starting values (a coach draft). */
+export type GoalDraft = Pick<
+  ObjectiveDto,
+  "name" | "kind" | "target" | "unit" | "startValue" | "endsOn" | "links"
+>;
+
 export function ObjectiveEditor({
   objective,
   habits,
@@ -54,6 +61,8 @@ export function ObjectiveEditor({
   today,
   weekStart,
   onDone,
+  initial,
+  submit,
 }: {
   /** Omit to create a new goal. */
   objective?: ObjectiveDto;
@@ -62,23 +71,25 @@ export function ObjectiveEditor({
   today: string;
   weekStart: number;
   onDone: () => void;
+  initial?: GoalDraft;
+  /** Manual goals only: a coach draft counts what's logged on the day log. */
+  submit?: EditorSubmit<GoalDraft & { startsOn: string; source: "manual" }>;
 }) {
   const me = useMe();
-  const [name, setName] = useState(objective?.name ?? "");
-  const [kind, setKind] = useState<ObjectiveKind>(objective?.kind ?? "total");
+  const start = objective ?? initial;
+  const [name, setName] = useState(start?.name ?? "");
+  const [kind, setKind] = useState<ObjectiveKind>(start?.kind ?? "total");
   const [source, setSource] = useState<ObjectiveSource>(objective?.source ?? "manual");
-  const [startValue, setStartValue] = useState<number | null>(objective?.startValue ?? null);
+  const [startValue, setStartValue] = useState<number | null>(start?.startValue ?? null);
   const [habitId, setHabitId] = useState(objective?.habitId ?? "");
-  const [target, setTarget] = useState<number | null>(objective?.target ?? null);
-  const [unit, setUnit] = useState(objective?.unit ?? "");
+  const [target, setTarget] = useState<number | null>(start?.target ?? null);
+  const [unit, setUnit] = useState(start?.unit ?? "");
   const [startsOn, setStartsOn] = useState(objective?.startsOn ?? today);
-  const [endsOn, setEndsOn] = useState(
-    objective?.endsOn ?? statPeriod("week", today, weekStart).end,
-  );
-  const [links, setLinks] = useState<string[]>(objective?.links ?? []);
+  const [endsOn, setEndsOn] = useState(start?.endsOn ?? statPeriod("week", today, weekStart).end);
+  const [links, setLinks] = useState<string[]>(start?.links ?? []);
   const create = useCreateObjective();
   const update = useUpdateObjective();
-  const saving = create.isPending || update.isPending;
+  const saving = submit?.pending || create.isPending || update.isPending;
 
   // Habits that can be counted: anything but groups (their sub-habits count instead).
   const countable = habits.filter((h) => h.type !== "group");
@@ -126,7 +137,14 @@ export function ObjectiveEditor({
       links,
       ...(reach && startValue !== null && { startValue }),
     };
-    if (objective) update.mutate({ id: objective.id, ...body }, { onSuccess: onDone });
+    if (submit) {
+      submit.onSubmit({
+        ...body,
+        kind,
+        source: "manual",
+        startValue: reach ? startValue : null,
+      });
+    } else if (objective) update.mutate({ id: objective.id, ...body }, { onSuccess: onDone });
     else
       create.mutate(
         { ...body, kind, source, ...(source === "habit" && { habitId }) },
@@ -321,7 +339,7 @@ export function ObjectiveEditor({
         </fieldset>
       )}
 
-      <ErrorNote error={create.error ?? update.error} />
+      <ErrorNote error={submit?.error ?? create.error ?? update.error} />
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onDone}>
           Cancel

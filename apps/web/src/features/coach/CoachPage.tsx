@@ -1,9 +1,7 @@
 import {
   COACH_STARTERS,
-  HABIT_TYPE_LABELS,
   IMPORTANCE_LABELS,
   MAX_COACH_MESSAGE,
-  WEEKDAY_SHORT,
   type CoachActionDto,
   type CoachMessageDto,
   type CoachThreadDto,
@@ -32,6 +30,7 @@ import { DebugJson } from "../../components/debug/Debug";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { useTalk } from "../../lib/talk";
 import { weekdayDate } from "../../lib/format";
+import { DraftCard } from "./DraftCard";
 
 export function CoachPage() {
   const talk = useTalk();
@@ -419,9 +418,13 @@ export function Message({ message: m }: { message: CoachMessageDto }) {
       )}
       {m.suggestions.length > 0 && (
         <ul className="space-y-2 pl-10">
-          {m.suggestions.map((s) => (
-            <Suggestion key={s.index} messageId={m.id} suggestion={s} />
-          ))}
+          {m.suggestions.map((s) =>
+            s.kind === "report" ? (
+              <ReportLine key={s.index} messageId={m.id} suggestion={s} />
+            ) : (
+              <DraftCard key={s.index} messageId={m.id} draft={s} />
+            ),
+          )}
         </ul>
       )}
     </div>
@@ -489,18 +492,6 @@ function Receipt({ messageId, action: a }: { messageId: string; action: CoachAct
   );
 }
 
-const KIND_LABEL: Record<CoachSuggestionDto["kind"], string> = {
-  habit: "Habit",
-  goal: "Goal",
-  report: "Scouting Report",
-};
-
-const ADD_LABEL: Record<CoachSuggestionDto["kind"], string> = {
-  habit: "Add habit",
-  goal: "Add goal",
-  report: "Add to report",
-};
-
 const SECTION_LABEL = {
   aspiration: "Aspiration",
   priority: "Priority",
@@ -508,48 +499,28 @@ const SECTION_LABEL = {
   constraint: "Constraint",
 } as const;
 
-function describe(s: CoachSuggestionDto, names: Map<string, string>) {
-  const nodes =
-    s.kind !== "report" && s.nodeIds.length
-      ? ` · ${s.nodeIds.map((id) => names.get(id) ?? "?").join(", ")}`
-      : "";
-  if (s.kind === "habit") {
-    const schedule =
-      s.days.length === 7 ? "every day" : s.days.map((d) => WEEKDAY_SHORT[d]).join(", ");
-    const goal =
-      s.target !== null
-        ? ` · goal ${s.target} ${s.habitType === "duration" ? "min" : (s.unit ?? "")}`
-        : "";
-    return `${HABIT_TYPE_LABELS[s.habitType]} · ${schedule}${goal}${nodes}`;
-  }
-  if (s.kind === "goal") {
-    return `${s.target} ${s.unit} in ${s.durationDays} day${s.durationDays === 1 ? "" : "s"}${nodes}`;
-  }
-  return `${SECTION_LABEL[s.section]}${
-    s.importance ? ` · ${IMPORTANCE_LABELS[s.importance]}` : ""
-  }${s.nodeId ? ` · ${names.get(s.nodeId) ?? "?"}` : ""}`;
-}
-
-function Suggestion({
+/** A line the coach offers for the Scouting Report; habits, goals and workouts are DraftCards. */
+function ReportLine({
   messageId,
   suggestion: s,
 }: {
   messageId: string;
-  suggestion: CoachSuggestionDto;
+  suggestion: Extract<CoachSuggestionDto, { kind: "report" }>;
 }) {
   const talk = useTalk();
   const resolve = useResolveCoachSuggestion();
   const ratings = useRatings();
   const names = new Map((ratings.data?.nodes ?? []).map((n) => [n.id, n.name]));
-  const title = s.kind === "report" ? s.text : s.name;
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-court-700 bg-court-900/60 p-3">
       <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider text-neon">
-          {s.kind === "report" ? talk.scoutingReport : KIND_LABEL[s.kind]}
+        <p className="text-[11px] uppercase tracking-wider text-neon">{talk.scoutingReport}</p>
+        <p className="font-medium">{s.text}</p>
+        <p className="text-sm text-court-500">
+          {SECTION_LABEL[s.section]}
+          {s.importance ? ` · ${IMPORTANCE_LABELS[s.importance]}` : ""}
+          {s.nodeId ? ` · ${names.get(s.nodeId) ?? "?"}` : ""}
         </p>
-        <p className="font-medium">{title}</p>
-        <p className="text-sm text-court-500">{describe(s, names)}</p>
         {s.reason && <p className="text-sm text-court-300">{s.reason}</p>}
         <ErrorNote error={resolve.error} />
       </div>
@@ -560,7 +531,7 @@ function Suggestion({
             disabled={resolve.isPending}
             onClick={() => resolve.mutate({ messageId, index: s.index, action: "accept" })}
           >
-            {ADD_LABEL[s.kind]}
+            Add to report
           </Button>
           <Button
             variant="ghost"

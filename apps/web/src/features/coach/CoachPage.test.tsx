@@ -70,6 +70,7 @@ function setup(state: CoachStateDto, url = "/coach") {
     if (path === "/coach" || path.startsWith("/coach?thread=")) return state;
     if (path === "/coach/threads") return state.thread ? [state.thread] : [];
     if (path === "/ratings") return { nodes: [{ id: "x", name: "Cardio" }] };
+    if (path === "/days/today") return { today: "2026-11-12" };
     if (path === "/coach/messages") return state;
     return new Promise(() => {});
   });
@@ -94,9 +95,8 @@ describe("CoachPage", () => {
     setup(chat);
     expect(await screen.findByText("Cardio is your biggest gap.")).toBeInTheDocument();
     expect(screen.getByText("Short run")).toBeInTheDocument();
-    expect(
-      await screen.findByText(/Time spent · Tue, Thu · goal 20 min · Cardio/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Time spent · Tue, Thu · goal 20 min")).toBeInTheDocument();
+    expect(await screen.findByText("Builds Cardio")).toBeInTheDocument();
     expect(screen.getByText("✓ Added")).toBeInTheDocument();
     expect(screen.getByText(/3 messages left/)).toBeInTheDocument();
 
@@ -204,5 +204,27 @@ describe("CoachPage", () => {
     fireEvent.click(within(list).getByRole("button", { name: "+ New chat" }));
     expect(await screen.findByText("What are we working on?")).toBeInTheDocument();
     expect(screen.queryByText("Cardio is your biggest gap.")).not.toBeInTheDocument();
+  });
+
+  it("opens a draft to tweak it, and saves the player's version", async () => {
+    setup(chat);
+    fireEvent.click(await screen.findByRole("button", { name: "Review and tweak" }));
+    const dialog = await screen.findByRole("dialog", { name: "Review habit" });
+    const name = within(dialog).getByDisplayValue("Short run");
+    fireEvent.change(name, { target: { value: "Easy run" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add habit" }));
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith("/coach/messages/a1/suggestions/0/accept", {
+        method: "POST",
+        body: expect.stringContaining('"name":"Easy run"'),
+      }),
+    );
+    const call = mockedApi.mock.calls.find(
+      ([p]) => p === "/coach/messages/a1/suggestions/0/accept",
+    )!;
+    const { edits } = JSON.parse((call[1] as { body: string }).body) as {
+      edits: { type: string; days: number[]; links: string[] };
+    };
+    expect(edits).toMatchObject({ type: "duration", days: [2, 4], links: ["x"] });
   });
 });

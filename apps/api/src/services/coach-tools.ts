@@ -19,8 +19,8 @@ import {
   TRACKING_FIELDS,
   TRACKING_LABELS,
   normalizeHabitConfig,
-  WEEKDAY_SHORT,
   type CoachActionDto,
+  type CoachSuggestionDto,
   type DayDto,
   type DayHabitDto,
   type ExerciseTracking,
@@ -37,15 +37,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Database } from "../db/client";
 import { getDay, saveEntry, saveObjective } from "./day-service";
-import { createHabit } from "./habit-service";
-import { createObjective } from "./objective-service";
-import {
-  createExercise,
-  createTemplate,
-  loadLookup,
-  logWorkout,
-  type Lookup,
-} from "./workout-service";
+import { createExercise, loadLookup, type Lookup } from "./workout-service";
 
 /**
  * The coach's tools (DESIGN.md §5.9): logging workouts, habits and goal progress the player
@@ -204,6 +196,10 @@ export interface CoachToolContext {
   leaves: Map<string, string>;
   /** Receipts for what the tools logged, in order. */
   actions: CoachActionDto[];
+  /** Drafts the player reviews before anything is saved (indexes are set by the caller). */
+  drafts: CoachSuggestionDto[];
+  /** Habit names that exist already, to keep drafts from duplicating them. */
+  habitNames: string[];
 }
 
 const dateField = z
@@ -315,10 +311,11 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
   };
   const tools: ToolSet = {};
 
-  if (c.features.workouts && c.editable) {
-    tools.log_workout = tool({
+  if (c.features.workouts) {
+    tools.draft_workout = tool({
       description:
-        "Log a finished workout the user describes, with every set they did. Ask first if you " +
+        "Draft a finished workout the user describes, with every set they did. It shows as a " +
+        "card they check, tweak and save; nothing is logged until they do. Ask first if you " +
         "don't know the exercises and roughly the sets, reps and weights; don't invent numbers.",
       inputSchema: z.object({
         date: dateField,
@@ -330,45 +327,47 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
       execute: (input) =>
         serial(async () => {
           if (full()) return full();
+          const date = input.date ?? focusDate;
+          if (!isValidDate(date) || date > c.today) {
+            return { error: "Workouts can't be in the future" };
+          }
           try {
             const built = await buildExercises(c, input.exercises, {
               done: true,
               keepEmpty: false,
             });
             if ("error" in built) return built;
-            const { exercises, lookup } = built;
+            const exercises = built.exercises.filter((e) => e.sets.length > 0);
+            if (!exercises.length) return { error: "A workout needs at least one set" };
             const sets = exercises.reduce((n, x) => n + x.sets.length, 0);
-            const durationS = Math.round((input.durationMinutes ?? Math.max(20, 3 * sets)) * 60);
-            const workout = await logWorkout(c.db, c.userId, {
-              name: input.name.trim().slice(0, 80) || "Workout",
-              notes: (input.notes ?? "").trim().slice(0, 2000),
-              localDate: input.date ?? focusDate,
-              durationS,
-              exercises,
-            });
-            const detail = describeExercises(workout.exercises, lookup, c.units);
-            c.actions.push({
-              index: c.actions.length,
+            const name = input.name.trim().slice(0, 80) || "Workout";
+            c.drafts.push({
+              index: 0,
               kind: "workout",
-              workoutId: workout.id,
-              date: workout.localDate,
-              title: workout.name,
-              detail,
-              undone: false,
+              name,
+              date,
+              durationS: Math.round((input.durationMinutes ?? Math.max(20, 3 * sets)) * 60),
+              notes: (input.notes ?? "").trim().slice(0, 2000),
+              exercises,
+              reason: "",
+              status: "pending",
             });
-            return { ok: true, logged: `${workout.name} on ${workout.localDate}: ${detail}` };
+            return {
+              ok: true,
+              drafted: `${name} on ${date}: ${describeExercises(exercises, built.lookup, c.units)}`,
+              note: "Not saved yet: ask if it's right; they save it from the card.",
+            };
           } catch (error) {
             return { error: message(error) };
           }
         }),
     });
-  }
 
-  if (c.features.workouts) {
-    tools.create_workout_template = tool({
+    tools.draft_workout_template = tool({
       description:
-        "Save a workout template (a routine they can start from the Train page): its " +
-        "exercises with the planned sets. Leave numbers null where they haven't said.",
+        "Draft a workout template (a routine they can start from the Train page): its " +
+        "exercises with the planned sets, numbers null where they haven't said. They review " +
+        "and save it from the card.",
       inputSchema: z.object({
         name: z.string().describe('e.g. "Push Day"'),
         notes: z.string().nullable(),
@@ -384,22 +383,21 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
             });
             if ("error" in built) return built;
             if (!built.exercises.length) return { error: "A template needs an exercise" };
-            const template = await createTemplate(c.db, c.userId, {
-              name: input.name.trim().slice(0, 80) || "Routine",
-              notes: (input.notes ?? "").trim().slice(0, 2000),
-              exercises: built.exercises.map((e) => ({ ...e, restS: e.restS ?? null })),
-            });
-            const detail = describeExercises(template.exercises, built.lookup, c.units);
-            c.actions.push({
-              index: c.actions.length,
+            const name = input.name.trim().slice(0, 80) || "Routine";
+            c.drafts.push({
+              index: 0,
               kind: "template",
-              templateId: template.id,
-              date: c.today,
-              title: template.name,
-              detail,
-              undone: false,
+              name,
+              notes: (input.notes ?? "").trim().slice(0, 2000),
+              exercises: built.exercises,
+              reason: "",
+              status: "pending",
             });
-            return { ok: true, created: `Template ${template.name}: ${detail}` };
+            return {
+              ok: true,
+              drafted: `Template ${name}: ${describeExercises(built.exercises, built.lookup, c.units)}`,
+              note: "Not saved yet: they review and save it from the card.",
+            };
           } catch (error) {
             return { error: message(error) };
           }
@@ -520,10 +518,10 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
     links.length ? ` · builds ${links.map((id) => c.leaves.get(id)).join(", ")}` : "";
 
   if (c.features.habits) {
-    tools.create_habit = tool({
+    tools.draft_habit = tool({
       description:
-        "Create a new habit when the user asks for one or agrees to one you proposed. Never " +
-        "duplicate an existing habit. Returns its ref so you can log it right away.",
+        "Draft a habit: when they ask for one, or when you recommend one. It shows as a card " +
+        "with every detail; they tweak and add it. Never duplicate an existing habit.",
       inputSchema: z.object({
         name: z.string().describe("Short, e.g. 'Read' or 'No soda'"),
         type: z
@@ -537,63 +535,56 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
         unit: z.string().nullable().describe("counter only, e.g. 'pages'"),
         avoid: z.boolean().describe("true for a habit to cut back on or quit"),
         refs,
+        reason: z.string().describe("One sentence on why, tied to what you know about them"),
       }),
       execute: (input) =>
         serial(async () => {
           if (full()) return full();
           const name = input.name.trim().slice(0, 60);
-          if (
-            [...c.refs.habits.values()].some((h) => h.name.toLowerCase() === name.toLowerCase())
-          ) {
+          const taken = [
+            ...c.habitNames,
+            ...c.drafts.filter((d) => d.kind === "habit").map((d) => d.name),
+          ];
+          if (!name || taken.some((n) => n.toLowerCase() === name.toLowerCase())) {
             return { error: `They already have a habit called ${name}` };
           }
-          try {
-            const days = [
-              ...new Set(input.days.map(Math.round).filter((d) => d >= 0 && d <= 6)),
-            ].sort();
-            const habit = await createHabit(c.db, c.userId, {
-              name,
-              type: input.type,
-              config: normalizeHabitConfig(input.type, {
-                target: input.target,
-                unit: input.unit?.trim() || null,
-                direction: input.avoid ? "avoid" : "build",
-              }),
-              days: days.length ? days : [0, 1, 2, 3, 4, 5, 6],
-              links: toLinks(input.refs),
-            });
-            const ref = `h${c.refs.habits.size + 1}`;
-            c.refs.habits.set(ref, habit);
-            const schedule =
-              habit.days.length === 7
-                ? "every day"
-                : habit.days.map((d) => WEEKDAY_SHORT[d]).join(", ");
-            const detail =
-              `${HABIT_TYPE_LABELS[habit.type]}${isAvoid(habit.config) ? " (avoid)" : ""} · ` +
-              `${schedule}${builds(habit.links)}`;
-            c.actions.push({
-              index: c.actions.length,
-              kind: "newHabit",
-              habitId: habit.id,
-              date: c.today,
-              title: habit.name,
-              detail,
-              undone: false,
-            });
-            return { ok: true, created: `${habit.name} (${detail})`, ref };
-          } catch (error) {
-            return { error: message(error) };
-          }
+          const days = [
+            ...new Set(input.days.map(Math.round).filter((d) => d >= 0 && d <= 6)),
+          ].sort();
+          const config = normalizeHabitConfig(input.type, {
+            target: input.target,
+            unit: input.unit?.trim() || null,
+            direction: input.avoid ? "avoid" : "build",
+          });
+          const nodeIds = toLinks(input.refs);
+          c.drafts.push({
+            index: 0,
+            kind: "habit",
+            name,
+            habitType: input.type,
+            days: days.length ? days : [0, 1, 2, 3, 4, 5, 6],
+            target: config.target,
+            unit: config.unit,
+            avoid: input.avoid,
+            nodeIds,
+            reason: input.reason.trim(),
+            status: "pending",
+          });
+          return {
+            ok: true,
+            drafted: `${name} (${HABIT_TYPE_LABELS[input.type]}${input.avoid ? ", avoid" : ""})${builds(nodeIds)}`,
+            note: "Not added yet: they review and add it from the card.",
+          };
         }),
     });
   }
 
   if (c.features.goals) {
-    tools.create_goal = tool({
+    tools.draft_goal = tool({
       description:
-        "Create a goal when the user asks for one or agrees to one you proposed. total: reach " +
-        "a total by the deadline ('Run 50 miles'). reach: move a number from where it is to a " +
-        "target ('Weigh 185', 'Pay the card down to 0'). Returns its ref.",
+        "Draft a goal: when they ask for one, or when you recommend one. total: reach a " +
+        "total by the deadline ('Run 50 miles'). reach: move a number from where it is to a " +
+        "target ('Weigh 185', 'Pay the card down to 0'). They tweak and add it from the card.",
       inputSchema: z.object({
         name: z.string(),
         kind: z.enum(["total", "reach"]),
@@ -604,6 +595,7 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
           .string()
           .describe("YYYY-MM-DD, inclusive; 'this month' means the month's last day"),
         refs,
+        reason: z.string().describe("One sentence on why, tied to what you know about them"),
       }),
       execute: (input) =>
         serial(async () => {
@@ -615,37 +607,35 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
           if (!isValidDate(input.deadline) || input.deadline < c.today || input.deadline > last) {
             return { error: `The deadline must be a date from ${c.today} to ${last}` };
           }
-          try {
-            const goal = await createObjective(c.db, c.userId, {
-              name: input.name.trim().slice(0, 80),
-              kind: input.kind,
-              target: Math.min(MAX_OBJECTIVE_TARGET, input.target),
-              ...(input.kind === "reach" && { startValue: input.startValue! }),
-              unit: input.unit.trim().slice(0, 20),
-              startsOn: c.today,
-              endsOn: input.deadline,
-              source: "manual",
-              links: toLinks(input.refs),
-            });
-            const ref = `g${c.refs.goals.size + 1}`;
-            c.refs.goals.set(ref, goal);
-            const detail =
-              goal.kind === "reach"
-                ? `${goal.startValue} → ${goal.target} ${goal.unit} by ${goal.endsOn}${builds(goal.links)}`
-                : `${goal.target} ${goal.unit} by ${goal.endsOn}${builds(goal.links)}`;
-            c.actions.push({
-              index: c.actions.length,
-              kind: "newGoal",
-              objectiveId: goal.id,
-              date: c.today,
-              title: goal.name,
-              detail,
-              undone: false,
-            });
-            return { ok: true, created: `${goal.name}: ${detail}`, ref };
-          } catch (error) {
-            return { error: message(error) };
+          if (!Number.isFinite(input.target) || (input.kind === "total" && input.target <= 0)) {
+            return { error: "A total goal needs a target above 0" };
           }
+          const nodeIds = toLinks(input.refs);
+          const name = input.name.trim().slice(0, 80);
+          const unit = input.unit.trim().slice(0, 20) || "times";
+          c.drafts.push({
+            index: 0,
+            kind: "goal",
+            name,
+            goalKind: input.kind,
+            target: Math.min(MAX_OBJECTIVE_TARGET, input.target),
+            unit,
+            startValue: input.kind === "reach" ? input.startValue : null,
+            endsOn: input.deadline,
+            durationDays:
+              Math.round(
+                (Date.parse(`${input.deadline}T00:00:00Z`) - Date.parse(`${c.today}T00:00:00Z`)) /
+                  86_400_000,
+              ) + 1,
+            nodeIds,
+            reason: input.reason.trim(),
+            status: "pending",
+          });
+          return {
+            ok: true,
+            drafted: `${name}: ${input.kind === "reach" ? `${input.startValue} → ` : ""}${input.target} ${unit} by ${input.deadline}${builds(nodeIds)}`,
+            note: "Not added yet: they review and add it from the card.",
+          };
         }),
     });
   }
