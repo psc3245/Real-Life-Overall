@@ -21,6 +21,7 @@ export function Menu({
   label,
   align = "start",
   triggerClassName = "",
+  tour,
   children,
 }: {
   /** What the trigger shows; a ▾ is added after it. */
@@ -29,6 +30,8 @@ export function Menu({
   label?: string;
   align?: "start" | "end";
   triggerClassName?: string;
+  /** The walkthrough's name for the trigger (`data-tour`). */
+  tour?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -125,6 +128,7 @@ export function Menu({
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         aria-label={label}
+        data-tour={tour}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onTriggerKey}
         className={`inline-flex items-center gap-1 ${triggerClassName}`}

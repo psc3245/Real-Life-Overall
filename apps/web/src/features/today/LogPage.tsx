@@ -134,7 +134,7 @@ export function LogPage() {
           <DayGoals day={d} />
         </div>
       )}
-      <div id="recap" className="scroll-mt-16">
+      <div id="recap" className="scroll-mt-16" data-tour="recap">
         <RecapPanel day={d} />
       </div>
       <DebugJson label="day (DayDto)" data={d} />

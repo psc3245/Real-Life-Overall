@@ -477,6 +477,13 @@ The weekly review rewrites it each week alongside the profile summary. When the 
 - **On a day:** the day log shows the scout's questions, then "Your questions": every live question scheduled that weekday and made by then (a new question doesn't reach back into logged days). They aren't stored until answered or saved; answers sit in `day_logs.prompts` next to the scout's, tagged with `promptId` (`mergeDayPrompts`). An unanswered one follows edits and drops out when deleted or unscheduled; an answered one keeps what was asked, even after the question is deleted.
 - **Recaps** read the answers like the scout's ("Answers to today's questions"). A recap writing tomorrow's scout questions keeps the player's own there.
 
+### 7.12 The walkthrough (added 2026-11-12)
+A spotlight tour of the main features, shown once. (A walkthrough is the practice where a team walks through its plays before running them.) Talk words: Tour at none, Walkthrough at normal, Shootaround at extra, Tutorial in a Souls season.
+- **When:** it starts by itself the first time a rated player opens the app (never during onboarding or season setup), and finishing or skipping it sets `preferences.walkthroughDone`, so it's once per account, not per device. "Replay the walkthrough" in the account menu runs it again.
+- **Stops:** a welcome, then Rating, Today, Log, End my day, Week, Playbook, Coach, League, Stats and the account menu (Personalize). Each opens its page behind the overlay and spotlights its nav item (`data-tour` attributes); End my day spotlights the log's recap panel. Stops for switched-off features (and Premium ones on Free) are left out, and a group opens on its first page still on. A target that isn't on screen gets a centered card instead.
+- **Controls:** Next and Back, arrow keys, Escape or Skip to end it. The page underneath can't be clicked while it runs.
+- Web only for now; iOS reads the same flag.
+
 ## 8. Architecture
 
 ### 8.1 Constraints
@@ -806,6 +813,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] iOS app parity for goals, workouts, body tracking and avoid habits (and personalization)
 - [x] iOS parity for charts, reports, settings (password, devices), Personalize (behavior, Today page, features) and admin. Tabs: Today, Playbook (Habits / Goals / Train), Week, Rating, You; Coach opens from Today and You. The web's look options (themes, fonts, density) and its admin debug panel stay web-only.
 - [x] Cross-device sync: feature toggles merge per feature on the server; the web refetches on every tab focus; the live workout and the journal adopt edits from the other device whenever nothing local is unsaved or in flight.
+- [x] The walkthrough: a once-per-account spotlight tour of the main features, replayable from the account menu (§7.12)
+- [ ] iOS: the walkthrough
 
 ---
 

@@ -175,6 +175,8 @@ export const preferencesSchema = z.object({
   startPage: z.enum(START_PAGES).catch("home"),
   /** How much sports framing the app and the model use (DESIGN.md §7.10). */
   sportsTalk: z.enum(SPORTS_TALK_LEVELS).catch("normal"),
+  /** The walkthrough (a tour of the main features) was finished or skipped; it shows once. */
+  walkthroughDone: z.boolean().catch(false),
   features: featuresSchema,
   today: todaySchema,
 });
@@ -213,6 +215,7 @@ export const preferencesPatchSchema = z
     showApiStatus: z.boolean(),
     startPage: z.enum(START_PAGES),
     sportsTalk: z.enum(SPORTS_TALK_LEVELS),
+    walkthroughDone: z.boolean(),
     features: z
       .object(
         Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<Feature, z.ZodBoolean>,
