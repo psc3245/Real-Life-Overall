@@ -385,6 +385,15 @@ export const workoutExerciseSchema = z.object({
 const exercisesSchema = z.array(workoutExerciseSchema).max(MAX_WORKOUT_EXERCISES);
 const dateSchema = z.string().refine(isValidDate, "Use a valid YYYY-MM-DD date");
 
+/** A finished workout recorded in one go (a coach draft the player saves). */
+export const logWorkoutBodySchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  notes: z.string().max(MAX_WORKOUT_NOTES).default(""),
+  localDate: dateSchema,
+  durationS: z.number().int().min(60).max(86_400),
+  exercises: exercisesSchema.min(1),
+});
+
 export const startWorkoutBodySchema = z.object({
   templateId: z.uuid().optional(),
   name: z.string().trim().min(1).max(80).optional(),
