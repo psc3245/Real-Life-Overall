@@ -1,6 +1,6 @@
 import type { CoachStateDto } from "@rlo/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../api/client";
@@ -12,7 +12,15 @@ vi.mock("../../api/client", async (importOriginal) => ({
 }));
 const mockedApi = vi.mocked(api);
 
+const thread = {
+  id: "t1",
+  title: "What should I work on?",
+  createdAt: "2026-10-26T10:00:00Z",
+  updatedAt: "2026-10-26T10:00:01Z",
+};
+
 const chat: CoachStateDto = {
+  thread,
   remaining: 3,
   messages: [
     {
@@ -59,7 +67,8 @@ const chat: CoachStateDto = {
 
 function setup(state: CoachStateDto, url = "/coach") {
   mockedApi.mockImplementation(async (path: string) => {
-    if (path === "/coach") return state;
+    if (path === "/coach" || path.startsWith("/coach?thread=")) return state;
+    if (path === "/coach/threads") return state.thread ? [state.thread] : [];
     if (path === "/ratings") return { nodes: [{ id: "x", name: "Cardio" }] };
     if (path === "/coach/messages") return state;
     return new Promise(() => {});
@@ -100,22 +109,22 @@ describe("CoachPage", () => {
   });
 
   it("sends a starter question from an empty chat", async () => {
-    setup({ messages: [], remaining: 30 });
+    setup({ thread: null, messages: [], remaining: 30 });
     fireEvent.click(await screen.findByRole("button", { name: "How am I doing overall?" }));
     await waitFor(() =>
       expect(mockedApi).toHaveBeenCalledWith("/coach/messages", {
         method: "POST",
-        body: JSON.stringify({ content: "How am I doing overall?" }),
+        body: JSON.stringify({ content: "How am I doing overall?", threadId: null }),
       }),
     );
   });
 
   it("sends a question passed from Today once", async () => {
-    setup({ messages: [], remaining: 30 }, "/coach?ask=Plan%20my%20week");
+    setup({ thread: null, messages: [], remaining: 30 }, "/coach?ask=Plan%20my%20week");
     await waitFor(() =>
       expect(mockedApi).toHaveBeenCalledWith("/coach/messages", {
         method: "POST",
-        body: JSON.stringify({ content: "Plan my week" }),
+        body: JSON.stringify({ content: "Plan my week", threadId: null }),
       }),
     );
     expect(mockedApi.mock.calls.filter(([p]) => p === "/coach/messages")).toHaveLength(1);
@@ -123,6 +132,7 @@ describe("CoachPage", () => {
 
   it("shows what the coach logged, with undo", async () => {
     const logged: CoachStateDto = {
+      thread,
       remaining: 30,
       messages: [
         {
@@ -172,5 +182,27 @@ describe("CoachPage", () => {
         method: "POST",
       }),
     );
+  });
+
+  it("lists conversations, continues the open one, and starts new chats", async () => {
+    setup(chat);
+    const list = await screen.findByRole("navigation", { name: "Conversations" });
+    expect(
+      await within(list).findByRole("button", { name: /What should I work on\?/ }),
+    ).toHaveAttribute("aria-current", "page");
+    fireEvent.change(screen.getByRole("textbox", { name: "Message the coach" }), {
+      target: { value: "And next week?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith("/coach/messages", {
+        method: "POST",
+        body: JSON.stringify({ content: "And next week?", threadId: "t1" }),
+      }),
+    );
+
+    fireEvent.click(within(list).getByRole("button", { name: "+ New chat" }));
+    expect(await screen.findByText("What are we working on?")).toBeInTheDocument();
+    expect(screen.queryByText("Cardio is your biggest gap.")).not.toBeInTheDocument();
   });
 });

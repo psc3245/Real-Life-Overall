@@ -19,8 +19,10 @@ export const MAX_COACH_SUGGESTIONS = 3;
 export const MAX_COACH_STEPS = 6;
 /** Things the coach can log in one turn. */
 export const MAX_COACH_ACTIONS = 6;
-/** Messages the page loads. */
+/** Messages the page loads per thread. */
 export const COACH_PAGE_MESSAGES = 100;
+/** Threads the list shows. */
+export const COACH_THREAD_LIST = 50;
 
 export const COACH_REPORT_SECTIONS = ["aspiration", "priority", "focus", "constraint"] as const;
 export type CoachReportSection = (typeof COACH_REPORT_SECTIONS)[number];
@@ -98,7 +100,21 @@ export interface CoachMessageDto {
   createdAt: string;
 }
 
+/** One conversation with the coach. */
+export interface CoachThreadDto {
+  id: string;
+  /** The first message (or "Postgame: Wed, Nov 11"), shortened. */
+  title: string;
+  createdAt: string;
+  /** The last message's time; threads list newest first. */
+  updatedAt: string;
+}
+
+export const MAX_COACH_THREAD_TITLE = 60;
+
+/** A thread's messages. `thread` is null for a new chat that has no messages yet. */
 export interface CoachStateDto {
+  thread: CoachThreadDto | null;
   messages: CoachMessageDto[];
   /** Messages left in the rolling 24-hour window. */
   remaining: number;
@@ -106,6 +122,8 @@ export interface CoachStateDto {
 
 export const coachMessageBodySchema = z.object({
   content: z.string().trim().min(1).max(MAX_COACH_MESSAGE),
+  /** The thread to continue; null starts a new one; left out continues the latest. */
+  threadId: z.uuid().nullable().optional(),
 });
 
 /** The postgame interview after a day's recap: the coach opens with questions about it. */

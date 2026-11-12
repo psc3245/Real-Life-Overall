@@ -33,8 +33,10 @@ export function PostgameModal({
 
 function Postgame({ day, onClose }: { day: DayDto; onClose: () => void }) {
   const talk = useTalk();
-  const coach = useCoach();
   const start = useStartPostgame();
+  // Each postgame is its own thread; until it exists there's nothing to show.
+  const threadId = start.data?.thread?.id ?? null;
+  const coach = useCoach(threadId ?? "new");
   const send = useSendCoachMessage();
   const endDay = useEndDay(day.date);
   const [draft, setDraft] = useState("");
@@ -48,11 +50,7 @@ function Postgame({ day, onClose }: { day: DayDto; onClose: () => void }) {
     start.mutate(day.date);
   });
 
-  // Only this interview: the opener and everything after it.
-  const opener = start.data?.messages.at(-1);
-  const messages = opener
-    ? (coach.data?.messages ?? []).filter((m) => m.createdAt >= opener.createdAt)
-    : [];
+  const messages = threadId ? (coach.data?.messages ?? []) : [];
   const remaining = coach.data?.remaining ?? 0;
 
   useEffect(() => {
@@ -63,7 +61,10 @@ function Postgame({ day, onClose }: { day: DayDto; onClose: () => void }) {
     const message = text.trim();
     if (!message || send.isPending) return;
     setDraft("");
-    send.mutate(message, { onError: () => setDraft((current) => current || message) });
+    send.mutate(
+      { content: message, threadId },
+      { onError: () => setDraft((current) => current || message) },
+    );
   };
 
   return (
@@ -95,7 +96,7 @@ function Postgame({ day, onClose }: { day: DayDto; onClose: () => void }) {
         {send.isPending && (
           <>
             <Bubble role="user" pending>
-              {send.variables}
+              {send.variables?.content}
             </Bubble>
             <TypingBubble />
           </>
@@ -127,7 +128,11 @@ function Postgame({ day, onClose }: { day: DayDto; onClose: () => void }) {
       )}
       <p className="text-center text-xs text-court-500">
         The conversation carries on in{" "}
-        <Link to="/coach" className="text-neon hover:underline" onClick={onClose}>
+        <Link
+          to={threadId ? `/coach?thread=${threadId}` : "/coach"}
+          className="text-neon hover:underline"
+          onClick={onClose}
+        >
           the {talk.coach.toLowerCase()} chat
         </Link>
         .

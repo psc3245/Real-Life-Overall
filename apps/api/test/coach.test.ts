@@ -10,7 +10,7 @@ import {
   type ScoutingReportDto,
 } from "@rlo/shared";
 import { describe, expect, it } from "vitest";
-import { coachMessages, users } from "../src/db/schema";
+import { coachMessages, coachThreads, users } from "../src/db/schema";
 import { createRatedApp, json } from "./flows";
 import { jsonResult, toolCallResult } from "./helpers";
 
@@ -80,7 +80,7 @@ describe("coach", () => {
   it("answers with context and keeps sensible suggestions", async () => {
     const t = await setup();
     const empty = await body<CoachStateDto>(await t.request("/coach"));
-    expect(empty).toEqual({ messages: [], remaining: MAX_COACH_MESSAGES_PER_DAY });
+    expect(empty).toEqual({ thread: null, messages: [], remaining: MAX_COACH_MESSAGES_PER_DAY });
 
     const state = await body<CoachStateDto>(await t.send("  What should I work on?  "));
     expect(state.remaining).toBe(MAX_COACH_MESSAGES_PER_DAY - 1);
@@ -165,11 +165,18 @@ describe("coach", () => {
     const t = await setup([bad, bad, bad]);
     expect((await t.send("Hello")).status).toBe(502);
     expect((await body<CoachStateDto>(await t.request("/coach"))).messages).toEqual([]);
+    // Not even an empty thread.
+    expect(await body(await t.request("/coach/threads"))).toEqual([]);
 
     const [user] = await t.db.select().from(users);
+    const [thread] = await t.db
+      .insert(coachThreads)
+      .values({ userId: user!.id, title: "Spam" })
+      .returning();
     await t.db.insert(coachMessages).values(
       Array.from({ length: MAX_COACH_MESSAGES_PER_DAY }, () => ({
         userId: user!.id,
+        threadId: thread!.id,
         role: "user" as const,
         content: "spam",
       })),
@@ -179,7 +186,8 @@ describe("coach", () => {
     expect(capped.status).toBe(429);
 
     const cleared = await body<CoachStateDto>(await t.request("/coach", { method: "DELETE" }));
-    expect(cleared).toEqual({ messages: [], remaining: MAX_COACH_MESSAGES_PER_DAY });
+    expect(cleared).toEqual({ thread: null, messages: [], remaining: MAX_COACH_MESSAGES_PER_DAY });
+    expect(await body(await t.request("/coach/threads"))).toEqual([]);
   });
 
   it("validates messages", async () => {
@@ -315,7 +323,7 @@ describe("coach logging", () => {
     const t = await setup([
       toolCallResult(["log_habit", { habit: "h9", date: null, num: 1, text: null }]),
       toolCallResult(["log_habit", { habit: "h1", date: "2099-01-01", num: 1, text: null }]),
-      done,
+      jsonResult({ reply: "That date is in the future; which day was it?", suggestions: [] }),
     ]);
     expect((await t.send("Log my run")).status).toBe(200);
     const prompts = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
@@ -354,8 +362,31 @@ describe("coach logging", () => {
     expect(
       (await t.request("/coach/postgame", { method: "POST", ...json({ date: "x" }) })).status,
     ).toBe(400);
+    // Its own thread, about its day: the answer's tools default to that day.
+    expect(state.thread!.title).toMatch(/^Postgame: \w{3} \d{4}-\d{2}-\d{2}$/);
   });
 
+  it("makes the model act on a claim it didn't back with a tool, or says so plainly", async () => {
+    const claim = jsonResult({ reply: "Logged your run.", suggestions: [] });
+    const t = await setup([
+      claim,
+      toolCallResult(["log_habit", { habit: "h1", date: null, num: 1, text: null }]),
+      done,
+      claim,
+      claim,
+    ]);
+    const before = t.model.doGenerateCalls.length;
+    await t.send("I ran this morning");
+    const fixed = await action(t);
+    expect(fixed.message.content).toBe("Logged it.");
+    expect(fixed.message.actions.map((a) => a.kind)).toEqual(["habit"]);
+    expect(JSON.stringify(t.model.doGenerateCalls[before + 1]!.prompt)).toContain("no tool ran");
+
+    // Still a false claim after the correction: the reply says so instead.
+    const state = await body<CoachStateDto>(await t.send("And I stretched"));
+    expect(state.messages.at(-1)!.content).toMatch(/^I didn't manage to log or save anything/);
+    expect(state.messages.at(-1)!.actions).toEqual([]);
+  });
   it("creates habits, goals and templates, logs to a new habit in the same turn, and undoes them", async () => {
     const plan = {
       name: "Push Day",
@@ -470,5 +501,69 @@ describe("coach logging", () => {
     ]);
     expect(await body(await t.request("/objectives"))).toEqual([]);
     expect(await body(await t.request("/workout-templates"))).toEqual([]);
+  });
+});
+
+describe("coach threads", () => {
+  const say = (text: string) => jsonResult({ reply: text, suggestions: [] });
+
+  it("keeps conversations apart, newest first, each with its own history", async () => {
+    const t = await setup([say("One."), say("Two."), say("Three.")]);
+    const send = async (content: string, threadId?: string | null) =>
+      body<CoachStateDto>(
+        await t.request("/coach/messages", { method: "POST", ...json({ content, threadId }) }),
+      );
+    const first = await send(
+      "What should I focus on this week? I want a plan for my running",
+      null,
+    );
+    expect(first.thread!.title).toBe("What should I focus on this week? I want a plan for my…");
+    const second = await send("Budget question", null);
+    expect(second.thread!.id).not.toBe(first.thread!.id);
+    expect(second.messages.map((m) => m.content)).toEqual(["Budget question", "Two."]);
+
+    // Back in the first thread: only its history goes to the model.
+    const again = await send("More on running", first.thread!.id);
+    expect(again.messages.map((m) => m.content)).toEqual([
+      "What should I focus on this week? I want a plan for my running",
+      "One.",
+      "More on running",
+      "Three.",
+    ]);
+    const prompt = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
+    expect(prompt).not.toContain("Budget question");
+
+    const threads = await body<{ id: string; title: string }[]>(await t.request("/coach/threads"));
+    expect(threads.map((x) => x.id)).toEqual([first.thread!.id, second.thread!.id]);
+    // No thread given: the latest (older clients); "new": an empty chat.
+    expect((await body<CoachStateDto>(await t.request("/coach"))).thread!.id).toBe(
+      first.thread!.id,
+    );
+    expect(await body(await t.request("/coach?thread=new"))).toMatchObject({
+      thread: null,
+      messages: [],
+    });
+    expect((await t.request(`/coach?thread=${crypto.randomUUID()}`)).status).toBe(404);
+
+    expect(
+      (await t.request(`/coach/threads/${second.thread!.id}`, { method: "DELETE" })).status,
+    ).toBe(204);
+    expect((await body<unknown[]>(await t.request("/coach/threads"))).length).toBe(1);
+    expect(
+      (
+        await t.request(`/coach/threads/${second.thread!.id}`, {
+          method: "DELETE",
+          user: "mallory",
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await t.request("/coach/messages", {
+          method: "POST",
+          ...json({ content: "Hi", threadId: second.thread!.id }),
+        })
+      ).status,
+    ).toBe(404);
   });
 });

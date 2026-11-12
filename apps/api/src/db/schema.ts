@@ -899,7 +899,25 @@ export const treeProposals = pgTable(
 
 export const coachRole = pgEnum("coach_role", ["user", "assistant"]);
 
-/** The coach chat, one thread per player (DESIGN.md §5.9). `suggestions`: CoachSuggestionDto[]. */
+/** Coach conversations; a player starts as many as they like (DESIGN.md §5.9). */
+export const coachThreads = pgTable(
+  "coach_threads",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text().notNull(),
+    /** A postgame's day: the coach's tools log to it by default. Null: today. */
+    focusDate: date({ mode: "string" }),
+    createdAt: createdAt(),
+    /** The last message's time, for ordering. */
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId, t.updatedAt)],
+);
+
+/** Coach chat messages, each in a thread (DESIGN.md §5.9). `suggestions`: CoachSuggestionDto[]. */
 export const coachMessages = pgTable(
   "coach_messages",
   {
@@ -907,6 +925,9 @@ export const coachMessages = pgTable(
     userId: uuid()
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    threadId: uuid()
+      .notNull()
+      .references(() => coachThreads.id, { onDelete: "cascade" }),
     role: coachRole().notNull(),
     content: text().notNull(),
     suggestions: jsonb().notNull().default([]),
@@ -914,7 +935,7 @@ export const coachMessages = pgTable(
     actions: jsonb().notNull().default([]),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.userId, t.createdAt)],
+  (t) => [index().on(t.userId, t.createdAt), index().on(t.threadId, t.createdAt)],
 );
 
 export const bugReportStatus = pgEnum("bug_report_status", BUG_REPORT_STATUSES);

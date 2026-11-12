@@ -3,6 +3,7 @@ import {
   coachReplyOutputSchema,
   COACH_HISTORY_MESSAGES,
   COACH_PAGE_MESSAGES,
+  COACH_THREAD_LIST,
   computeNodeValues,
   dayOfWeek,
   HABIT_TYPE_LABELS,
@@ -13,6 +14,7 @@ import {
   MAX_ASPIRATIONS,
   MAX_COACH_MESSAGES_PER_DAY,
   MAX_COACH_STEPS,
+  MAX_COACH_THREAD_TITLE,
   MAX_COACH_SUGGESTIONS,
   MAX_CONSTRAINTS,
   MAX_HABIT_LINKS,
@@ -28,6 +30,7 @@ import {
   type CoachActionDto,
   type CoachMessageDto,
   type CoachStateDto,
+  type CoachThreadDto,
   type CoachSuggestionDto,
   type HabitConfig,
   type HabitDto,
@@ -43,7 +46,7 @@ import { LlmError, type LlmClient } from "../llm/client";
 import { coachPrompt, postgamePrompt } from "../llm/prompts/coach";
 import { refsFor, renderTree, toPromptNodes } from "../llm/prompts/tree";
 import * as coachRepo from "../repos/coach-repo";
-import type { CoachMessageRow } from "../repos/coach-repo";
+import type { CoachMessageRow, CoachThreadRow } from "../repos/coach-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as habitRepo from "../repos/habit-repo";
 import * as recapRepo from "../repos/recap-repo";
@@ -78,21 +81,74 @@ function toDto(row: CoachMessageRow): CoachMessageDto {
   };
 }
 
-export async function getCoach(db: Database, userId: string): Promise<CoachStateDto> {
+const toThreadDto = (row: CoachThreadRow): CoachThreadDto => ({
+  id: row.id,
+  title: row.title,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+});
+
+/**
+ * Which thread a request means: an id, null for a new chat, or (left out, as older clients
+ * do) the latest one.
+ */
+async function resolveThread(db: Database, userId: string, threadId: string | null | undefined) {
+  if (threadId === null) return null;
+  if (threadId === undefined) return (await coachRepo.findThreads(db, userId, 1))[0] ?? null;
+  const thread = await coachRepo.findThread(db, userId, threadId);
+  if (!thread) throw notFound("Conversation not found");
+  return thread;
+}
+
+async function stateOf(
+  db: Database,
+  userId: string,
+  thread: CoachThreadRow | null,
+): Promise<CoachStateDto> {
   const [rows, used] = await Promise.all([
-    coachRepo.findRecent(db, userId, COACH_PAGE_MESSAGES),
+    thread ? coachRepo.findRecent(db, thread.id, COACH_PAGE_MESSAGES) : [],
     coachRepo.countUserMessagesSince(db, userId, new Date(Date.now() - DAY_MS)),
   ]);
   return {
+    thread: thread && toThreadDto(thread),
     messages: rows.map(toDto),
     remaining: Math.max(0, MAX_COACH_MESSAGES_PER_DAY - used),
   };
 }
 
+export async function getCoach(
+  db: Database,
+  userId: string,
+  threadId?: string | null,
+): Promise<CoachStateDto> {
+  return stateOf(db, userId, await resolveThread(db, userId, threadId));
+}
+
+export async function listThreads(db: Database, userId: string): Promise<CoachThreadDto[]> {
+  return (await coachRepo.findThreads(db, userId, COACH_THREAD_LIST)).map(toThreadDto);
+}
+
+export async function deleteThread(db: Database, userId: string, threadId: string) {
+  const thread = await coachRepo.findThread(db, userId, threadId);
+  if (!thread) throw notFound("Conversation not found");
+  await coachRepo.deleteThread(db, thread.id);
+}
+
 export async function clearCoach(db: Database, userId: string): Promise<CoachStateDto> {
   await coachRepo.deleteAll(db, userId);
-  return getCoach(db, userId);
+  return getCoach(db, userId, null);
 }
+
+/** A thread's title from its first message: the first line, cut at a word. */
+export function threadTitle(text: string) {
+  const line = text.trim().split("\n")[0]!.replace(/\s+/g, " ");
+  if (line.length <= MAX_COACH_THREAD_TITLE) return line;
+  const cut = line.slice(0, MAX_COACH_THREAD_TITLE - 1);
+  return `${cut.slice(0, cut.lastIndexOf(" ") > 20 ? cut.lastIndexOf(" ") : cut.length)}…`;
+}
+
+/** Words a reply uses when it says it did something. */
+const CLAIMS = /\b(logged|saved|created|added|recorded|marked|set up|made)\b/i;
 
 /** Habits with how often they were done over the last two weeks. */
 async function renderHabits(db: Database, userId: string, today: string, ctx: LeafContext | null) {
@@ -301,12 +357,16 @@ function normalizeSuggestions(
   return out;
 }
 
-/** Sends one message and stores it with the coach's reply. Nothing is stored if the call fails. */
+/**
+ * Sends one message in a thread (a new one for null) and stores it with the coach's reply.
+ * Nothing is stored if the call fails.
+ */
 export async function sendMessage(
   db: Database,
   llm: LlmClient,
   userId: string,
   content: string,
+  threadId?: string | null,
 ): Promise<CoachStateDto> {
   const used = await coachRepo.countUserMessagesSince(db, userId, new Date(Date.now() - DAY_MS));
   if (used >= MAX_COACH_MESSAGES_PER_DAY) {
@@ -314,13 +374,18 @@ export async function sendMessage(
       message: `You've sent ${MAX_COACH_MESSAGES_PER_DAY} messages to the coach in the last day. Try again later.`,
     });
   }
+  const thread = await resolveThread(db, userId, threadId);
   const [built, history, habits] = await Promise.all([
-    buildContext(db, userId),
-    coachRepo.findRecent(db, userId, COACH_HISTORY_MESSAGES),
+    buildContext(db, userId, thread?.focusDate ?? undefined),
+    thread ? coachRepo.findRecent(db, thread.id, COACH_HISTORY_MESSAGES) : [],
     habitRepo.findAllByUser(db, userId),
   ]);
   const { context, ctx, idByRef, features, today, day, dayRefs, units } = built;
-  const messages: ModelMessage[] = [...history.map(toModelMessage), { role: "user", content }];
+  const messages: ModelMessage[] = [
+    ...threadOpening(thread, history),
+    ...history.map(toModelMessage),
+    { role: "user", content },
+  ];
   const actions: CoachActionDto[] = [];
   const tools = coachTools(
     {
@@ -337,19 +402,44 @@ export async function sendMessage(
     },
     day.date,
   );
-  let output: Output;
-  try {
-    output = await llm.generateStructured({
+  const ask = (prompt: ModelMessage[]) =>
+    llm.generateStructured({
       purpose: "coach.chat",
       userId,
       schema: coachReplyOutputSchema,
       system: `${coachPrompt.system}\n\n---\n\n${context}`,
-      prompt: messages,
+      prompt,
       promptVersion: coachPrompt.version,
       maxOutputTokens: 2048,
       tools,
       maxSteps: MAX_COACH_STEPS,
     });
+  let output: Output;
+  try {
+    output = await ask(messages);
+    // Models sometimes say they logged something without calling the tool. Nothing logged
+    // plus a reply that claims otherwise gets one correction; then it's said plainly.
+    if (!actions.length && Object.keys(tools).length && CLAIMS.test(output.reply)) {
+      output = await ask([
+        ...messages,
+        { role: "assistant", content: output.reply },
+        {
+          role: "user",
+          content:
+            "[From the app, not the user: no tool ran, so nothing was logged, created or " +
+            "saved. If they asked for something, call the tool now. Then reply again to the " +
+            "user without claiming anything the tools didn't confirm.]",
+        },
+      ]);
+      if (!actions.length && CLAIMS.test(output.reply)) {
+        output = {
+          reply:
+            "I didn't manage to log or save anything that time. Tell me again and I'll " +
+            "add it, or add it from the day log.",
+          suggestions: [],
+        };
+      }
+    }
   } catch (error) {
     // Things already logged stay logged, so their receipts (and undo) have to be kept.
     if (!(error instanceof LlmError) || !actions.length) throw error;
@@ -366,19 +456,34 @@ export async function sendMessage(
     features,
   );
   const now = Date.now();
-  await coachRepo.insertMany(db, [
-    { userId, role: "user", content, createdAt: new Date(now) },
-    {
-      userId,
-      role: "assistant",
-      content: output.reply.trim() || "Sorry, I don't have an answer for that.",
-      suggestions,
-      actions,
-      // A millisecond later, so the pair always reads in order.
-      createdAt: new Date(now + 1),
-    },
-  ]);
-  return getCoach(db, userId);
+  const saved = await db.transaction(async (tx) => {
+    const t = thread ?? (await coachRepo.insertThread(tx, { userId, title: threadTitle(content) }));
+    await coachRepo.insertMany(tx, [
+      { userId, threadId: t.id, role: "user", content, createdAt: new Date(now) },
+      {
+        userId,
+        threadId: t.id,
+        role: "assistant",
+        content: output.reply.trim() || "Sorry, I don't have an answer for that.",
+        suggestions,
+        actions,
+        // A millisecond later, so the pair always reads in order.
+        createdAt: new Date(now + 1),
+      },
+    ]);
+    await coachRepo.touchThread(tx, t.id, new Date(now + 1));
+    return t;
+  });
+  return getCoach(db, userId, saved.id);
+}
+
+/**
+ * The model needs a conversation to start with the player; a postgame thread starts with the
+ * coach, so it gets the line that opened it (never stored).
+ */
+function threadOpening(thread: CoachThreadRow | null, history: CoachMessageRow[]): ModelMessage[] {
+  if (!thread?.focusDate || history[0]?.role !== "assistant") return [];
+  return [{ role: "user", content: `I just ended ${thread.focusDate}.` }];
 }
 
 /**
@@ -393,29 +498,35 @@ export async function startPostgame(
 ): Promise<CoachStateDto> {
   const { context, day } = await buildContext(db, userId, date);
   if (!day.recap) throw conflict("End the day first");
-  const history = await coachRepo.findRecent(db, userId, COACH_HISTORY_MESSAGES);
   const output = await llm.generateStructured({
     purpose: "coach.chat",
     userId,
     schema: coachReplyOutputSchema,
     system: `${coachPrompt.system}\n\n---\n\n${context}\n\n---\n\n${postgamePrompt.instruction}`,
     // The model needs a user turn to answer; this one isn't stored.
-    prompt: [
-      ...history.map(toModelMessage),
-      { role: "user", content: `I just ended ${date === day.today ? "my day" : date}.` },
-    ],
+    prompt: [{ role: "user", content: `I just ended ${date}.` }],
     promptVersion: `${coachPrompt.version}+${postgamePrompt.version}`,
     maxOutputTokens: 1024,
   });
-  await coachRepo.insertMany(db, [
-    {
+  // Each postgame is its own thread, about its day.
+  const thread = await db.transaction(async (tx) => {
+    const t = await coachRepo.insertThread(tx, {
       userId,
-      role: "assistant",
-      content: output.reply.trim() || "How did the day go?",
-      suggestions: [],
-    },
-  ]);
-  return getCoach(db, userId);
+      title: `Postgame: ${WEEKDAY_SHORT[dayOfWeek(date)]} ${date}`,
+      focusDate: date,
+    });
+    await coachRepo.insertMany(tx, [
+      {
+        userId,
+        threadId: t.id,
+        role: "assistant",
+        content: output.reply.trim() || "How did the day go?",
+        suggestions: [],
+      },
+    ]);
+    return t;
+  });
+  return getCoach(db, userId, thread.id);
 }
 
 /** Takes back one thing the coach logged: deletes the workout, or restores the old entry. */
@@ -456,7 +567,7 @@ export async function undoAction(
     row.id,
     actions.map((x) => (x.index === index ? { ...x, undone: true } : x)),
   );
-  return getCoach(db, userId);
+  return getCoach(db, userId, row.threadId);
 }
 
 /** Adds a suggested line to the Scouting Report (the player's own edit). */
@@ -551,5 +662,5 @@ export async function resolveSuggestion(
       x.index === index ? { ...x, status: action === "accept" ? "accepted" : "dismissed" } : x,
     ),
   );
-  return { state: await getCoach(db, userId), habit, goal };
+  return { state: await getCoach(db, userId, row.threadId), habit, goal };
 }

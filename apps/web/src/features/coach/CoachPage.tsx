@@ -6,6 +6,7 @@ import {
   WEEKDAY_SHORT,
   type CoachActionDto,
   type CoachMessageDto,
+  type CoachThreadDto,
   type CoachSuggestionDto,
 } from "@rlo/shared";
 import {
@@ -18,8 +19,9 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router";
 import {
-  useClearCoach,
   useCoach,
+  useCoachThreads,
+  useDeleteCoachThread,
   useResolveCoachSuggestion,
   useSendCoachMessage,
   useUndoCoachAction,
@@ -33,32 +35,49 @@ import { weekdayDate } from "../../lib/format";
 
 export function CoachPage() {
   const talk = useTalk();
-  const coach = useCoach();
-  const send = useSendCoachMessage();
-  const clear = useClearCoach();
-  const [draft, setDraft] = useState("");
   const [params, setParams] = useSearchParams();
+  // ?thread=<id>, ?thread=new for a fresh chat; nothing opens the latest.
+  const ref = params.get("thread") ?? "latest";
+  const coach = useCoach(ref);
+  const threads = useCoachThreads();
+  const send = useSendCoachMessage();
+  const remove = useDeleteCoachThread();
+  const [draft, setDraft] = useState("");
   const asked = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
+  const thread = coach.data?.thread ?? null;
   const messages = coach.data?.messages ?? [];
   const remaining = coach.data?.remaining ?? 0;
   const empty = messages.length === 0 && !send.isPending;
 
-  const submit = (text: string) => {
+  const open = (id: string | null) =>
+    setParams(id ? { thread: id } : { thread: "new" }, { replace: false });
+
+  const submit = (text: string, threadId = ref === "new" ? null : (thread?.id ?? null)) => {
     const message = text.trim();
     if (!message || send.isPending) return;
     // Clear right away so it reads as sent; restore it if sending fails.
     setDraft("");
-    send.mutate(message, { onError: () => setDraft((current) => current || message) });
+    send.mutate(
+      { content: message, threadId },
+      {
+        onSuccess: (state) => {
+          if (state.thread && state.thread.id !== thread?.id) {
+            setParams({ thread: state.thread.id }, { replace: true });
+          }
+        },
+        onError: () => setDraft((current) => current || message),
+      },
+    );
   };
 
-  // A question asked from Today's coach card arrives as ?ask=… and is sent once.
+  // A question asked from Today's coach card arrives as ?ask=… and starts its own chat, once.
   useEffect(() => {
     const ask = params.get("ask");
     if (!ask || asked.current || !coach.data) return;
     asked.current = true;
-    setParams({}, { replace: true });
-    submit(ask);
+    setParams({ thread: "new" }, { replace: true });
+    submit(ask, null);
   });
 
   useEffect(() => {
@@ -69,82 +88,148 @@ export function CoachPage() {
   if (coach.isError) return <ErrorNote error={coach.error} />;
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-3xl flex-col gap-6 pt-4">
-      <header className="flex items-center justify-between gap-4 border-b border-court-800 pb-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <CoachAvatar size="lg" />
-          <div className="min-w-0">
-            <h1 className="font-display text-3xl font-bold uppercase leading-none">{talk.coach}</h1>
-            <p className="mt-1 text-xs uppercase tracking-[0.3em] text-neon">{talk.coachTagline}</p>
-          </div>
-        </div>
-        {messages.length > 0 && (
-          <Button
-            variant="ghost"
-            disabled={clear.isPending || send.isPending}
-            onClick={() => {
-              if (window.confirm("Clear the whole conversation?")) clear.mutate();
-            }}
-          >
-            Clear chat
-          </Button>
-        )}
-      </header>
-
-      <div className="flex flex-1 flex-col gap-4" aria-live="polite">
-        {empty && (
-          <div className="m-auto flex max-w-xl flex-col items-center gap-3 py-8 text-center">
-            <CoachAvatar size="xl" />
-            <h2 className="font-display text-3xl font-bold uppercase">What are we working on?</h2>
-            <p className="text-court-300">
-              The {talk.coach.toLowerCase()} knows your habits, goals, recent days and{" "}
-              <Link to="/scouting-report" className="text-neon hover:underline">
-                {talk.scoutingReport}
-              </Link>
-              , and can suggest habits and goals you add with one tap. Tell it what you did and it
-              logs workouts, habits and goal progress for you.
-            </p>
-            <div className="mt-3 grid w-full gap-2 sm:grid-cols-2">
-              {COACH_STARTERS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={remaining === 0}
-                  onClick={() => submit(s)}
-                  className="rounded-xl border border-court-700 bg-court-900/60 px-4 py-3 text-left text-sm text-court-100 transition hover:border-neon hover:bg-court-900 disabled:opacity-40"
-                >
-                  {s}
-                </button>
-              ))}
+    <div className="mx-auto grid max-w-5xl gap-6 pt-4 md:grid-cols-[15rem_minmax(0,1fr)]">
+      <ThreadList
+        threads={threads.data ?? []}
+        active={ref === "new" ? null : (thread?.id ?? null)}
+        onOpen={open}
+      />
+      <div className="flex min-h-[calc(100dvh-8rem)] min-w-0 flex-col gap-6">
+        <header className="flex items-center justify-between gap-4 border-b border-court-800 pb-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <CoachAvatar size="lg" />
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl font-bold uppercase leading-none">
+                {talk.coach}
+              </h1>
+              <p className="mt-1 truncate text-xs uppercase tracking-[0.3em] text-neon">
+                {thread && ref !== "new" ? thread.title : talk.coachTagline}
+              </p>
             </div>
           </div>
-        )}
-        {messages.map((m) => (
-          <Message key={m.id} message={m} />
-        ))}
-        {send.isPending && (
-          <>
-            <Bubble role="user" pending>
-              {send.variables}
-            </Bubble>
-            <TypingBubble />
-          </>
-        )}
-        <div ref={bottom} />
+          {thread && ref !== "new" && (
+            <Button
+              variant="ghost"
+              disabled={remove.isPending || send.isPending}
+              onClick={() => {
+                if (!window.confirm("Delete this conversation?")) return;
+                remove.mutate(thread.id, { onSuccess: () => setParams({}, { replace: true }) });
+              }}
+            >
+              Delete chat
+            </Button>
+          )}
+        </header>
+
+        <div className="flex flex-1 flex-col gap-4" aria-live="polite">
+          {(empty || ref === "new") && !send.isPending && (
+            <div className="m-auto flex max-w-xl flex-col items-center gap-3 py-8 text-center">
+              <CoachAvatar size="xl" />
+              <h2 className="font-display text-3xl font-bold uppercase">What are we working on?</h2>
+              <p className="text-court-300">
+                The {talk.coach.toLowerCase()} knows your habits, goals, recent days and{" "}
+                <Link to="/scouting-report" className="text-neon hover:underline">
+                  {talk.scoutingReport}
+                </Link>
+                . Tell it what you did and it logs workouts, habits and goal progress; ask and it
+                makes habits, goals and workout templates for you.
+              </p>
+              <div className="mt-3 grid w-full gap-2 sm:grid-cols-2">
+                {COACH_STARTERS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={remaining === 0}
+                    onClick={() => submit(s)}
+                    className="rounded-xl border border-court-700 bg-court-900/60 px-4 py-3 text-left text-sm text-court-100 transition hover:border-neon hover:bg-court-900 disabled:opacity-40"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {ref !== "new" && messages.map((m) => <Message key={m.id} message={m} />)}
+          {send.isPending && (
+            <>
+              <Bubble role="user" pending>
+                {send.variables?.content}
+              </Bubble>
+              <TypingBubble />
+            </>
+          )}
+          <div ref={bottom} />
+        </div>
+
+        <ErrorNote error={send.error ?? remove.error} />
+
+        <Composer
+          value={draft}
+          onChange={setDraft}
+          onSubmit={() => submit(draft)}
+          busy={send.isPending}
+          remaining={remaining}
+          placeholder={`Ask the ${talk.coach.toLowerCase()}…`}
+        />
+        <DebugJson label="coach" data={coach.data} />
       </div>
-
-      <ErrorNote error={send.error ?? clear.error} />
-
-      <Composer
-        value={draft}
-        onChange={setDraft}
-        onSubmit={() => submit(draft)}
-        busy={send.isPending}
-        remaining={remaining}
-        placeholder={`Ask the ${talk.coach.toLowerCase()}…`}
-      />
-      <DebugJson label="coach" data={coach.data} />
     </div>
+  );
+}
+
+/** Conversations, newest first: a sidebar on wide screens, a picker on phones. */
+function ThreadList({
+  threads,
+  active,
+  onOpen,
+}: {
+  threads: CoachThreadDto[];
+  active: string | null;
+  onOpen: (id: string | null) => void;
+}) {
+  return (
+    <nav aria-label="Conversations" className="space-y-2 md:sticky md:top-20 md:self-start">
+      <Button variant="primary" className="w-full" onClick={() => onOpen(null)}>
+        + New chat
+      </Button>
+      {threads.length > 0 && (
+        <>
+          <select
+            aria-label="Open a conversation"
+            value={active ?? ""}
+            onChange={(e) => onOpen(e.target.value || null)}
+            className="w-full rounded-lg border border-court-700 bg-court-900 px-3 py-2 text-sm md:hidden"
+          >
+            {active === null && <option value="">New chat</option>}
+            {threads.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+          <ul className="hidden max-h-[calc(100dvh-12rem)] space-y-1 overflow-y-auto md:block">
+            {threads.map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  aria-current={t.id === active ? "page" : undefined}
+                  onClick={() => onOpen(t.id)}
+                  className={`w-full rounded-lg px-3 py-2 text-left transition ${t.id === active ? "bg-court-800 text-court-100" : "text-court-300 hover:bg-court-900 hover:text-court-100"}`}
+                >
+                  <span className="block truncate text-sm">{t.title}</span>
+                  <span className="block text-[11px] text-court-500">
+                    {new Date(t.updatedAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </nav>
   );
 }
 
