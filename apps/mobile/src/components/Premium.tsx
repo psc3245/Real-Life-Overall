@@ -32,7 +32,7 @@ export function PremiumBadge() {
   );
 }
 
-/** What a free account sees in place of a premium screen; upgrades are by an admin for now. */
+/** What a free account sees in place of a premium screen, with the way to the upgrade screen. */
 export function PremiumLocked({ title, detail }: { title: string; detail?: string }) {
   return (
     <Screen title={title}>

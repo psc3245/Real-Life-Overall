@@ -14,8 +14,8 @@ export function PremiumBadge({ className = "" }: { className?: string }) {
 }
 
 /**
- * What a free account sees in place of a premium page. There's no checkout yet: accounts are
- * upgraded by an admin while the app is in testing.
+ * What a free account sees in place of a premium page, with the way to /upgrade. There's no
+ * checkout yet: players switch plans there themselves (DESIGN.md §8.9).
  */
 export function PremiumLocked({ title, children }: { title: string; children?: ReactNode }) {
   return (
