@@ -244,6 +244,7 @@ All LLM work lives behind one internal module, `apps/api/src/llm/`, with a **pro
   - an updated **potential projection** (end-of-season estimate per category and Overall);
   - an archetype update (Phase 3);
   - an updated **rolling profile summary** (memory, §5.5).
+- **Two calls** (2026-11-12): the review above, and the evolution (Scouting Report, weight shifts, tree change; §4.5, §5.8) run in parallel on the same prompt, both purpose `recap.weekly` (prompt versions `weekly-review-*` and `weekly-evolution-*`). One schema with everything compiled to a structured-output grammar Anthropic rejected as too large, so every review failed.
 
 ### 5.4 Decay (hybrid)
 - **Rules are data the LLM writes and code runs.** Example shape (Zod in `packages/shared`):
