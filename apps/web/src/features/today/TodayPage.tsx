@@ -1,4 +1,7 @@
 import {
+  bucketHabits,
+  type DayHabitDto,
+  type HabitBucketDto,
   addDays,
   BACKFILL_DAYS,
   canLevelUp,
@@ -15,7 +18,7 @@ import {
 } from "@rlo/shared";
 import { lazy, Suspense, type ReactNode } from "react";
 import { Link } from "react-router";
-import { useDay } from "../../api/days";
+import { useDay, useHabitBuckets } from "../../api/days";
 import { useMe } from "../../api/hooks";
 import { usePreferences } from "../../api/preferences";
 import { useActivity, useRatings } from "../../api/ratings";
@@ -213,6 +216,18 @@ function Card({
 
 const cardLink = "text-sm text-court-300 hover:text-neon";
 
+/** A day's habits in bucket order, each bucket's first one carrying its heading. */
+function withBucketHeadings(items: DayHabitDto[], buckets: HabitBucketDto[]) {
+  const groups = bucketHabits(items, (h) => h.habit, buckets);
+  const titled = groups.length > 1 || groups.some((g) => g.bucket);
+  return groups.flatMap((g) =>
+    g.items.map((item, i) => ({
+      item,
+      heading: titled && i === 0 ? (g.bucket?.name ?? "Other") : null,
+    })),
+  );
+}
+
 function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
   const talk = useTalk();
   const scheduled = day.habits.filter((h) => h.scheduled);
@@ -221,6 +236,7 @@ function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
   );
   const done = isDayHabitDone;
   const count = scheduled.filter(done).length;
+  const buckets = useHabitBuckets().data ?? [];
 
   return (
     <Card
@@ -263,49 +279,55 @@ function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
             </div>
           )}
           <ul className="divide-y divide-court-800">
-            {[...scheduled, ...extra]
-              .filter((h) => !hideDone || !done(h))
-              .map((h) => (
-                <li key={h.habit.id}>
-                  <Link
-                    to={`/log#habit-${h.habit.id}`}
-                    className="flex items-center gap-3 py-2 hover:text-neon"
+            {withBucketHeadings(
+              [...scheduled, ...extra].filter((h) => !hideDone || !done(h)),
+              buckets,
+            ).map(({ item: h, heading }) => (
+              <li key={h.habit.id}>
+                {heading && (
+                  <p className="pb-1 pt-3 text-xs uppercase tracking-wider text-court-500">
+                    {heading}
+                  </p>
+                )}
+                <Link
+                  to={`/log#habit-${h.habit.id}`}
+                  className="flex items-center gap-3 py-2 hover:text-neon"
+                >
+                  <span
+                    aria-hidden
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${done(h) ? "border-neon bg-neon text-court-950" : "border-court-500"}`}
                   >
-                    <span
-                      aria-hidden
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${done(h) ? "border-neon bg-neon text-court-950" : "border-court-500"}`}
-                    >
-                      {done(h) ? "✓" : ""}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">
-                      {h.habit.name}
-                      {!h.scheduled && <span className="ml-2 text-xs text-court-500">bonus</span>}
-                    </span>
-                    <span className="max-w-[40%] truncate text-sm tabular-nums text-court-300">
-                      {h.habit.type === "group"
-                        ? groupProgress(h)
-                        : h.entry
-                          ? formatHabitEntry(h.habit.type, h.habit.config, h.entry)
-                          : "to do"}
-                    </span>
-                  </Link>
-                  {h.children && h.children.length > 0 && (
-                    <ul className="mb-2 ml-8 space-y-0.5 text-sm text-court-300">
-                      {h.children.map((c) => (
-                        <li key={c.habit.id} className="flex justify-between gap-3">
-                          <span className={isDayHabitDone(c) ? "text-court-100" : ""}>
-                            {isDayHabitDone(c) ? "✓ " : "○ "}
-                            {c.habit.name}
-                          </span>
-                          <span className="truncate tabular-nums">
-                            {c.entry ? formatHabitEntry(c.habit.type, c.habit.config, c.entry) : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
+                    {done(h) ? "✓" : ""}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {h.habit.name}
+                    {!h.scheduled && <span className="ml-2 text-xs text-court-500">bonus</span>}
+                  </span>
+                  <span className="max-w-[40%] truncate text-sm tabular-nums text-court-300">
+                    {h.habit.type === "group"
+                      ? groupProgress(h)
+                      : h.entry
+                        ? formatHabitEntry(h.habit.type, h.habit.config, h.entry)
+                        : "to do"}
+                  </span>
+                </Link>
+                {h.children && h.children.length > 0 && (
+                  <ul className="mb-2 ml-8 space-y-0.5 text-sm text-court-300">
+                    {h.children.map((c) => (
+                      <li key={c.habit.id} className="flex justify-between gap-3">
+                        <span className={isDayHabitDone(c) ? "text-court-100" : ""}>
+                          {isDayHabitDone(c) ? "✓ " : "○ "}
+                          {c.habit.name}
+                        </span>
+                        <span className="truncate tabular-nums">
+                          {c.entry ? formatHabitEntry(c.habit.type, c.habit.config, c.entry) : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
           </ul>
         </>
       )}

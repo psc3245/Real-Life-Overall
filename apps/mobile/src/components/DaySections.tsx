@@ -12,7 +12,7 @@ import { ObjectiveAmount, ObjectiveBar, objectiveStatusText, statusColor } from 
 import { Body, Card, ErrorNote, Field, Label, Muted, TextLink } from "./ui";
 
 const goGoals = () => router.push({ pathname: "/habits", params: { view: "goals" } });
-const goTrain = () => router.push({ pathname: "/habits", params: { view: "train" } });
+const goTrain = () => router.push("/train");
 
 function Head({
   title,

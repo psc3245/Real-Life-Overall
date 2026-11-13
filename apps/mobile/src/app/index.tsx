@@ -24,7 +24,7 @@ export default function Index() {
   if (me.isPending || active.isPending) return <Loading />;
   // Pushed over training so Back lands where it would have from "Resume".
   if (active.data && features.workouts) {
-    return <Redirect href={{ pathname: "/habits", params: { view: "train", resume: "1" } }} />;
+    return <Redirect href={{ pathname: "/train", params: { resume: "1" } }} />;
   }
   const start = me.data?.preferences.startPage ?? "today";
   // The log is pushed over Today so Back lands somewhere sensible.

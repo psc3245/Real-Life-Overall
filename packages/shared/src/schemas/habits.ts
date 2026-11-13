@@ -163,6 +163,7 @@ export const MAX_HABIT_JOURNAL = 5000;
 export const MAX_HABIT_COUNT = 1_000_000;
 export const MAX_DAY_JOURNAL = 10_000;
 export const MAX_HABIT_LINKS = 4;
+export const MAX_HABIT_BUCKETS = 20;
 export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 /** Type-specific settings. Fields that don't apply to a type are null. */
@@ -521,6 +522,41 @@ export interface HabitDto {
   startsOn: string;
   /** The group this is a sub-habit of, if any. */
   parentId?: string | null;
+  /** The bucket it's filed in (top-level habits only; sub-habits sit with their group). */
+  bucketId?: string | null;
+}
+
+/** A named section habits are filed into for lists ("Morning", "Health"). Order is the player's. */
+export interface HabitBucketDto {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+/**
+ * Splits habit-like items into the player's buckets, in bucket order, keeping each bucket's items
+ * in their own order. Items in no bucket (or a deleted one) come last with `bucket: null`. Empty
+ * buckets are left out.
+ */
+export function bucketHabits<T>(
+  items: T[],
+  habitOf: (item: T) => Pick<HabitDto, "bucketId">,
+  buckets: HabitBucketDto[],
+): { bucket: HabitBucketDto | null; items: T[] }[] {
+  const sorted = [...buckets].sort((a, b) => a.sortOrder - b.sortOrder);
+  const known = new Set(sorted.map((b) => b.id));
+  const out = sorted.map((bucket) => ({
+    bucket: bucket as HabitBucketDto | null,
+    items: items.filter((i) => habitOf(i).bucketId === bucket.id),
+  }));
+  out.push({
+    bucket: null,
+    items: items.filter((i) => {
+      const id = habitOf(i).bucketId;
+      return !id || !known.has(id);
+    }),
+  });
+  return out.filter((g) => g.items.length > 0);
 }
 
 export interface DayHabitDto {
@@ -576,6 +612,7 @@ export const createHabitBodySchema = z.object({
   startsOn: dateSchema.optional(),
   /** Makes this a sub-habit of a group (it takes the group's schedule). */
   parentId: z.uuid().optional(),
+  bucketId: z.uuid().nullable().optional(),
 });
 
 export const updateHabitBodySchema = z
@@ -585,8 +622,16 @@ export const updateHabitBodySchema = z
     days: daysSchema,
     links: z.array(z.uuid()).max(MAX_HABIT_LINKS),
     startsOn: dateSchema,
+    bucketId: z.uuid().nullable(),
   })
   .partial();
+
+export const habitBucketBodySchema = z.object({ name: z.string().trim().min(1).max(40) });
+
+/** Every bucket id, in the new order. */
+export const habitBucketOrderBodySchema = z.object({
+  ids: z.array(z.uuid()).max(MAX_HABIT_BUCKETS),
+});
 
 export const suggestLinksBodySchema = z.object({
   name: z.string().trim().min(1).max(60),

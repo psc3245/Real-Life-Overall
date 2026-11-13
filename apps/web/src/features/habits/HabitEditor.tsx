@@ -25,7 +25,7 @@ import {
   WEEKDAY_NAMES,
 } from "@rlo/shared";
 import { useState, type FormEvent } from "react";
-import { useCreateHabit, useSuggestLinks, useUpdateHabit } from "../../api/days";
+import { useCreateHabit, useHabitBuckets, useSuggestLinks, useUpdateHabit } from "../../api/days";
 import { AttributePicker } from "../../components/AttributePicker";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -87,6 +87,10 @@ export function HabitEditor({
   const [days, setDays] = useState<number[]>(start?.days ?? ALL_DAYS);
   const [links, setLinks] = useState<string[]>(start?.links ?? []);
   const [startsOn, setStartsOn] = useState(habit?.startsOn ?? today);
+  const [bucketId, setBucketId] = useState<string | null>(habit?.bucketId ?? null);
+  const buckets = useHabitBuckets().data ?? [];
+  // Sub-habits sit with their group; coach drafts are filed after saving.
+  const filable = !parent && !submit && buckets.length > 0;
   const [reason, setReason] = useState<string | null>(null);
   const create = useCreateHabit();
   const update = useUpdateHabit();
@@ -129,6 +133,7 @@ export function HabitEditor({
       name: name.trim(),
       config,
       ...(!parent && { days, startsOn }),
+      ...(filable && { bucketId }),
       links: type === "group" ? [] : links,
     };
     if (submit) submit.onSubmit({ name: body.name, type, config, days, links, startsOn });
@@ -372,6 +377,25 @@ export function HabitEditor({
             Add sub-habits after saving. They follow this schedule; link attributes on them.
           </p>
         </div>
+      )}
+
+      {filable && (
+        <label className="block space-y-1">
+          {label("Bucket")}
+          <select
+            aria-label="Bucket"
+            value={bucketId ?? ""}
+            onChange={(e) => setBucketId(e.target.value || null)}
+            className={compactFieldClass}
+          >
+            <option value="">No bucket</option>
+            {buckets.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
 
       {parent ? (

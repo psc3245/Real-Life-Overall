@@ -1,4 +1,5 @@
 import {
+  bucketHabits,
   describeHabitGoal,
   GROUP_RULE_LABELS,
   HABIT_TYPE_LABELS,
@@ -7,7 +8,8 @@ import {
 } from "@rlo/shared";
 import { useState } from "react";
 import { Link } from "react-router";
-import { useArchiveHabit, useDay, useHabits } from "../../api/days";
+import { useArchiveHabit, useDay, useHabitBuckets, useHabits } from "../../api/days";
+import { BucketsPanel } from "./BucketsPanel";
 import { useRatings } from "../../api/ratings";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -24,6 +26,7 @@ export function scheduleLabel(days: number[]) {
 export function ManageHabitsPage() {
   const habits = useHabits();
   const ratings = useRatings();
+  const buckets = useHabitBuckets();
   const archive = useArchiveHabit();
   const today = useDay(null).data?.today;
   /** Habit id awaiting archive confirmation. */
@@ -110,64 +113,78 @@ export function ManageHabitsPage() {
         </p>
       )}
 
-      <ul className="space-y-3">
-        {habits.data
-          .filter((h) => !h.parentId)
-          .map((h: HabitDto) => {
-            const subs = habits.data.filter((c) => c.parentId === h.id);
-            return (
-              <li key={h.id} className="space-y-2">
-                {editing === h.id ? (
-                  <HabitEditor
-                    habit={h}
-                    nodes={nodes}
-                    today={today}
-                    onDone={() => setEditing(null)}
-                  />
-                ) : (
-                  row(h)
-                )}
-                {h.type === "group" && (
-                  <ul className="ml-4 space-y-2 border-l border-court-700 pl-4">
-                    {subs.map((c) => (
-                      <li key={c.id}>
-                        {editing === c.id ? (
+      <BucketsPanel buckets={buckets.data ?? []} />
+
+      {bucketHabits(
+        habits.data.filter((h) => !h.parentId),
+        (h) => h,
+        buckets.data ?? [],
+      ).map((group, _, all) => (
+        <section key={group.bucket?.id ?? "none"} className="space-y-3">
+          {/* No headings until the player makes a bucket. */}
+          {(group.bucket || all.length > 1) && (
+            <h2 className="font-display text-xl uppercase tracking-wider text-court-300">
+              {group.bucket?.name ?? "No bucket"}
+            </h2>
+          )}
+          <ul className="space-y-3">
+            {group.items.map((h: HabitDto) => {
+              const subs = habits.data.filter((c) => c.parentId === h.id);
+              return (
+                <li key={h.id} className="space-y-2">
+                  {editing === h.id ? (
+                    <HabitEditor
+                      habit={h}
+                      nodes={nodes}
+                      today={today}
+                      onDone={() => setEditing(null)}
+                    />
+                  ) : (
+                    row(h)
+                  )}
+                  {h.type === "group" && (
+                    <ul className="ml-4 space-y-2 border-l border-court-700 pl-4">
+                      {subs.map((c) => (
+                        <li key={c.id}>
+                          {editing === c.id ? (
+                            <HabitEditor
+                              habit={c}
+                              parent={h}
+                              nodes={nodes}
+                              today={today}
+                              onDone={() => setEditing(null)}
+                            />
+                          ) : (
+                            row(c)
+                          )}
+                        </li>
+                      ))}
+                      <li>
+                        {editing === `sub:${h.id}` ? (
                           <HabitEditor
-                            habit={c}
                             parent={h}
                             nodes={nodes}
                             today={today}
                             onDone={() => setEditing(null)}
                           />
                         ) : (
-                          row(c)
+                          <Button
+                            variant="ghost"
+                            disabled={editing !== null}
+                            onClick={() => setEditing(`sub:${h.id}`)}
+                          >
+                            + Sub-habit
+                          </Button>
                         )}
                       </li>
-                    ))}
-                    <li>
-                      {editing === `sub:${h.id}` ? (
-                        <HabitEditor
-                          parent={h}
-                          nodes={nodes}
-                          today={today}
-                          onDone={() => setEditing(null)}
-                        />
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          disabled={editing !== null}
-                          onClick={() => setEditing(`sub:${h.id}`)}
-                        >
-                          + Sub-habit
-                        </Button>
-                      )}
-                    </li>
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-      </ul>
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
       <ErrorNote error={archive.error} />
     </div>
   );

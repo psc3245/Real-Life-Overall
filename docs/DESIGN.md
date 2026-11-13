@@ -496,6 +496,11 @@ A spotlight tour of the main features, shown once. (A walkthrough is the practic
 - **Rule of thumb:** reasonably important actions are felt; routine taps (navigation, typing, opening menus) aren't. One helper (`lib/haptics.ts`) names feels by meaning: *tap* (steppers, stars, scale steps, adding a set, undoing a check), *impact* (checking off a set or habit, a clean avoid day, adding exercises, starting a workout, accepting a coach draft), *remove* (deleting a set, exercise, workout, habit, goal, template, chart, report or question), *success*, *warning* (rest timer done) and *error*.
 - **Actions that take time buzz when they finish, not when tapped:** a mutation declares `meta: { haptic }` and the query client's `MutationCache` fires it once the server answers (success for finishing a workout, ending the day, the weekly review, initial ratings, a report run, saving a habit or goal; a light tap when the coach replies), and any failure of such a mutation is felt as an error. Debounced saves (habit entries, the journal) don't buzz on save; their controls already did on the tap.
 
+### 7.15 Habit buckets (added 2026-11-13)
+- **Buckets** are named sections the player files habits into ("Morning", "Health", "Work"): `habit_buckets` (name, sort order, up to 20) and `habits.bucket_id` (top-level habits only; sub-habits sit with their group; deleting a bucket leaves its habits unfiled). They only organize lists and never change what counts as done. Groups are different: a group is a habit with a done rule.
+- Made, renamed, reordered and deleted on Manage habits; a habit's bucket is picked in its editor. Manage, the day log, Today's habits card and the stats glance list habits by bucket in the player's order, with unfiled ones last under "Other". There are no headings until a bucket exists.
+- **Off-schedule habits stay out of the way:** the day log shows scheduled habits plus any already logged as a bonus; the rest sit behind a collapsed "Show N not scheduled today" toggle (still loggable as bonus days). Today's card already showed only those.
+
 ## 8. Architecture
 
 ### 8.1 Constraints
@@ -705,7 +710,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
   - **Phase 3:** Player card, charts, badges, goals and potential, season setup and archive.
   - **Phase 4:** Profile, friends, compare, leaderboards.
   - **Refinements (before mobile):** Today is an at-a-glance overview and logging lives at `/log`; `/habits` is the habit stats glance (week / month / season; management at `/habits/manage`); the Week page adds day-by-day detail and opens earlier reviews; `/ratings/activity` holds the full change feed; every attribute and category has a page (`/ratings/node/:id`: history, changes, children, linked habits) and is linked wherever it appears; long pages get sticky section nav; heatmap days show a hover card and open their log.
-  - **iOS app:** five tabs (Today, Playbook, Week, Rating, You). Playbook switches between Habits, Goals and Train (the web's Playbook menu); You gathers the League and Stats menus and the account menu (profile, Scouting Report, coach, body, friends, leaderboards, charts, reports, history, settings, personalize, admin). Tabs and rows hide with their features. Detail screens (a day's log, attribute pages, activity, seasons, profiles, onboarding) push over the tabs. Same dark 2K look, with SF Symbols and native sheets, prompts and share sheets.
+  - **iOS app:** five tabs (Today, Playbook, Workouts, Rating, You; changed 2026-11-13, Week was a tab and training sat in Playbook). Playbook switches between Habits and Goals; Workouts is the training home. Week is pushed from a calendar button in Today's header and a "Weekly review" row in You (same `/week` path). Letting players pick their own tabs is planned. You gathers the League and Stats menus and the account menu (profile, Scouting Report, coach, body, friends, leaderboards, charts, reports, history, settings, personalize, admin). Tabs and rows hide with their features. Detail screens (a day's log, attribute pages, activity, seasons, profiles, onboarding) push over the tabs. Same dark 2K look, with SF Symbols and native sheets, prompts and share sheets.
 - Responsive from the start (web first, mobile later). Consider making it an installable **PWA** before going native.
 - The 2K look is dark-first and the default; light themes and other styles are opt-in personalization (§7.9).
 
@@ -830,6 +835,9 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [ ] iOS: the walkthrough
 - [x] Goal comparisons (reach, beat or stay under) for every numeric habit, optional goals on scales and stars, and a time-of-day habit type (§7.13)
 - [x] iOS: haptics for important actions, felt on completion for waited-on ones (§7.14)
+- [x] Habit buckets, and off-schedule habits tucked away on the day log (§7.15)
+- [x] iOS tabs: Today, Playbook, Workouts, Rating, You; Week opens from Today and You (§10)
+- [ ] iOS: customizable tab bar
 
 ---
 

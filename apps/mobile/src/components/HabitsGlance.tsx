@@ -1,4 +1,5 @@
 import {
+  bucketHabits,
   formatStatAverage,
   HABIT_STAT_RANGES,
   HABIT_TYPE_LABELS,
@@ -8,14 +9,14 @@ import {
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useHabitStats } from "@/api/days";
+import { useHabitBuckets, useHabitStats } from "@/api/days";
 import { useRatings } from "@/api/ratings";
 import { Segmented } from "./controls";
 import { DayStrip } from "./DayStrip";
 import { NodeChip } from "./NodeChip";
 import { StatGrid, StatTile } from "./StatTile";
 import { ChartButton } from "./ChartButton";
-import { Body, Card, ErrorNote, Loading, Muted, TextLink } from "./ui";
+import { Body, Card, ErrorNote, Label, Loading, Muted, TextLink } from "./ui";
 import { shortDate } from "@/lib/format";
 import { scheduleLabel } from "@/lib/habits";
 import { colors, fonts, space } from "@/lib/theme";
@@ -37,6 +38,7 @@ export function HabitsGlance() {
   const all = stats.data?.habits ?? [];
   // Groups count once (their sub-habits show inside the group's card).
   const habits = all.filter((h) => !h.habit.parentId);
+  const buckets = useHabitBuckets().data ?? [];
   const scheduled = habits.reduce((n, h) => n + h.scheduled, 0);
   const completed = habits.reduce((n, h) => n + h.completed, 0);
   const remaining = habits.reduce((n, h) => n + h.remaining, 0);
@@ -79,15 +81,20 @@ export function HabitsGlance() {
         </StatGrid>
       )}
 
-      {habits.map((h) => (
-        <HabitCard
-          key={h.habit.id}
-          stats={h}
-          subs={all.filter((c) => c.habit.parentId === h.habit.id)}
-          range={range}
-          today={stats.data!.today}
-          names={names}
-        />
+      {bucketHabits(habits, (h) => h.habit, buckets).map((g, _, groups) => (
+        <View key={g.bucket?.id ?? "none"} style={{ gap: space.md }}>
+          {(g.bucket || groups.length > 1) && <Label>{g.bucket?.name ?? "Other"}</Label>}
+          {g.items.map((h) => (
+            <HabitCard
+              key={h.habit.id}
+              stats={h}
+              subs={all.filter((c) => c.habit.parentId === h.habit.id)}
+              range={range}
+              today={stats.data!.today}
+              names={names}
+            />
+          ))}
+        </View>
       ))}
     </View>
   );

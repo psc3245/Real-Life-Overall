@@ -40,7 +40,7 @@ function ActiveWorkoutScreen() {
     );
   }
   // Finished or discarded (here or on another device): back to the training home.
-  if (!active.data) return <Redirect href={{ pathname: "/habits", params: { view: "train" } }} />;
+  if (!active.data) return <Redirect href="/train" />;
   return <LiveWorkout key={active.data.id} workout={active.data} />;
 }
 

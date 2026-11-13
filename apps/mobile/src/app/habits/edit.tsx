@@ -25,7 +25,14 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, StyleSheet, Text, View } from "react-native";
-import { useCreateHabit, useDay, useHabits, useSuggestLinks, useUpdateHabit } from "@/api/days";
+import {
+  useCreateHabit,
+  useDay,
+  useHabitBuckets,
+  useHabits,
+  useSuggestLinks,
+  useUpdateHabit,
+} from "@/api/days";
 import { useRatings } from "@/api/ratings";
 import { AttributePicker } from "@/components/AttributePicker";
 import { Chip, FormRow, NumberField } from "@/components/controls";
@@ -147,6 +154,10 @@ function HabitEditor({
   const [days, setDays] = useState<number[]>(start?.days ?? ALL_DAYS);
   const [links, setLinks] = useState<string[]>(start?.links ?? []);
   const [startsOn, setStartsOn] = useState(habit?.startsOn ?? today);
+  const [bucketId, setBucketId] = useState<string | null>(habit?.bucketId ?? null);
+  const buckets = useHabitBuckets().data ?? [];
+  // Sub-habits sit with their group; coach drafts are filed after saving.
+  const filable = !parent && !draft && buckets.length > 0;
   const [reason, setReason] = useState<string | null>(null);
   const create = useCreateHabit();
   const update = useUpdateHabit();
@@ -189,6 +200,7 @@ function HabitEditor({
       name: name.trim(),
       config,
       ...(!parent && { days, startsOn }),
+      ...(filable && { bucketId }),
       links: type === "group" ? [] : links,
     };
     if (draft) {
@@ -356,6 +368,22 @@ function HabitEditor({
               Add sub-habits after saving. They follow this schedule; link attributes on them.
             </Muted>
           </View>
+        )}
+
+        {filable && (
+          <FormRow label="Bucket">
+            <View style={styles.wrap}>
+              <Chip label="None" selected={bucketId === null} onPress={() => setBucketId(null)} />
+              {buckets.map((b) => (
+                <Chip
+                  key={b.id}
+                  label={b.name}
+                  selected={bucketId === b.id}
+                  onPress={() => setBucketId(b.id)}
+                />
+              ))}
+            </View>
+          </FormRow>
         )}
 
         {parent ? (

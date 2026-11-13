@@ -18,13 +18,14 @@ import {
   Screen,
 } from "@/components/ui";
 import { WeekBreakdown } from "@/components/WeekBreakdown";
+import { FeatureGate } from "@/components/FeatureGate";
 import { shortDate } from "@/lib/format";
 import { cap, useTalk } from "@/lib/talk";
 import { space } from "@/lib/theme";
 
 const WORKING = ["Reading your week…", "Checking habits and decay…", "Setting next week's focus…"];
 
-export default function WeekScreen() {
+function WeekScreen() {
   const talk = useTalk();
   const weekly = useWeekly();
   const ratings = useRatings();
@@ -140,5 +141,14 @@ function WeekStartPicker() {
         onChange={(v) => !set.isPending && set.mutate(Number(v))}
       />
     </FormRow>
+  );
+}
+
+/** Pushed from Today's header and the You tab (it was a tab of its own before Workouts). */
+export default function GatedWeekScreen() {
+  return (
+    <FeatureGate feature="week">
+      <WeekScreen />
+    </FeatureGate>
   );
 }

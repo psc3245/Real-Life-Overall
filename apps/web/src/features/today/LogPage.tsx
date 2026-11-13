@@ -1,4 +1,5 @@
 import {
+  bucketHabits,
   addDays,
   BACKFILL_DAYS,
   groupProgress,
@@ -13,7 +14,7 @@ import {
 } from "@rlo/shared";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { useDay, useSaveEntry, useSaveJournal } from "../../api/days";
+import { useDay, useHabitBuckets, useSaveEntry, useSaveJournal } from "../../api/days";
 import { usePreferences } from "../../api/preferences";
 import { useRatings } from "../../api/ratings";
 import { DayPicker } from "../../components/DayPicker";
@@ -196,9 +197,20 @@ function Journal({ day }: { day: DayDto }) {
 
 function Habits({ day, leaves }: { day: DayDto; leaves: RatedNodeDto[] }) {
   const names = new Map(leaves.map((n) => [n.id, n.name]));
+  const buckets = useHabitBuckets().data ?? [];
+  const [showOff, setShowOff] = useState(false);
   const scheduled = day.habits.filter((h) => h.scheduled);
-  const bonus = day.habits.filter((h) => !h.scheduled);
+  // Off-schedule habits stay out of the way unless already logged (a bonus day).
+  const logged = (h: DayHabitDto) => Boolean(h.entry || h.children?.some((c) => c.entry));
+  const shown = day.habits.filter((h) => h.scheduled || logged(h));
+  const off = day.habits.filter((h) => !h.scheduled && !logged(h));
   const done = scheduled.filter(isDayHabitDone);
+  const groups = bucketHabits(shown, (h) => h.habit, buckets);
+  const item = (h: DayHabitDto) => (
+    <div key={`${day.date}-${h.habit.id}`} className={h.scheduled ? undefined : "opacity-80"}>
+      <HabitItem item={h} day={day} names={names} />
+    </div>
+  );
 
   return (
     <section className="space-y-4">
@@ -224,22 +236,31 @@ function Habits({ day, leaves }: { day: DayDto; leaves: RatedNodeDto[] }) {
           to log alongside your journal.
         </p>
       )}
-      <div className="space-y-3">
-        {scheduled.map((h) => (
-          <HabitItem key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
-        ))}
-      </div>
-      {bonus.length > 0 && (
-        <>
-          <p className="pt-2 text-xs uppercase tracking-wider text-court-500">
-            Not scheduled today
-          </p>
-          <div className="space-y-3 opacity-80">
-            {bonus.map((h) => (
-              <HabitItem key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
-            ))}
-          </div>
-        </>
+      {day.habits.length > 0 && shown.length === 0 && (
+        <p className="text-sm text-court-500">Nothing scheduled today.</p>
+      )}
+      {groups.map((g) => (
+        <div key={g.bucket?.id ?? "none"} className="space-y-3">
+          {(g.bucket || groups.length > 1) && (
+            <p className="pt-1 text-xs uppercase tracking-wider text-court-300">
+              {g.bucket?.name ?? "Other"}
+            </p>
+          )}
+          {g.items.map(item)}
+        </div>
+      ))}
+      {off.length > 0 && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            aria-expanded={showOff}
+            onClick={() => setShowOff((v) => !v)}
+            className="text-sm text-court-500 hover:text-neon"
+          >
+            {showOff ? "Hide" : "Show"} {off.length} not scheduled today {showOff ? "▲" : "▼"}
+          </button>
+          {showOff && <div className="space-y-3 opacity-80">{off.map(item)}</div>}
+        </div>
       )}
     </section>
   );

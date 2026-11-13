@@ -1,4 +1,5 @@
 import {
+  bucketHabits,
   formatStatAverage,
   HABIT_STAT_RANGES,
   HABIT_TYPE_LABELS,
@@ -7,7 +8,7 @@ import {
 } from "@rlo/shared";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { useHabitStats } from "../../api/days";
+import { useHabitBuckets, useHabitStats } from "../../api/days";
 import { useRatings } from "../../api/ratings";
 import { NodeChip } from "../../components/NodeChip";
 import { ErrorNote } from "../onboarding/ErrorNote";
@@ -41,6 +42,7 @@ export function HabitsGlancePage() {
   const all = stats.data?.habits ?? [];
   // Groups count once (their sub-habits show inside the group's card).
   const habits = all.filter((h) => !h.habit.parentId);
+  const buckets = useHabitBuckets().data ?? [];
   const scheduled = habits.reduce((n, h) => n + h.scheduled, 0);
   const completed = habits.reduce((n, h) => n + h.completed, 0);
   const remaining = habits.reduce((n, h) => n + h.remaining, 0);
@@ -114,18 +116,27 @@ export function HabitsGlancePage() {
         </dl>
       )}
 
-      <ul className="grid gap-4 lg:grid-cols-2">
-        {habits.map((h) => (
-          <HabitCard
-            key={h.habit.id}
-            stats={h}
-            subs={all.filter((c) => c.habit.parentId === h.habit.id)}
-            range={range}
-            today={stats.data!.today}
-            names={names}
-          />
-        ))}
-      </ul>
+      {bucketHabits(habits, (h) => h.habit, buckets).map((g, _, groups) => (
+        <section key={g.bucket?.id ?? "none"} className="space-y-3">
+          {(g.bucket || groups.length > 1) && (
+            <h2 className="font-display text-xl uppercase tracking-wider text-court-300">
+              {g.bucket?.name ?? "Other"}
+            </h2>
+          )}
+          <ul className="grid gap-4 lg:grid-cols-2">
+            {g.items.map((h) => (
+              <HabitCard
+                key={h.habit.id}
+                stats={h}
+                subs={all.filter((c) => c.habit.parentId === h.habit.id)}
+                range={range}
+                today={stats.data!.today}
+                names={names}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
       <DebugJson label="habit stats" data={stats.data} />
     </div>
   );

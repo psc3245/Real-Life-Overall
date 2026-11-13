@@ -25,11 +25,7 @@ function WorkoutHistoryScreen() {
       {history.isSuccess && workouts.length === 0 && (
         <Card>
           <Muted style={{ textAlign: "center" }}>No workouts yet.</Muted>
-          <Button
-            title="Start one"
-            variant="ghost"
-            onPress={() => router.push({ pathname: "/habits", params: { view: "train" } })}
-          />
+          <Button title="Start one" variant="ghost" onPress={() => router.push("/train")} />
         </Card>
       )}
       {workouts.map((w) => (

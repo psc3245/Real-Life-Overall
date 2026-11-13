@@ -1,4 +1,5 @@
 import {
+  bucketHabits,
   addDays,
   BACKFILL_DAYS,
   canLevelUp,
@@ -22,7 +23,7 @@ import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { SymbolView } from "expo-symbols";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useDay } from "@/api/days";
+import { useDay, useHabitBuckets } from "@/api/days";
 import { useMe } from "@/api/hooks";
 import { useChartViews, useMetricSeries } from "@/api/metrics";
 import { usePreferences } from "@/api/preferences";
@@ -50,6 +51,7 @@ import {
   Card,
   ErrorNote,
   Field,
+  Label,
   Loading,
   Muted,
   NeedsRating,
@@ -139,6 +141,17 @@ export default function TodayScreen() {
           </View>
         )}
         <DayPicker today={d.today} onPick={(date) => openLog(date, d.today)} />
+        {prefs.features.week && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={talk.nav.week}
+            hitSlop={8}
+            onPress={() => router.push("/week")}
+            style={styles.iconButton}
+          >
+            <SymbolView name="calendar" tintColor={colors.neon} size={20} />
+          </Pressable>
+        )}
         {prefs.features.coach && (
           <Pressable
             accessibilityRole="button"
@@ -229,6 +242,7 @@ function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
     (h) => !h.scheduled && (h.entry || h.children?.some((c) => c.entry)),
   );
   const count = scheduled.filter(isDayHabitDone).length;
+  const buckets = useHabitBuckets().data ?? [];
 
   return (
     <Section
@@ -254,11 +268,20 @@ function HabitsCard({ day, hideDone }: { day: DayDto; hideDone: boolean }) {
             </View>
           )}
           <View>
-            {[...scheduled, ...extra]
-              .filter((h) => !hideDone || !isDayHabitDone(h))
-              .map((h) => (
-                <HabitLine key={h.habit.id} item={h} day={day} />
-              ))}
+            {bucketHabits(
+              [...scheduled, ...extra].filter((h) => !hideDone || !isDayHabitDone(h)),
+              (h) => h.habit,
+              buckets,
+            ).map((g, _, groups) => (
+              <View key={g.bucket?.id ?? "none"}>
+                {(g.bucket || groups.length > 1) && (
+                  <Label style={styles.bucket}>{g.bucket?.name ?? "Other"}</Label>
+                )}
+                {g.items.map((h) => (
+                  <HabitLine key={h.habit.id} item={h} day={day} />
+                ))}
+              </View>
+            ))}
           </View>
         </>
       )}
@@ -483,7 +506,7 @@ function TrainingCard({ day }: { day: DayDto }) {
       title={talk.nav.workouts}
       action={{
         label: day.workouts.length ? "Train →" : "Start a workout →",
-        href: { pathname: "/habits", params: { view: "train" } },
+        href: "/train",
       }}
     >
       {day.workouts.length === 0 ? (
@@ -598,6 +621,7 @@ function CoachCard() {
 }
 
 const styles = StyleSheet.create({
+  bucket: { color: colors.court500, fontSize: 11, marginTop: space.sm },
   actions: { flexDirection: "row", gap: space.sm, alignItems: "center" },
   iconButton: {
     width: 44,
