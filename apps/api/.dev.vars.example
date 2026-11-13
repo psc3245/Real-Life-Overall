@@ -19,5 +19,8 @@ BETTER_AUTH_SECRET=
 # Estimated LLM spend one user can trigger per rolling 24h (the hourly job is exempt):
 # LLM_USER_DAILY_BUDGET_USD=1
 # LLM_FREE_DAILY_BUDGET_USD=0.25
+# Players pick Free, Premium or Dev themselves on the upgrade page (no checkout yet). "false"
+# leaves upgrades to admins:
+# SELF_UPGRADES=true
 # Comma-separated emails made Admin once confirmed (bootstraps the first admin):
 # ADMIN_EMAILS=you@example.com

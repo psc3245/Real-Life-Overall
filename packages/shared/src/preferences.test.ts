@@ -14,6 +14,7 @@ describe("preferences", () => {
     expect(parsePreferences(null)).toEqual(DEFAULT_PREFERENCES);
     expect(DEFAULT_PREFERENCES.theme).toBe("court");
     expect(DEFAULT_PREFERENCES.sportsTalk).toBe("normal");
+    expect(DEFAULT_PREFERENCES.walkthroughDone).toBe(false);
     expect(parsePreferences({ sportsTalk: "loud" }).sportsTalk).toBe("normal");
     expect(parsePreferences({ sportsTalk: "extra" }).sportsTalk).toBe("extra");
     expect(Object.values(DEFAULT_PREFERENCES.features).every(Boolean)).toBe(true);

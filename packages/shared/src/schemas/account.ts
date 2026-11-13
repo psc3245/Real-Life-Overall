@@ -52,6 +52,14 @@ export interface AiUsageDto {
 
 export const setRoleBodySchema = z.object({ role: z.enum(USER_ROLES) });
 
+/**
+ * The types a player can switch to themselves from the upgrade page while there's no checkout
+ * (`PUT /me/role`, behind `SELF_UPGRADES`). Admin is only ever given.
+ */
+export const SELF_SERVE_ROLES = ["user", "premium", "dev"] as const;
+export type SelfServeRole = (typeof SELF_SERVE_ROLES)[number];
+export const setOwnRoleBodySchema = z.object({ role: z.enum(SELF_SERVE_ROLES) });
+
 export const isPremiumRole = (role: UserRole) => role !== "user";
 /** Dev and admin accounts: features in testing and bug reports. */
 export const isTesterRole = (role: UserRole) => role === "dev" || role === "admin";

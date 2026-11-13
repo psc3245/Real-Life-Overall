@@ -28,10 +28,16 @@ export function AccountSettings({ me, id }: { me: Me; id: string }) {
           <p className="text-sm text-court-300">{ROLE_DETAILS[me.role]}</p>
         </div>
         {premium ? (
-          me.role !== "premium" && (
-            <span className="text-xs uppercase tracking-wider text-court-500">
-              {me.role === "dev" ? "Lifetime Premium" : "Premium included"}
-            </span>
+          me.selfUpgrade && me.role !== "admin" ? (
+            <Link to="/upgrade" className="text-sm text-neon hover:underline">
+              Change plan →
+            </Link>
+          ) : (
+            me.role !== "premium" && (
+              <span className="text-xs uppercase tracking-wider text-court-500">
+                {me.role === "dev" ? "Lifetime Premium" : "Premium included"}
+              </span>
+            )
           )
         ) : (
           <Link

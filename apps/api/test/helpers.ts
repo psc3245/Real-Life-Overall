@@ -72,7 +72,9 @@ export const testBindings = {
   CORS_ORIGINS: "http://localhost:5173",
 };
 
-export async function createTestApp(options: { doGenerate?: MockGenerate } = {}) {
+export async function createTestApp(
+  options: { doGenerate?: MockGenerate; bindings?: Record<string, string> } = {},
+) {
   const db = await createTestDb();
   const { resolver, model } = mockResolver(options.doGenerate ?? []);
   const llm = new LlmClient(resolver, dbCallRecorder(db), dbVoiceResolver(db));
@@ -81,7 +83,11 @@ export async function createTestApp(options: { doGenerate?: MockGenerate } = {})
     const headers = new Headers(init.headers);
     headers.set("x-dev-user", init.user ?? "tester");
     if (init.body) headers.set("content-type", "application/json");
-    return app.request(`/api${path}`, { ...init, headers }, testBindings);
+    return app.request(
+      `/api${path}`,
+      { ...init, headers },
+      { ...testBindings, ...options.bindings },
+    );
   };
   return { app, db, llm, model, request };
 }

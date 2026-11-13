@@ -183,4 +183,35 @@ describe("account types", () => {
     const res = await request("/me/ai-usage");
     expect(JSON.stringify(await res.json())).not.toContain("0.1"); // no dollars
   });
+
+  it("let players switch themselves between Free, Premium and Dev", async () => {
+    const { request } = await setup();
+    const role = (r: string) => request("/me/role", { method: "PUT", ...json({ role: r }) });
+    expect((await body<MeDto>(await request("/me"))).selfUpgrade).toBe(true);
+
+    const premium = await body<MeDto>(await role("premium"));
+    expect(premium.role).toBe("premium");
+    expect(premium.premiumSince).not.toBeNull();
+    expect(premium.locked).toEqual({});
+    const dev = await body<MeDto>(await role("dev"));
+    expect(dev.role).toBe("dev");
+    expect(dev.premiumSince).toBe(premium.premiumSince);
+    const free = await body<MeDto>(await role("user"));
+    expect(free.role).toBe("user");
+    expect(free.premiumSince).toBeNull();
+
+    expect((await role("admin")).status).toBe(400);
+  });
+
+  it("leave admins alone, and switch off with SELF_UPGRADES=false", async () => {
+    const { request, setRole } = await setup();
+    await setRole("admin");
+    const admin = await request("/me/role", { method: "PUT", ...json({ role: "premium" }) });
+    expect(admin.status).toBe(400);
+
+    const t = await createTestApp({ bindings: { SELF_UPGRADES: "false" } });
+    expect((await body<MeDto>(await t.request("/me"))).selfUpgrade).toBe(false);
+    const off = await t.request("/me/role", { method: "PUT", ...json({ role: "premium" }) });
+    expect(off.status).toBe(403);
+  });
 });

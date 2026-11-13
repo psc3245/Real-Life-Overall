@@ -35,6 +35,14 @@ export const envSchema = z.object({
   LLM_USER_DAILY_BUDGET_USD: z.coerce.number().positive().default(1),
   /** The same for free accounts (DESIGN.md §8.9). */
   LLM_FREE_DAILY_BUDGET_USD: z.coerce.number().positive().default(0.25),
+  /**
+   * Players switch themselves between Free, Premium and Dev on the upgrade page, at no charge,
+   * until there's a checkout (DESIGN.md §8.9). "false" leaves upgrades to admins.
+   */
+  SELF_UPGRADES: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
   ANTHROPIC_API_KEY: optionalKey,
   /** Required by Anthropic when the API key is not scoped to a single workspace. */
   ANTHROPIC_WORKSPACE_ID: optionalKey,

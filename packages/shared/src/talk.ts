@@ -88,6 +88,8 @@ export interface TalkTerms {
   startScouting: string;
   reveal: string;
   revealButton: string;
+  /** The guided tour of the main features. */
+  walkthrough: string;
 }
 
 export const TALK: Record<SportsTalk, TalkTerms> = {
@@ -143,6 +145,7 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     startScouting: "Start the questions",
     reveal: "Results",
     revealButton: "Show my rating",
+    walkthrough: "Tour",
   },
   normal: {
     scout: "the scout",
@@ -196,6 +199,7 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     startScouting: "Start scouting",
     reveal: "Reveal",
     revealButton: "Reveal my rating",
+    walkthrough: "Walkthrough",
   },
   extra: {
     scout: "your scout",
@@ -249,6 +253,7 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
     startScouting: "Hit the combine",
     reveal: "Draft night",
     revealButton: "Reveal my rating",
+    walkthrough: "Shootaround",
   },
 };
 
@@ -309,6 +314,7 @@ export const SOULS_TALK: TalkTerms = {
   startScouting: "Create your character",
   reveal: "Awakening",
   revealButton: "Awaken",
+  walkthrough: "Tutorial",
 };
 
 /** The app's words for a sports-talk level in a season of `mode`. */

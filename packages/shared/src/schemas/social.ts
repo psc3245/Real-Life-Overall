@@ -57,6 +57,8 @@ export interface MeDto {
   role: UserRole;
   /** When the account became Premium, Dev or Admin; null on Free. */
   premiumSince: string | null;
+  /** The player can switch between Free, Premium and Dev themselves (`SELF_UPGRADES`). */
+  selfUpgrade: boolean;
   /** Locked features are also off in `preferences.features`, whatever the player picked. */
   preferences: Preferences;
   /** Features this account can't use, and why: Premium only or still in testing. */

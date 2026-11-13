@@ -20,6 +20,7 @@ import { BugReportModal } from "../components/BugReportModal";
 import { AccountBadge } from "../components/Premium";
 import { premiumTenure } from "@rlo/shared";
 import { useState } from "react";
+import { startWalkthrough, Walkthrough } from "../features/walkthrough/Walkthrough";
 
 const PAGE_WIDTH: Record<Preferences["pageWidth"], string> = {
   narrow: "max-w-3xl",
@@ -98,6 +99,7 @@ export function RootLayout() {
         </OwnScoreProvider>
       </main>
       {auth.signedIn && <PreferencesModal />}
+      {auth.signedIn && <Walkthrough />}
       <DebugPanel />
     </div>
   );
@@ -119,13 +121,13 @@ interface NavItem {
  * A dropdown of related pages. Lit when you're on one of them; a single item shows as a plain
  * link and an empty group (everything switched off) disappears.
  */
-function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
+function NavGroup({ label, tour, items }: { label: string; tour: string; items: NavItem[] }) {
   const { pathname } = useLocation();
   if (!items.length) return null;
   if (items.length === 1) {
     const [only] = items;
     return (
-      <NavLink to={only!.to} className={side}>
+      <NavLink to={only!.to} className={side} data-tour={tour}>
         {only!.label}
         {only!.badge ? <CountPill count={only!.badge} /> : null}
       </NavLink>
@@ -135,6 +137,7 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
   const badge = items.reduce((sum, i) => sum + (i.badge ?? 0), 0);
   return (
     <Menu
+      tour={tour}
       triggerClassName={groupTrigger(active)}
       trigger={
         <>
@@ -235,6 +238,7 @@ function MainNav({
       <div className="contents lg:flex lg:items-center lg:justify-between lg:gap-3 xl:gap-5">
         <NavLink
           to="/today"
+          data-tour="nav-today"
           className={({ isActive }) =>
             `whitespace-nowrap font-display text-base font-semibold uppercase tracking-wider ${isActive ? "text-neon" : "text-court-100 hover:text-neon"}`
           }
@@ -242,17 +246,17 @@ function MainNav({
           {talk.nav.today}
         </NavLink>
         <span className="contents lg:flex lg:gap-3 xl:gap-5">
-          <NavLink to="/log" className={side}>
+          <NavLink to="/log" className={side} data-tour="nav-log">
             {talk.nav.log}
           </NavLink>
-          <NavGroup label={talk.nav.plan} items={plan} />
+          <NavGroup label={talk.nav.plan} tour="nav-plan" items={plan} />
           {features.week && (
-            <NavLink to="/week" className={side}>
+            <NavLink to="/week" className={side} data-tour="nav-week">
               {talk.nav.week}
             </NavLink>
           )}
           {features.coach && (
-            <NavLink to="/coach" className={side}>
+            <NavLink to="/coach" className={side} data-tour="nav-coach">
               {talk.coach}
             </NavLink>
           )}
@@ -265,6 +269,7 @@ function MainNav({
       </div>
       <NavLink
         to="/ratings"
+        data-tour="nav-rating"
         className={({ isActive }) =>
           `whitespace-nowrap rounded-full border-2 border-neon px-6 py-1.5 font-display text-lg font-bold uppercase tracking-[0.2em] shadow-[0_0_18px_-6px_var(--color-neon)] transition ${isActive ? "bg-neon text-court-950" : "text-neon hover:bg-neon/10"}`
         }
@@ -272,8 +277,8 @@ function MainNav({
         {talk.nav.rating}
       </NavLink>
       <div className="contents lg:flex lg:items-center lg:justify-end lg:gap-3 xl:gap-5">
-        <NavGroup label={talk.nav.social} items={social} />
-        <NavGroup label={talk.nav.stats} items={stats} />
+        <NavGroup label={talk.nav.social} tour="nav-social" items={social} />
+        <NavGroup label={talk.nav.stats} tour="nav-stats" items={stats} />
       </div>
     </nav>
   );
@@ -294,6 +299,7 @@ function AccountMenu({
   onSignOut?: () => void;
 }) {
   const [reporting, setReporting] = useState(false);
+  const talk = useTalk();
   const { role, premium } = useAccount();
   const me = useMe();
   const tenure = premiumTenure(me.data?.premiumSince ?? null);
@@ -308,6 +314,7 @@ function AccountMenu({
       <Menu
         align="end"
         label={`Account menu for ${name}`}
+        tour="account-menu"
         triggerClassName="rounded-full py-0.5 pr-2 pl-0.5 text-sm text-court-300 hover:text-court-100"
         trigger={
           <>
@@ -350,6 +357,9 @@ function AccountMenu({
         <MenuLink to={preferencesLink()} detail="Theme, Today page, features">
           Personalize
         </MenuLink>
+        <MenuButton onSelect={startWalkthrough}>
+          Replay the {talk.walkthrough.toLowerCase()}
+        </MenuButton>
         {tester && <MenuButton onSelect={() => setReporting(true)}>Report a bug</MenuButton>}
         {admin && (
           <MenuLink to="/admin" detail="Admin tools">

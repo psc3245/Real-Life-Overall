@@ -4,11 +4,12 @@ import {
   type AiUsageDto,
   type FeatureLock,
   type Feature,
+  type SelfServeRole,
 } from "@rlo/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { useAuthState } from "./auth";
-import { useMe } from "./hooks";
+import { queryKeys, useMe, type Me } from "./hooks";
 
 /** The signed-in account's type (DESIGN.md §8.9). Free until /me loads. */
 export function useAccount() {
@@ -22,4 +23,20 @@ export function useAccount() {
 /** Share of the rolling 24-hour AI budget used (DESIGN.md §8.9). */
 export function useAiUsage() {
   return useQuery({ queryKey: ["me", "ai-usage"], queryFn: () => api<AiUsageDto>("/me/ai-usage") });
+}
+
+/**
+ * Switches the account between Free, Premium and Dev from the upgrade page (DESIGN.md §8.9).
+ * Everything refetches after, since what's locked changes across the app.
+ */
+export function useSetOwnRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (role: SelfServeRole) =>
+      api<Me>("/me/role", { method: "PUT", body: JSON.stringify({ role }) }),
+    onSuccess: async (me) => {
+      queryClient.setQueryData(queryKeys.me, me);
+      await queryClient.invalidateQueries();
+    },
+  });
 }
