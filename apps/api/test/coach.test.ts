@@ -428,6 +428,7 @@ describe("coach logging", () => {
       target: 20,
       unit: "pages",
       avoid: false,
+      compare: null,
       refs,
       reason: "You said you want to read more.",
     });
@@ -542,6 +543,7 @@ describe("coach logging", () => {
           target: null,
           unit: null,
           avoid: false,
+          compare: null,
           refs: [],
           reason: "",
         },

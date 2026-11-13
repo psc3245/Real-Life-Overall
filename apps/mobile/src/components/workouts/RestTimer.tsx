@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardHeight } from "@/lib/keyboard";
+import { haptics } from "@/lib/haptics";
 import { colors, fonts, space } from "@/lib/theme";
 
 /** Rest lengths offered in an exercise's menu. */
@@ -44,7 +45,11 @@ export function RestTimerBar({ timer }: { timer: ReturnType<typeof useRestTimer>
     return () => clearInterval(id);
   }, [endsAt]);
   useEffect(() => {
-    if (endsAt && now >= endsAt) stop();
+    if (endsAt && now >= endsAt) {
+      // Rest is over: the phone is often face-down on a bench, so make it felt.
+      haptics.warning();
+      stop();
+    }
   }, [endsAt, now, stop]);
   if (!endsAt) return null;
 

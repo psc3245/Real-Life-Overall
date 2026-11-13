@@ -34,6 +34,7 @@ export function useSeasonSetup() {
 export function useSaveSeasonTree() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: (nodes: TreeDraftNode[]) =>
       api<RatingsDto>("/seasons/setup/tree", { method: "PUT", body: JSON.stringify({ nodes }) }),
     onSuccess: async (ratings) => {

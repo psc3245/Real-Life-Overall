@@ -59,6 +59,7 @@ export function useCoachDraft(
 export function useSendCoachMessage() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "tap" },
     mutationFn: ({ content, threadId }: { content: string; threadId: string | null }) =>
       api<CoachStateDto>("/coach/messages", {
         method: "POST",
@@ -74,6 +75,7 @@ export function useSendCoachMessage() {
 export function useDeleteCoachThread() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "remove" },
     mutationFn: (id: string) => api<void>(`/coach/threads/${id}`, { method: "DELETE" }),
     onSuccess: (_, id) => {
       queryClient.removeQueries({ queryKey: threadKey(id) });
@@ -87,6 +89,7 @@ export function useDeleteCoachThread() {
 export function useStartPostgame() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "tap" },
     mutationFn: (date: string) =>
       api<CoachStateDto>("/coach/postgame", { method: "POST", body: JSON.stringify({ date }) }),
     onSuccess: (state) => storeThread(queryClient, state),
@@ -96,6 +99,7 @@ export function useStartPostgame() {
 export function useUndoCoachAction() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "tap" },
     mutationFn: ({ messageId, index }: { messageId: string; index: number }) =>
       api<CoachStateDto>(`/coach/messages/${messageId}/actions/${index}/undo`, {
         method: "POST",
@@ -119,6 +123,7 @@ export function useClearCoach() {
 export function useResolveCoachSuggestion() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "impact" },
     mutationFn: ({
       messageId,
       index,

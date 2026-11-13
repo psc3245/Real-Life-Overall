@@ -1,6 +1,7 @@
 import type { CustomPromptDto } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
+import type { HapticKind } from "@/lib/haptics";
 
 export const customPromptsKey = ["custom-prompts"] as const;
 
@@ -12,9 +13,13 @@ export function useCustomPrompts() {
 }
 
 /** Any change can add or drop a question on today's log. */
-function usePromptMutation<TInput>(request: (input: TInput) => Promise<unknown>) {
+function usePromptMutation<TInput>(
+  request: (input: TInput) => Promise<unknown>,
+  haptic: HapticKind = "success",
+) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic },
     mutationFn: request,
     onSuccess: () =>
       Promise.all([
@@ -45,7 +50,8 @@ export function useUpdateCustomPrompt() {
 }
 
 export function useDeleteCustomPrompt() {
-  return usePromptMutation((id: string) =>
-    api<null>(`/custom-prompts/${id}`, { method: "DELETE" }),
+  return usePromptMutation(
+    (id: string) => api<null>(`/custom-prompts/${id}`, { method: "DELETE" }),
+    "remove",
   );
 }

@@ -11,6 +11,7 @@ export const HABIT_TYPES = [
   "checknote",
   "counter",
   "duration",
+  "time",
   "slider",
   "rating",
   "shorttext",
@@ -36,6 +37,7 @@ export const HABIT_TYPE_LABELS: Record<HabitType, string> = {
   checknote: "Done + note",
   counter: "Count",
   duration: "Time spent",
+  time: "Time of day",
   slider: "Scale",
   rating: "Stars",
   shorttext: "Short answer",
@@ -54,6 +56,105 @@ export const HABIT_DIRECTION_LABELS: Record<HabitDirection, string> = {
   build: "Build",
   avoid: "Avoid",
 };
+
+/**
+ * How a build habit's entry meets its target: reach it, beat it, or stay under it. Missing on
+ * older habits, which all meant "atLeast". For time-of-day habits, less is earlier.
+ */
+export const HABIT_COMPARES = ["atLeast", "moreThan", "atMost", "lessThan"] as const;
+export type HabitCompare = (typeof HABIT_COMPARES)[number];
+export const HABIT_COMPARE_LABELS: Record<HabitCompare, string> = {
+  atLeast: "At least",
+  moreThan: "More than",
+  atMost: "At most",
+  lessThan: "Less than",
+};
+export const TIME_COMPARE_LABELS: Record<HabitCompare, string> = {
+  atLeast: "At or after",
+  moreThan: "After",
+  atMost: "By",
+  lessThan: "Before",
+};
+/** How a goal reads after a slash: "6/8", "1800/≤2000". "At least" is implied. */
+export const COMPARE_SYMBOLS: Record<HabitCompare, string> = {
+  atLeast: "",
+  moreThan: ">",
+  atMost: "≤",
+  lessThan: "<",
+};
+
+/** Types whose build goal is a number with a comparison. */
+export const TARGETED_TYPES: readonly HabitType[] = [
+  "counter",
+  "duration",
+  "slider",
+  "rating",
+  "time",
+];
+/** Types where the target is optional: without one, logging anything counts as done. */
+export const OPTIONAL_TARGET_TYPES: readonly HabitType[] = ["slider", "rating", "time"];
+
+export const MINUTES_PER_DAY = 1440;
+
+/** "6:05 AM" from minutes after midnight. */
+export function formatTimeOfDay(minutes: number): string {
+  const m = ((Math.round(minutes) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  const h = Math.floor(m / 60);
+  return `${h % 12 || 12}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** "06:05" (an <input type="time"> value) from minutes after midnight. */
+export function timeInputValue(minutes: number): string {
+  const m = ((Math.round(minutes) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Minutes after midnight from "6:05", "06:05", "6:05 pm", "18:05" or "6pm"; null if unreadable.
+ */
+export function parseTimeOfDay(input: string): number | null {
+  const match = input
+    .trim()
+    .toLowerCase()
+    .match(/^(\d{1,2})(?::(\d{2}))?\s*(a|p|am|pm)?$/);
+  if (!match) return null;
+  let h = Number(match[1]);
+  const m = Number(match[2] ?? 0);
+  const half = match[3]?.[0];
+  if (m > 59 || h > 23 || (half && (h < 1 || h > 12))) return null;
+  if (half === "a" && h === 12) h = 0;
+  if (half === "p" && h < 12) h += 12;
+  return h * 60 + m;
+}
+
+/**
+ * How far `minutes` is past `target` on the clock, from -720 to 720, so a time just after
+ * midnight reads as later than a late-night target (bedtimes) rather than 23 hours earlier.
+ */
+export function clockOffset(minutes: number, target: number): number {
+  const d = (((minutes - target) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  return d > MINUTES_PER_DAY / 2 ? d - MINUTES_PER_DAY : d;
+}
+
+/** The average time of day, measured around `anchor` so bedtimes either side of midnight work. */
+export function averageTimeOfDay(values: number[], anchor = values[0] ?? 0): number | null {
+  if (!values.length) return null;
+  const mean = values.reduce((sum, v) => sum + clockOffset(v, anchor), 0) / values.length;
+  return ((Math.round(anchor + mean) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+}
+
+function meets(n: number, target: number, compare: HabitCompare): boolean {
+  switch (compare) {
+    case "moreThan":
+      return n > target;
+    case "atMost":
+      return n <= target;
+    case "lessThan":
+      return n < target;
+    default:
+      return n >= target;
+  }
+}
 
 export const MAX_HABIT_NOTE = 280;
 export const MAX_HABIT_SHORT_TEXT = 200;
@@ -80,6 +181,8 @@ export interface HabitConfig {
   rule?: GroupRule | null;
   /** Missing on older habits, which are all "build". Groups have none. */
   direction?: HabitDirection | null;
+  /** Build habits with a target (TARGETED_TYPES): how an entry meets it. */
+  compare?: HabitCompare | null;
 }
 
 export const isAvoid = (config: HabitConfig) => config.direction === "avoid";
@@ -94,6 +197,7 @@ export const habitConfigInputSchema = z
     max: optionalNumber,
     rule: z.enum(GROUP_RULES).nullable().optional(),
     direction: z.enum(HABIT_DIRECTIONS).nullable().optional(),
+    compare: z.enum(HABIT_COMPARES).nullable().optional(),
   })
   .default({});
 
@@ -108,33 +212,84 @@ export function normalizeHabitConfig(
     const target = rule === "count" ? Math.round(positive(input.target, 1)) : null;
     return { ...none, rule, target };
   }
+  if (type === "time") {
+    // Earlier or later is the goal either way, so time habits are always "build".
+    const target =
+      input.target == null ? null : clamp(Math.round(input.target), 0, MINUTES_PER_DAY - 1);
+    return { ...none, direction: "build", compare: input.compare ?? "atMost", target };
+  }
   const direction: HabitDirection = input.direction ?? "build";
   const avoid = direction === "avoid";
-  // A limit can be zero ("no cigarettes"); a goal can't.
+  const compare: HabitCompare = input.compare ?? "atLeast";
+  const goal = avoid ? {} : { compare };
+  // A limit can be zero ("no cigarettes"), as can "at most" or "more than" goals; the rest can't.
+  const zeroOk = avoid || compare === "atMost" || compare === "moreThan";
   const amount = (fallback: number) =>
-    avoid
+    zeroOk
       ? Math.max(0, Math.round(input.target ?? fallback))
       : Math.round(positive(input.target, fallback));
   switch (type) {
     case "counter":
-      return { ...none, direction, target: amount(avoid ? 0 : 1), unit: input.unit || "times" };
+      return {
+        ...none,
+        direction,
+        ...goal,
+        target: amount(avoid ? 0 : 1),
+        unit: input.unit || "times",
+      };
     case "duration":
-      return { ...none, direction, target: amount(30) };
+      return { ...none, direction, ...goal, target: amount(30) };
     case "slider": {
       const ok = (input.min ?? 0) < (input.max ?? 10);
       const min = ok ? (input.min ?? 0) : 0;
       const max = ok ? (input.max ?? 10) : 10;
-      const limit = avoid ? clamp(input.target ?? Math.round((min + max) / 2), min, max) : null;
-      return { ...none, direction, min, max, target: limit };
+      // Build goals are optional here: without one, any logged level counts.
+      const target = avoid
+        ? clamp(input.target ?? Math.round((min + max) / 2), min, max)
+        : input.target == null
+          ? null
+          : clamp(input.target, min, max);
+      return { ...none, direction, ...goal, min, max, target };
     }
     case "rating": {
       const max = Math.min(10, Math.max(3, Math.round(input.max ?? 5)));
-      const limit = avoid ? clamp(Math.round(input.target ?? Math.floor(max / 2)), 1, max) : null;
-      return { ...none, direction, min: 1, max, target: limit };
+      const target = avoid
+        ? clamp(Math.round(input.target ?? Math.floor(max / 2)), 1, max)
+        : input.target == null
+          ? null
+          : clamp(Math.round(input.target), 1, max);
+      return { ...none, direction, ...goal, min: 1, max, target };
     }
     default:
       return { ...none, direction };
   }
+}
+
+/** A build habit's comparison (older habits have none and meant "at least"). */
+export function habitCompare(type: HabitType, config: HabitConfig): HabitCompare {
+  return config.compare ?? (type === "time" ? "atMost" : "atLeast");
+}
+
+/**
+ * The goal in words for "goal …": "8 glasses" (at least is implied), "at most 2000 cal",
+ * "by 6:30 AM", "4 of 5 stars". Null without one.
+ */
+export function describeHabitGoal(type: HabitType, config: HabitConfig): string | null {
+  if (!TARGETED_TYPES.includes(type) || config.target === null || isAvoid(config)) return null;
+  const compare = habitCompare(type, config);
+  if (type === "time") {
+    return `${TIME_COMPARE_LABELS[compare].toLowerCase()} ${formatTimeOfDay(config.target)}`;
+  }
+  const unit =
+    type === "counter"
+      ? ` ${config.unit ?? ""}`.trimEnd()
+      : type === "duration"
+        ? " min"
+        : type === "rating"
+          ? ` of ${config.max ?? 5} stars`
+          : "";
+  const words = compare === "atLeast" ? "" : `${HABIT_COMPARE_LABELS[compare].toLowerCase()} `;
+  return `${words}${config.target}${unit}`;
 }
 
 function positive(n: number | null | undefined, fallback: number) {
@@ -170,6 +325,8 @@ export function validateHabitEntry(
         : `Enter a whole number from 0 to ${MAX_HABIT_COUNT.toLocaleString("en-US")}`;
     case "duration":
       return num !== null && num >= 0 && num <= 1440 ? null : "Enter minutes (0-1440)";
+    case "time":
+      return isInt(num) && num >= 0 && num < MINUTES_PER_DAY ? null : "Enter a time of day";
     case "slider":
       return num !== null && num >= (config.min ?? 0) && num <= (config.max ?? 10)
         ? null
@@ -209,13 +366,25 @@ export function isHabitDone(type: HabitType, config: HabitConfig, value: HabitEn
         return !value.text?.trim();
     }
   }
+  const compare = habitCompare(type, config);
   switch (type) {
     case "checkbox":
     case "checknote":
       return value.num === 1;
     case "counter":
     case "duration":
-      return (value.num ?? 0) >= (config.target ?? 1);
+      return meets(value.num ?? 0, config.target ?? 1, compare);
+    case "slider":
+    case "rating":
+      // Without a target, any logged value counts.
+      return (
+        value.num !== null && (config.target == null || meets(value.num, config.target, compare))
+      );
+    case "time":
+      return (
+        value.num !== null &&
+        (config.target == null || meets(clockOffset(value.num, config.target), 0, compare))
+      );
     case "shorttext":
     case "journal":
       return Boolean(value.text?.trim());
@@ -305,6 +474,10 @@ export function formatHabitEntry(
   if (!value) return "—";
   if (isAvoid(config)) return formatAvoidEntry(type, config, value);
   const n = value.num;
+  const symbol = COMPARE_SYMBOLS[habitCompare(type, config)];
+  // "6/8 glasses" for counts and time ("at least" is implied), "4/5 (≥4)" for scales and stars.
+  const goal = config.target !== null ? `${symbol}${config.target}` : "";
+  const line = goal ? ` (${symbol || "≥"}${config.target})` : "";
   switch (type) {
     case "checkbox":
       return n === 1 ? "✓" : "—";
@@ -312,14 +485,21 @@ export function formatHabitEntry(
       return n === 1 ? (value.text?.trim() ? `✓ ${value.text.trim()}` : "✓") : "—";
     case "counter": {
       const unit = config.unit ? ` ${config.unit}` : "";
-      return config.target ? `${n ?? 0}/${config.target}${unit}` : `${n ?? 0}${unit}`;
+      return goal ? `${n ?? 0}/${goal}${unit}` : `${n ?? 0}${unit}`;
     }
     case "duration":
-      return config.target ? `${n ?? 0}/${config.target} min` : `${n ?? 0} min`;
+      return goal ? `${n ?? 0}/${goal} min` : `${n ?? 0} min`;
+    case "time": {
+      if (n === null) return "—";
+      const target = config.target;
+      return target === null
+        ? formatTimeOfDay(n)
+        : `${formatTimeOfDay(n)} (${TIME_COMPARE_LABELS[habitCompare(type, config)].toLowerCase()} ${formatTimeOfDay(target)})`;
+    }
     case "rating":
-      return n === null ? "—" : `${n}/${config.max ?? 5}`;
+      return n === null ? "—" : `${n}/${config.max ?? 5}${line}`;
     case "slider":
-      return n === null ? "—" : `${n}${config.max !== null ? `/${config.max}` : ""}`;
+      return n === null ? "—" : `${n}${config.max !== null ? `/${config.max}` : ""}${line}`;
     case "group":
       return value.text ?? (n === 1 ? "✓" : "—");
     default:

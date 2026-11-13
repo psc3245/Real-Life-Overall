@@ -2,6 +2,7 @@ import type { DayDto, ObjectiveDto, ObjectiveKind, ObjectiveSource } from "@rlo/
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { dayKey } from "./days";
+import type { HapticKind } from "@/lib/haptics";
 
 export const objectivesKey = ["objectives"] as const;
 
@@ -9,9 +10,13 @@ export function useObjectives() {
   return useQuery({ queryKey: objectivesKey, queryFn: () => api<ObjectiveDto[]>("/objectives") });
 }
 
-function useObjectiveMutation<TInput, TOutput>(request: (input: TInput) => Promise<TOutput>) {
+function useObjectiveMutation<TInput, TOutput>(
+  request: (input: TInput) => Promise<TOutput>,
+  haptic: HapticKind = "success",
+) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic },
     mutationFn: request,
     onSuccess: () =>
       Promise.all([
@@ -52,7 +57,10 @@ export function useUpdateObjective() {
 }
 
 export function useDeleteObjective() {
-  return useObjectiveMutation((id: string) => api<null>(`/objectives/${id}`, { method: "DELETE" }));
+  return useObjectiveMutation(
+    (id: string) => api<null>(`/objectives/${id}`, { method: "DELETE" }),
+    "remove",
+  );
 }
 
 /** Sets what a manual goal gained on `date`; null clears it. */

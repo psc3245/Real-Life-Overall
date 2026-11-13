@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { addDays, dayOfWeek, isEditableDate, isValidDate } from "../dates";
 import {
+  averageTimeOfDay,
+  clockOffset,
+  describeHabitGoal,
   formatHabitEntry,
+  formatTimeOfDay,
+  parseTimeOfDay,
   groupProgress,
   isDayHabitDone,
   isGroupDone,
@@ -36,6 +41,7 @@ describe("normalizeHabitConfig", () => {
       min: null,
       max: null,
       direction: "build",
+      compare: "atLeast",
     });
     expect(normalizeHabitConfig("duration", {})).toMatchObject({ target: 30 });
     expect(normalizeHabitConfig("slider", { min: 5, max: 2 })).toMatchObject({ min: 0, max: 10 });
@@ -100,7 +106,9 @@ describe("formatHabitEntry", () => {
     expect(formatHabitEntry("duration", { ...config, target: 30 }, { num: 25, text: null })).toBe(
       "25/30 min",
     );
-    expect(formatHabitEntry("rating", { ...config, max: 5 }, { num: 4, text: null })).toBe("4/5");
+    expect(
+      formatHabitEntry("rating", { ...config, target: null, max: 5 }, { num: 4, text: null }),
+    ).toBe("4/5");
     expect(formatHabitEntry("shorttext", config, { num: null, text: " Read ch. 3 " })).toBe(
       "Read ch. 3",
     );
@@ -192,5 +200,86 @@ describe("avoid habits", () => {
         text: null,
       }),
     ).toBe("3/≤2 coffees");
+  });
+});
+
+describe("goal comparisons", () => {
+  const entry = (num: number) => ({ num, text: null });
+  it("reaches, beats or stays under a count", () => {
+    const at = (compare: "atLeast" | "moreThan" | "atMost" | "lessThan", n: number) =>
+      isHabitDone("counter", normalizeHabitConfig("counter", { target: 5, compare }), entry(n));
+    expect([at("atLeast", 5), at("atLeast", 4)]).toEqual([true, false]);
+    expect([at("moreThan", 5), at("moreThan", 6)]).toEqual([false, true]);
+    expect([at("atMost", 5), at("atMost", 6)]).toEqual([true, false]);
+    expect([at("lessThan", 5), at("lessThan", 4)]).toEqual([false, true]);
+  });
+
+  it("keeps older habits as at-least and lets under-goals be zero", () => {
+    const old = { target: 3, unit: "x", min: null, max: null };
+    expect(isHabitDone("counter", old, entry(3))).toBe(true);
+    expect(normalizeHabitConfig("counter", { target: 0, compare: "atMost" }).target).toBe(0);
+    expect(normalizeHabitConfig("counter", { target: 0, compare: "lessThan" }).target).toBe(1);
+    expect(normalizeHabitConfig("counter", { direction: "avoid" })).not.toHaveProperty("compare");
+  });
+
+  it("gives scales and stars an optional goal", () => {
+    const plain = normalizeHabitConfig("rating", {});
+    expect(plain.target).toBeNull();
+    expect(isHabitDone("rating", plain, entry(1))).toBe(true);
+    const four = normalizeHabitConfig("rating", { target: 4 });
+    expect(isHabitDone("rating", four, entry(3))).toBe(false);
+    expect(formatHabitEntry("rating", four, entry(4))).toBe("4/5 (≥4)");
+    const calm = normalizeHabitConfig("slider", { target: 3, compare: "atMost" });
+    expect(isHabitDone("slider", calm, entry(2))).toBe(true);
+    expect(formatHabitEntry("slider", calm, entry(2))).toBe("2/10 (≤3)");
+  });
+
+  it("formats and describes goals", () => {
+    const cal = normalizeHabitConfig("counter", { target: 2000, unit: "cal", compare: "atMost" });
+    expect(formatHabitEntry("counter", cal, entry(1800))).toBe("1800/≤2000 cal");
+    expect(describeHabitGoal("counter", cal)).toBe("at most 2000 cal");
+    expect(describeHabitGoal("checkbox", normalizeHabitConfig("checkbox"))).toBeNull();
+  });
+});
+
+describe("time of day habits", () => {
+  const entry = (num: number) => ({ num, text: null });
+  it("parses and formats clock times", () => {
+    expect(parseTimeOfDay("6:30")).toBe(390);
+    expect(parseTimeOfDay("6:30 pm")).toBe(1110);
+    expect(parseTimeOfDay("12am")).toBe(0);
+    expect(parseTimeOfDay("23:59")).toBe(1439);
+    expect(parseTimeOfDay("25:00")).toBeNull();
+    expect(parseTimeOfDay("13pm")).toBeNull();
+    expect(formatTimeOfDay(0)).toBe("12:00 AM");
+    expect(formatTimeOfDay(1110)).toBe("6:30 PM");
+  });
+
+  it("tracks without a target and validates minutes after midnight", () => {
+    const track = normalizeHabitConfig("time", { direction: "avoid" });
+    expect(track).toMatchObject({ target: null, direction: "build", compare: "atMost" });
+    expect(isHabitDone("time", track, entry(500))).toBe(true);
+    expect(validateHabitEntry("time", track, entry(1440))).not.toBeNull();
+    expect(validateHabitEntry("time", track, entry(390))).toBeNull();
+  });
+
+  it("wins earlier or later, across midnight", () => {
+    const wake = normalizeHabitConfig("time", { target: 390 });
+    expect(isHabitDone("time", wake, entry(385))).toBe(true);
+    expect(isHabitDone("time", wake, entry(390))).toBe(true);
+    expect(isHabitDone("time", wake, entry(400))).toBe(false);
+    expect(formatHabitEntry("time", wake, entry(385))).toBe("6:25 AM (by 6:30 AM)");
+    const bed = normalizeHabitConfig("time", { target: 23 * 60 + 30, compare: "lessThan" });
+    expect(isHabitDone("time", bed, entry(23 * 60))).toBe(true);
+    expect(isHabitDone("time", bed, entry(30))).toBe(false);
+    const late = normalizeHabitConfig("time", { target: 22 * 60, compare: "moreThan" });
+    expect(isHabitDone("time", late, entry(60))).toBe(true);
+    expect(describeHabitGoal("time", late)).toBe("after 10:00 PM");
+  });
+
+  it("averages around midnight", () => {
+    expect(clockOffset(30, 1410)).toBe(60);
+    expect(averageTimeOfDay([1410, 30])).toBe(0);
+    expect(averageTimeOfDay([360, 420])).toBe(390);
   });
 });

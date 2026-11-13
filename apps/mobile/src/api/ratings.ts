@@ -29,6 +29,7 @@ export function useRatings(enabled = true) {
 export function useRateInitial() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: () => api<OnboardingStateDto>("/onboarding/rate", { method: "POST" }),
     onSuccess: async (state) => {
       queryClient.setQueryData(onboardingKey, state);

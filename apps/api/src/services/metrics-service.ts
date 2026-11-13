@@ -4,6 +4,8 @@ import {
   HABIT_TYPE_LABELS,
   HEADLINE_RECORD,
   isAvoid,
+  clockOffset,
+  TARGETED_TYPES,
   isEntryDone,
   localDateIn,
   RECORD_LABELS,
@@ -60,22 +62,31 @@ function nodeLabel(node: RatingNodeDto, nodes: RatingNodeDto[]) {
   return { label: node.name, detail: path.length ? path.join(" › ") : "Category" };
 }
 
+/**
+ * A time of day as hours after midnight (6:30 AM = 6.5), measured around `anchor` so a 12:30 AM
+ * bedtime charts as 24.5 next to an 11:30 PM target instead of dropping to 0.5.
+ */
+function clockHours(minutes: number, anchor: number) {
+  return Math.round(((anchor + clockOffset(minutes, anchor)) / 60) * 100) / 100;
+}
+
 /** What a habit's daily value means on a chart. */
 function habitMetric(h: HabitDto): MetricDto {
-  const numeric =
-    h.type === "counter" || h.type === "duration" || h.type === "slider" || h.type === "rating";
+  const numeric = TARGETED_TYPES.includes(h.type);
   const unit =
     h.type === "counter"
       ? (h.config.unit ?? "")
       : h.type === "duration"
         ? "min"
-        : h.type === "rating"
-          ? "stars"
-          : h.type === "slider"
-            ? "pts"
-            : isAvoid(h.config)
-              ? "kept"
-              : "done";
+        : h.type === "time"
+          ? "h"
+          : h.type === "rating"
+            ? "stars"
+            : h.type === "slider"
+              ? "pts"
+              : isAvoid(h.config)
+                ? "kept"
+                : "done";
   return {
     id: `habit:${h.id}`,
     group: "habits",
@@ -88,8 +99,14 @@ function habitMetric(h: HabitDto): MetricDto {
           ? "session"
           : "amount",
     target:
-      h.type === "counter" || h.type === "duration" || isAvoid(h.config) ? h.config.target : null,
-    detail: `${isAvoid(h.config) ? "Avoid · " : ""}${HABIT_TYPE_LABELS[h.type]}`,
+      h.type === "time"
+        ? h.config.target !== null
+          ? clockHours(h.config.target, h.config.target)
+          : null
+        : TARGETED_TYPES.includes(h.type) || isAvoid(h.config)
+          ? h.config.target
+          : null,
+    detail: `${isAvoid(h.config) ? "Avoid · " : ""}${HABIT_TYPE_LABELS[h.type]}${h.type === "time" ? " · hours after midnight" : ""}`,
   };
 }
 
@@ -308,9 +325,13 @@ export async function series(
       );
       const start = h.startsOn > from ? h.startsOn : from;
       if (metric.kind === "session") {
-        // Scales and stars: the logged value on days with one.
+        // Scales, stars and times of day: the logged value on days with one.
+        const logged = [...entries].filter(([, v]) => v.num !== null);
+        const anchor = h.config.target ?? logged[0]?.[1].num ?? 0;
         points = sparse(
-          new Map([...entries].filter(([, v]) => v.num !== null).map(([d, v]) => [d, v.num!])),
+          new Map(
+            logged.map(([d, v]) => [d, h.type === "time" ? clockHours(v.num!, anchor) : v.num!]),
+          ),
           start,
           to,
         );

@@ -13,6 +13,7 @@ export function useSouls(enabled = true) {
 export function useLevelUp() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: (body: LevelUpBody) =>
       api<SoulsDto>("/souls/level-up", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: async (souls) => {

@@ -281,6 +281,13 @@
       "when": 1794583568217,
       "tag": "0039_sport_workouts",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794594484267,
+      "tag": "0040_habit_time",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,10 @@
-import { GROUP_RULE_LABELS, HABIT_TYPE_LABELS, WEEKDAY_SHORT, type HabitDto } from "@rlo/shared";
+import {
+  describeHabitGoal,
+  GROUP_RULE_LABELS,
+  HABIT_TYPE_LABELS,
+  WEEKDAY_SHORT,
+  type HabitDto,
+} from "@rlo/shared";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useArchiveHabit, useDay, useHabits } from "../../api/days";
@@ -43,6 +49,7 @@ export function ManageHabitsPage() {
           {HABIT_TYPE_LABELS[h.type]}
           {h.type === "group" &&
             ` · ${GROUP_RULE_LABELS[h.config.rule ?? "all"]}${h.config.rule === "count" ? ` (${h.config.target})` : ""}`}
+          {describeHabitGoal(h.type, h.config) && ` · goal ${describeHabitGoal(h.type, h.config)}`}
           {!h.parentId && ` · ${scheduleLabel(h.days)} · since ${h.startsOn}`}
           {h.links.length > 0 && ` · ${h.links.map((id) => names.get(id) ?? "?").join(", ")}`}
         </p>

@@ -1,5 +1,10 @@
 import {
+  COMPARE_SYMBOLS,
+  describeHabitGoal,
+  habitCompare,
+  isHabitDone,
   MAX_HABIT_JOURNAL,
+  MINUTES_PER_DAY,
   MAX_HABIT_NOTE,
   MAX_HABIT_SHORT_TEXT,
   type HabitDto,
@@ -8,7 +13,9 @@ import {
 import { SymbolView } from "expo-symbols";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { haptics } from "@/lib/haptics";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { TimeField } from "./TimeField";
 import { Field } from "./ui";
 
 interface Props {
@@ -54,8 +61,12 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
   };
   const { config } = habit;
   const avoid = config.direction === "avoid";
-  /** Avoid habits: past the line turns the number red. */
-  const over = (n: number | null) => avoid && n !== null && n > (config.target ?? 0);
+  const compare = habitCompare(habit.type, config);
+  /** Past an avoid habit's line, or missing a stay-under goal, turns the number red. */
+  const over = (n: number | null) =>
+    n !== null &&
+    (avoid || compare === "atMost" || compare === "lessThan") &&
+    !isHabitDone(habit.type, config, { num: n, text: null });
 
   switch (habit.type) {
     case "checkbox":
@@ -63,6 +74,9 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
       if (avoid) {
         const pick = (next: 0 | 1) => {
           const value = num === next ? null : next;
+          // A clean day lands like a check-off; a slip or an undo is just a tick.
+          if (value === 0) haptics.impact();
+          else haptics.tap();
           setNum(value);
           onSave({ num: value, text: value === 1 ? text || null : null });
         };
@@ -115,6 +129,8 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
             hitSlop={8}
             onPress={() => {
               const next = done ? null : 1;
+              if (next) haptics.impact();
+              else haptics.tap();
               setNum(next);
               onSave({ num: next, text: next === null ? null : text || null });
             }}
@@ -175,7 +191,7 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
           />
           <Step symbol="plus" disabled={disabled} onPress={() => set(value + step)} />
           <Text style={[styles.unit, over(value) && { color: colors.flare }]}>
-            {avoid ? `/ ≤${config.target}` : `/ ${config.target}`} {unit}
+            {`/ ${avoid ? "≤" : COMPARE_SYMBOLS[compare]}${config.target}`} {unit}
           </Text>
         </View>
       );
@@ -227,6 +243,7 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
                 disabled={disabled}
                 onPress={() => {
                   const next = num === n ? null : n;
+                  haptics.tap();
                   setNum(next);
                   onSave({ num: next, text: null });
                 }}
@@ -244,6 +261,46 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
       );
     }
 
+    case "time": {
+      const goal = describeHabitGoal(habit.type, config);
+      const missed = num !== null && !isHabitDone(habit.type, config, { num, text: null });
+      const set = (next: number | null) => {
+        setNum(next);
+        debounced({ num: next, text: null });
+      };
+      const nudge = (by: number) =>
+        num !== null && set((num + by + MINUTES_PER_DAY) % MINUTES_PER_DAY);
+      return (
+        <View style={styles.row}>
+          <Step symbol="minus" disabled={disabled || num === null} onPress={() => nudge(-5)} />
+          <TimeField
+            accessibilityLabel={`${habit.name} time`}
+            value={num}
+            disabled={disabled}
+            onChange={set}
+            style={missed && { color: colors.flare }}
+          />
+          <Step symbol="plus" disabled={disabled || num === null} onPress={() => nudge(5)} />
+          {num === null ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={disabled}
+              onPress={() => {
+                haptics.tap();
+                const now = new Date();
+                set(now.getHours() * 60 + now.getMinutes());
+              }}
+              style={styles.choice}
+            >
+              <Text style={styles.choiceText}>Now</Text>
+            </Pressable>
+          ) : (
+            goal && <Text style={[styles.unit, missed && { color: colors.flare }]}>{goal}</Text>
+          )}
+        </View>
+      );
+    }
+
     case "rating":
       return (
         <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={habit.name}>
@@ -257,6 +314,7 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
               hitSlop={4}
               onPress={() => {
                 const next = num === star ? null : star;
+                haptics.tap();
                 setNum(next);
                 onSave({ num: next, text: null });
               }}
@@ -320,7 +378,10 @@ function Step({
       accessibilityLabel={symbol === "plus" ? "Increase" : "Decrease"}
       disabled={disabled}
       hitSlop={6}
-      onPress={onPress}
+      onPress={() => {
+        haptics.tap();
+        onPress();
+      }}
       style={[styles.step, disabled && { opacity: 0.4 }]}
     >
       <SymbolView name={symbol} tintColor={colors.neon} size={15} />

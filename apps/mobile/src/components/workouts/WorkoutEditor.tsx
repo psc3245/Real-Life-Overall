@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Card, Muted, ScrollLockContext } from "@/components/ui";
+import { haptics } from "@/lib/haptics";
 import { colors, fonts, space } from "@/lib/theme";
 import { ExerciseBlock, type EditorMode } from "./ExerciseBlock";
 import { ExercisePicker } from "./ExercisePicker";
@@ -74,6 +75,7 @@ export function WorkoutEditor({
 
   const add = (ids: string[]) => {
     setPicking(false);
+    haptics.impact();
     const added = ids.map((exerciseId): WorkoutExerciseDto => {
       // Start with as many sets as last time, so the "Previous" column lines up.
       const count = Math.max(1, previous[exerciseId]?.length ?? 1);

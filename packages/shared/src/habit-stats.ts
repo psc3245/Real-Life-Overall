@@ -1,7 +1,9 @@
 import { addDays, dayOfWeek } from "./dates";
 import { seasonForDate } from "./season";
 import {
+  averageTimeOfDay,
   formatHabitEntry,
+  formatTimeOfDay,
   isEntryDone,
   isSlip,
   type HabitDto,
@@ -13,7 +15,7 @@ export const HABIT_STAT_RANGES = ["week", "month", "season"] as const;
 export type HabitStatRange = (typeof HABIT_STAT_RANGES)[number];
 
 /** Numeric habits whose values are worth averaging. */
-const AVERAGED = new Set(["counter", "duration", "rating", "slider"]);
+const AVERAGED = new Set(["counter", "duration", "rating", "slider", "time"]);
 
 export interface HabitDayStat {
   date: string;
@@ -39,7 +41,7 @@ export interface HabitStatsDto {
   remaining: number;
   /** completed / scheduled, or null with nothing scheduled yet. */
   rate: number | null;
-  /** Mean of logged values in the period (numeric types only). */
+  /** Mean of logged values in the period (numeric types only; minutes after midnight for time). */
   average: number | null;
   target: number | null;
   /** Scheduled days done in a row, through today (an unfinished today doesn't break it). */
@@ -170,14 +172,28 @@ export function habitStats(
     slips,
     remaining,
     rate: scheduled ? completed / scheduled : null,
-    average: values.length
-      ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
-      : null,
+    average:
+      habit.type === "time"
+        ? averageTimeOfDay(values, habit.config.target ?? values[0])
+        : values.length
+          ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
+          : null,
     target: habit.type === "counter" || habit.type === "duration" ? habit.config.target : null,
     currentStreak: streaks.current,
     bestStreak: streaks.best,
     bestStreakEnd: streaks.bestEnd,
     days,
     recent: recent.slice(0, 5),
+  };
+}
+
+/** The "Avg" fact: "6:41 AM" for time of day, otherwise "6.5 / 8" and its unit. */
+export function formatStatAverage(s: HabitStatsDto): { value: string; suffix: string } | null {
+  if (s.average === null) return null;
+  const { type, config } = s.habit;
+  if (type === "time") return { value: formatTimeOfDay(s.average), suffix: "" };
+  return {
+    value: `${s.average}${s.target !== null ? ` / ${s.target}` : ""}`,
+    suffix: type === "duration" ? "min" : (config.unit ?? ""),
   };
 }

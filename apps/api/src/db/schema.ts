@@ -363,6 +363,7 @@ export const habitType = pgEnum("habit_type", [
   "shorttext",
   "journal",
   "group",
+  "time",
 ]);
 
 export const habits = pgTable(
