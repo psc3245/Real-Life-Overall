@@ -5,8 +5,8 @@ import { useSeasonMode, useTalk } from "@/lib/talk";
 import { colors } from "@/lib/theme";
 
 /**
- * Today, Playbook (habits, goals and training), Week, Rating and You. Tabs whose features are all
- * switched off in Personalize drop out, as their links do on the web.
+ * Today, Playbook (habits and goals), Workouts, Rating and You. Week opens from Today and You.
+ * Tabs whose features are all switched off in Personalize drop out, as their links do on the web.
  */
 export default function TabsLayout() {
   const talk = useTalk();
@@ -14,7 +14,7 @@ export default function TabsLayout() {
   const { features } = usePreferences();
   // Pending friend requests badge the You tab (the web shows them on its League menu).
   const requests = useFriends(features.friends).data?.incoming.length ?? 0;
-  const playbook = features.habits || features.goals || features.workouts;
+  const playbook = features.habits || features.goals;
   return (
     <NativeTabs tintColor={colors.neon}>
       <NativeTabs.Trigger name="today">
@@ -31,9 +31,9 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>{talk.nav.plan}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="checklist" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="week" hidden={!features.week}>
-        <NativeTabs.Trigger.Label>{talk.nav.week}</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: "calendar", selected: "calendar" }} />
+      <NativeTabs.Trigger name="train" hidden={!features.workouts}>
+        <NativeTabs.Trigger.Label>{talk.nav.workouts}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="dumbbell" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="ratings">
         <NativeTabs.Trigger.Label>{talk.nav.rating}</NativeTabs.Trigger.Label>

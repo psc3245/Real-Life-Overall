@@ -44,7 +44,7 @@ describe("HabitsGlancePage", () => {
   beforeEach(() => {
     mockedApi.mockReset();
     mockedApi.mockImplementation(async (path: string) =>
-      path.startsWith("/habits") ? stats : null,
+      path === "/habits/buckets" ? [] : path.startsWith("/habits") ? stats : null,
     );
   });
 

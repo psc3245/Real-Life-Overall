@@ -1,4 +1,5 @@
 import {
+  bucketHabits,
   describeHabitGoal,
   GROUP_RULE_LABELS,
   HABIT_TYPE_LABELS,
@@ -6,9 +7,10 @@ import {
 } from "@rlo/shared";
 import { router } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { useArchiveHabit, useHabits } from "@/api/days";
+import { useArchiveHabit, useHabitBuckets, useHabits } from "@/api/days";
+import { BucketsCard } from "@/components/BucketsCard";
 import { useRatings } from "@/api/ratings";
-import { Body, Button, Card, ErrorNote, Loading, Muted, Screen } from "@/components/ui";
+import { Body, Button, Card, ErrorNote, Label, Loading, Muted, Screen } from "@/components/ui";
 import { scheduleLabel } from "@/lib/habits";
 import { colors, space } from "@/lib/theme";
 import { FeatureGate } from "@/components/FeatureGate";
@@ -20,6 +22,7 @@ const edit = (params: { id?: string; parent?: string }) =>
 function ManageHabitsScreen() {
   const habits = useHabits();
   const ratings = useRatings();
+  const buckets = useHabitBuckets();
   const archive = useArchiveHabit();
   const names = new Map((ratings.data?.nodes ?? []).map((n) => [n.id, n.name]));
 
@@ -73,7 +76,11 @@ function ManageHabitsScreen() {
   );
 
   return (
-    <Screen eyebrow="Habits" title="Manage" onRefresh={() => habits.refetch()}>
+    <Screen
+      eyebrow="Habits"
+      title="Manage"
+      onRefresh={() => Promise.all([habits.refetch(), buckets.refetch()])}
+    >
       <Button title="+ New habit" onPress={() => edit({})} />
       {habits.data.length === 0 && (
         <Card>
@@ -83,27 +90,35 @@ function ManageHabitsScreen() {
           </Muted>
         </Card>
       )}
-      {habits.data
-        .filter((h) => !h.parentId)
-        .map((h) => (
-          <View key={h.id} style={{ gap: space.sm }}>
-            {row(h)}
-            {h.type === "group" && (
-              <View style={styles.subs}>
-                {habits.data
-                  .filter((c) => c.parentId === h.id)
-                  .map((c) => (
-                    <View key={c.id}>{row(c)}</View>
-                  ))}
-                <Button
-                  title="+ Sub-habit"
-                  variant="ghost"
-                  onPress={() => edit({ parent: h.id })}
-                />
-              </View>
-            )}
-          </View>
-        ))}
+      <BucketsCard buckets={buckets.data ?? []} />
+      {bucketHabits(
+        habits.data.filter((h) => !h.parentId),
+        (h) => h,
+        buckets.data ?? [],
+      ).map((g, _, groups) => (
+        <View key={g.bucket?.id ?? "none"} style={{ gap: space.sm }}>
+          {(g.bucket || groups.length > 1) && <Label>{g.bucket?.name ?? "No bucket"}</Label>}
+          {g.items.map((h) => (
+            <View key={h.id} style={{ gap: space.sm }}>
+              {row(h)}
+              {h.type === "group" && (
+                <View style={styles.subs}>
+                  {habits.data
+                    .filter((c) => c.parentId === h.id)
+                    .map((c) => (
+                      <View key={c.id}>{row(c)}</View>
+                    ))}
+                  <Button
+                    title="+ Sub-habit"
+                    variant="ghost"
+                    onPress={() => edit({ parent: h.id })}
+                  />
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      ))}
       <Muted style={{ fontSize: 13 }}>Tap a habit to edit it.</Muted>
       <ErrorNote error={archive.error} />
     </Screen>

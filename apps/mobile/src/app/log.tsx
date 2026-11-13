@@ -1,4 +1,5 @@
 import {
+  bucketHabits,
   addDays,
   BACKFILL_DAYS,
   groupProgress,
@@ -14,7 +15,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from "react-native";
-import { useDay, useSaveEntry, useSaveJournal } from "@/api/days";
+import { useDay, useHabitBuckets, useSaveEntry, useSaveJournal } from "@/api/days";
 import { usePreferences } from "@/api/preferences";
 import { useRatings } from "@/api/ratings";
 import { DayBody, DayGoals, DayWorkouts } from "@/components/DaySections";
@@ -177,9 +178,20 @@ function Journal({ day }: { day: DayDto }) {
 }
 
 function Habits({ day, names }: { day: DayDto; names: Map<string, string> }) {
+  const buckets = useHabitBuckets().data ?? [];
+  const [showOff, setShowOff] = useState(false);
   const scheduled = day.habits.filter((h) => h.scheduled);
-  const bonus = day.habits.filter((h) => !h.scheduled);
+  // Off-schedule habits stay out of the way unless already logged (a bonus day).
+  const logged = (h: DayHabitDto) => Boolean(h.entry || h.children?.some((c) => c.entry));
+  const shown = day.habits.filter((h) => h.scheduled || logged(h));
+  const off = day.habits.filter((h) => !h.scheduled && !logged(h));
   const done = scheduled.filter(isDayHabitDone);
+  const groups = bucketHabits(shown, (h) => h.habit, buckets);
+  const item = (h: DayHabitDto) => (
+    <View key={`${day.date}-${h.habit.id}`} style={!h.scheduled && { opacity: 0.8 }}>
+      <HabitItem item={h} day={day} names={names} />
+    </View>
+  );
 
   return (
     <View style={{ gap: space.md }}>
@@ -192,17 +204,28 @@ function Habits({ day, names }: { day: DayDto; names: Map<string, string> }) {
           <Muted>No habits yet. Add one to log alongside your journal.</Muted>
         </Card>
       )}
-      {scheduled.map((h) => (
-        <HabitItem key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
+      {day.habits.length > 0 && shown.length === 0 && <Muted>Nothing scheduled today.</Muted>}
+      {groups.map((g) => (
+        <View key={g.bucket?.id ?? "none"} style={{ gap: space.md }}>
+          {(g.bucket || groups.length > 1) && (
+            <Label style={{ color: colors.court300 }}>{g.bucket?.name ?? "Other"}</Label>
+          )}
+          {g.items.map(item)}
+        </View>
       ))}
-      {bonus.length > 0 && (
+      {off.length > 0 && (
         <>
-          <Label style={{ color: colors.court500 }}>Not scheduled today</Label>
-          <View style={{ gap: space.md, opacity: 0.8 }}>
-            {bonus.map((h) => (
-              <HabitItem key={`${day.date}-${h.habit.id}`} item={h} day={day} names={names} />
-            ))}
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showOff }}
+            onPress={() => setShowOff((v) => !v)}
+            hitSlop={6}
+          >
+            <Muted>
+              {showOff ? "Hide" : "Show"} {off.length} not scheduled today {showOff ? "▲" : "▼"}
+            </Muted>
+          </Pressable>
+          {showOff && <View style={{ gap: space.md, opacity: 0.8 }}>{off.map(item)}</View>}
         </>
       )}
     </View>

@@ -366,6 +366,22 @@ export const habitType = pgEnum("habit_type", [
   "time",
 ]);
 
+/** Named sections habits are filed into (HabitBucketDto). */
+export const habitBuckets = pgTable(
+  "habit_buckets",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    sortOrder: integer().notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
 export const habits = pgTable(
   "habits",
   {
@@ -386,6 +402,8 @@ export const habits = pgTable(
     sortOrder: integer().notNull().default(0),
     /** The group this is a sub-habit of (habits of type "group"). */
     parentId: uuid().references((): AnyPgColumn => habits.id, { onDelete: "cascade" }),
+    /** Top-level habits only; deleting the bucket leaves its habits unfiled. */
+    bucketId: uuid().references(() => habitBuckets.id, { onDelete: "set null" }),
     archivedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

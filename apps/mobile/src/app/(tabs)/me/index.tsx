@@ -47,6 +47,12 @@ export default function MeScreen() {
     },
   ].filter((x) => x !== false);
   const stats = [
+    features.week && {
+      icon: "calendar" as const,
+      label: talk.weeklyReview,
+      detail: "This week day by day, and the review",
+      href: "/week" as const,
+    },
     features.charts && {
       icon: "chart.xyaxis.line" as const,
       label: "Charts",

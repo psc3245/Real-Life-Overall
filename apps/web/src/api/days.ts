@@ -6,6 +6,7 @@ import type {
   HabitStatsResponseDto,
   HabitType,
   LinkSuggestionDto,
+  HabitBucketDto,
 } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
@@ -84,6 +85,7 @@ export interface HabitInput {
   links: string[];
   startsOn: string;
   parentId?: string;
+  bucketId?: string | null;
 }
 
 export function useCreateHabit() {
@@ -104,6 +106,54 @@ export function useUpdateHabit() {
 
 export function useArchiveHabit() {
   return useHabitMutation((id: string) => api<null>(`/habits/${id}`, { method: "DELETE" }));
+}
+
+export const bucketsKey = [...habitsKey, "buckets"] as const;
+
+export function useHabitBuckets() {
+  return useQuery({
+    queryKey: bucketsKey,
+    queryFn: () => api<HabitBucketDto[]>("/habits/buckets"),
+  });
+}
+
+function useBucketMutation<TInput, TOutput>(request: (input: TInput) => Promise<TOutput>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    // Deleting a bucket unfiles its habits, so habits refresh too.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: habitsKey }),
+  });
+}
+
+export function useCreateBucket() {
+  return useBucketMutation((name: string) =>
+    api<HabitBucketDto>("/habits/buckets", { method: "POST", body: JSON.stringify({ name }) }),
+  );
+}
+
+export function useRenameBucket() {
+  return useBucketMutation(({ id, name }: { id: string; name: string }) =>
+    api<HabitBucketDto>(`/habits/buckets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  );
+}
+
+export function useReorderBuckets() {
+  return useBucketMutation((ids: string[]) =>
+    api<HabitBucketDto[]>("/habits/buckets/order", {
+      method: "PUT",
+      body: JSON.stringify({ ids }),
+    }),
+  );
+}
+
+export function useDeleteBucket() {
+  return useBucketMutation((id: string) =>
+    api<null>(`/habits/buckets/${id}`, { method: "DELETE" }),
+  );
 }
 
 export function useSuggestLinks() {

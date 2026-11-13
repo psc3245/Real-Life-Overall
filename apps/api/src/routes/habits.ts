@@ -2,12 +2,15 @@ import {
   createHabitBodySchema,
   dateParamSchema,
   HABIT_STAT_RANGES,
+  habitBucketBodySchema,
+  habitBucketOrderBodySchema,
   suggestLinksBodySchema,
   updateHabitBodySchema,
 } from "@rlo/shared";
 import { z } from "zod";
 import { Hono } from "hono";
 import type { AppEnv } from "../context";
+import * as buckets from "../services/habit-bucket-service";
 import * as habits from "../services/habit-service";
 import { idParam, parseJson } from "../validation";
 
@@ -22,6 +25,25 @@ export const habitRoutes = new Hono<AppEnv>()
   .get("/stats", async (c) => {
     const { range, date } = statsQuerySchema.parse(c.req.query());
     return c.json(await habits.getHabitStats(c.get("db"), c.get("userId"), range, date));
+  })
+  .get("/buckets", async (c) => c.json(await buckets.listBuckets(c.get("db"), c.get("userId"))))
+  .post("/buckets", async (c) => {
+    const body = await parseJson(c, habitBucketBodySchema);
+    return c.json(await buckets.createBucket(c.get("db"), c.get("userId"), body), 201);
+  })
+  .put("/buckets/order", async (c) => {
+    const body = await parseJson(c, habitBucketOrderBodySchema);
+    return c.json(await buckets.reorderBuckets(c.get("db"), c.get("userId"), body));
+  })
+  .patch("/buckets/:id", async (c) => {
+    const body = await parseJson(c, habitBucketBodySchema);
+    return c.json(
+      await buckets.renameBucket(c.get("db"), c.get("userId"), idParam(c, "id", "Bucket"), body),
+    );
+  })
+  .delete("/buckets/:id", async (c) => {
+    await buckets.deleteBucket(c.get("db"), c.get("userId"), idParam(c, "id", "Bucket"));
+    return c.body(null, 204);
   })
   .post("/", async (c) => {
     const body = await parseJson(c, createHabitBodySchema);

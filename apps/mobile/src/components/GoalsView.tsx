@@ -98,7 +98,7 @@ function GoalCard({
         : o.source === "workouts"
           ? {
               label: "Start a workout →",
-              go: () => router.push({ pathname: "/habits", params: { view: "train" } }),
+              go: () => router.push("/train"),
             }
           : { label: `Log ${o.habitName ?? "the habit"} →`, go: () => router.push("/log") };
 

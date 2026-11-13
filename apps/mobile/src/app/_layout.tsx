@@ -71,6 +71,7 @@ function RootStack() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="log" options={pushedOptions} />
+          <Stack.Screen name="week" options={pushedOptions} />
           <Stack.Screen name="node/[id]" options={pushedOptions} />
           <Stack.Screen name="habits/manage" options={pushedOptions} />
           <Stack.Screen name="habits/edit" options={{ ...pushedOptions, presentation: "modal" }} />

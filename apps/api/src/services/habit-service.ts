@@ -23,6 +23,7 @@ import { badRequest, conflict, notFound } from "../errors";
 import type { LlmClient } from "../llm/client";
 import { suggestLinksPrompt } from "../llm/prompts/habits";
 import { refsFor, toPromptNodes } from "../llm/prompts/tree";
+import { requireBucket } from "./habit-bucket-service";
 import * as habitRepo from "../repos/habit-repo";
 import type { HabitRow } from "../repos/habit-repo";
 import * as nodeRepo from "../repos/rating-node-repo";
@@ -66,6 +67,7 @@ export function toHabitDto(row: HabitRow, lineageIds: string[], ctx: LeafContext
     sortOrder: row.sortOrder,
     startsOn: row.startsOn,
     parentId: row.parentId,
+    bucketId: row.bucketId,
   };
 }
 
@@ -134,6 +136,7 @@ export async function createHabit(
     if (!parent || parent.type !== "group") throw badRequest("Sub-habits go inside a group");
     if (input.type === "group") throw badRequest("Groups can't contain other groups yet");
   }
+  const bucketId = parent ? null : ((await requireBucket(db, userId, input.bucketId)) ?? null);
   const row = await db.transaction(async (tx) => {
     const created = await habitRepo.insert(tx, {
       userId,
@@ -143,6 +146,8 @@ export async function createHabit(
       days: parent ? parent.days : input.days,
       startsOn: parent ? parent.startsOn : (input.startsOn ?? localDateIn(tz, new Date())),
       parentId: parent?.id ?? null,
+      // Sub-habits sit with their group.
+      bucketId,
       sortOrder: existing.length,
     });
     await habitRepo.replaceLinks(tx, created.id, lineages);
@@ -172,10 +177,13 @@ export async function updateHabit(
         ...(input.startsOn !== undefined && { startsOn: input.startsOn }),
       };
 
+  const bucketId = habit.parentId ? undefined : await requireBucket(db, userId, input.bucketId);
+
   const row = await db.transaction(async (tx) => {
     if (habit.type === "group") await habitRepo.updateChildren(tx, habit.id, schedule);
     const updated = await habitRepo.update(tx, habit.id, {
       ...(input.name !== undefined && { name: input.name }),
+      ...(bucketId !== undefined && { bucketId }),
       ...schedule,
       ...(input.config !== undefined && {
         config: normalizeHabitConfig(habit.type, {
