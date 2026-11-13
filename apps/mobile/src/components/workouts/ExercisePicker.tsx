@@ -2,6 +2,7 @@ import {
   CATEGORY_LABELS,
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
+  SPORT_LABELS,
   TRACKING_LABELS,
   type ExerciseCategory,
   type ExerciseDto,
@@ -57,22 +58,25 @@ export function CategoryChips({
 }
 
 export const exerciseDetail = (e: ExerciseDto) =>
-  `${CATEGORY_LABELS[e.category]} · ${TRACKING_LABELS[e.tracking]}${e.custom ? " · custom" : ""}`;
+  `${e.sport ? SPORT_LABELS[e.sport] : CATEGORY_LABELS[e.category]} · ${TRACKING_LABELS[e.tracking]}${e.custom ? " · custom" : ""}`;
 
 /** Picks one or more exercises to add, or creates a custom one. */
 export function ExercisePicker({
   open,
   exercises,
+  initialCategory = null,
   onAdd,
   onClose,
 }: {
   open: boolean;
   exercises: ExerciseDto[];
+  /** Opens filtered to this category (sport practices start on Sport & skill). */
+  initialCategory?: ExerciseCategory | null;
   onAdd: (ids: string[]) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<ExerciseCategory | null>(null);
+  const [category, setCategory] = useState<ExerciseCategory | null>(initialCategory);
   const [picked, setPicked] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const shown = filterExercises(exercises, query, category);

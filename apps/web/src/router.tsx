@@ -10,6 +10,7 @@ import { ReportEditorPage } from "./features/reports/ReportEditorPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
 import { ActiveWorkoutPage } from "./features/workouts/ActiveWorkoutPage";
 import { CardioPage } from "./features/workouts/CardioPage";
+import { SportsPage } from "./features/workouts/SportsPage";
 import { ExercisesPage } from "./features/workouts/ExercisesPage";
 import { StartWorkoutPage } from "./features/workouts/StartWorkoutPage";
 import { TemplatePage } from "./features/workouts/TemplatePage";
@@ -256,6 +257,16 @@ export const router = createBrowserRouter([
           <RequireAuth>
             <FeatureGate feature="workouts">
               <CardioPage />
+            </FeatureGate>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "workouts/sports",
+        element: (
+          <RequireAuth>
+            <FeatureGate feature="workouts">
+              <SportsPage />
             </FeatureGate>
           </RequireAuth>
         ),

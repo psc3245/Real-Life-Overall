@@ -2,6 +2,8 @@ import type {
   BodyDto,
   CardioInput,
   CardioOverviewDto,
+  LiveWorkoutKind,
+  SportOverviewDto,
   ExerciseCategory,
   ExerciseDetailDto,
   ExerciseDto,
@@ -27,6 +29,7 @@ export const templatesKey = ["workout-templates"] as const;
 export const exercisesKey = ["exercises"] as const;
 export const bodyKey = ["body"] as const;
 export const cardioKey = [...workoutsKey, "cardio"] as const;
+export const sportKey = [...workoutsKey, "sport"] as const;
 
 /** Finished workouts change the day log, goals that count workouts and exercise stats. */
 function refreshAfterWorkout(queryClient: QueryClient) {
@@ -67,7 +70,7 @@ export function useWorkoutHistory() {
 export function useStartWorkout() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { templateId?: string } = {}) =>
+    mutationFn: (input: { templateId?: string; kind?: LiveWorkoutKind } = {}) =>
       api<WorkoutDto>("/workouts", { method: "POST", body: JSON.stringify(input) }),
     onSuccess: async (workout) => {
       queryClient.setQueryData(activeWorkoutKey, workout);
@@ -130,6 +133,15 @@ export function useDeleteWorkout() {
   });
 }
 
+// Sports
+
+export function useSportOverview() {
+  return useQuery({
+    queryKey: sportKey,
+    queryFn: () => api<SportOverviewDto>("/workouts/sport"),
+  });
+}
+
 // Cardio
 
 export function useCardioOverview() {
@@ -165,6 +177,7 @@ export function useTemplates() {
 }
 
 export interface TemplateInput {
+  kind?: LiveWorkoutKind;
   name: string;
   notes: string;
   exercises: WorkoutExerciseDto[];

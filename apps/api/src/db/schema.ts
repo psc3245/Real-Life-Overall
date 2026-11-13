@@ -717,6 +717,8 @@ export const exercises = pgTable(
   (t) => [index().on(t.userId)],
 );
 
+export const workoutKind = pgEnum("workout_kind", WORKOUT_KINDS);
+
 /** Workout plans: exercises with target sets (WorkoutExerciseDto[]). No limit per user. */
 export const workoutTemplates = pgTable(
   "workout_templates",
@@ -725,6 +727,8 @@ export const workoutTemplates = pgTable(
     userId: uuid()
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** strength or sport (cardio sessions have no templates). */
+    kind: workoutKind().notNull().default("strength"),
     name: text().notNull(),
     notes: text().notNull().default(""),
     exercises: jsonb().notNull().default([]),
@@ -734,8 +738,6 @@ export const workoutTemplates = pgTable(
   },
   (t) => [index().on(t.userId)],
 );
-
-export const workoutKind = pgEnum("workout_kind", WORKOUT_KINDS);
 
 /**
  * Logged workouts. `exercises` is WorkoutExerciseDto[] (kg, m, s); the whole document is saved

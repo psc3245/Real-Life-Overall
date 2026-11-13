@@ -1,4 +1,4 @@
-import type { ExerciseDto, WorkoutTemplateDto } from "@rlo/shared";
+import type { ExerciseDto, LiveWorkoutKind, WorkoutTemplateDto } from "@rlo/shared";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
@@ -16,10 +16,11 @@ import { Body, Button, Card, ErrorNote, Label, Muted } from "@/components/ui";
 import { colors, fonts, space } from "@/lib/theme";
 import { since } from "@/lib/workouts";
 import { CardioHome } from "./Cardio";
+import { SportStats } from "./Sports";
 
-type Mode = "lifting" | "cardio";
+type Mode = "lifting" | "cardio" | "sports";
 
-/** Train: lifting (start a workout or a template) or cardio, like the web's training tabs. */
+/** Train: lifting, cardio or sports, like the web's training tabs. */
 export function TrainHome() {
   const [mode, setMode] = useState<Mode>("lifting");
   return (
@@ -29,11 +30,19 @@ export function TrainHome() {
         options={[
           { value: "lifting", label: "Lifting" },
           { value: "cardio", label: "Cardio" },
+          { value: "sports", label: "Sports" },
         ]}
         value={mode}
         onChange={setMode}
       />
-      {mode === "lifting" ? <LiftingHome /> : <CardioHome />}
+      {mode === "lifting" && <LiveHome kind="strength" />}
+      {mode === "cardio" && <CardioHome />}
+      {mode === "sports" && (
+        <>
+          <LiveHome kind="sport" />
+          <SportStats />
+        </>
+      )}
       <SettingsGroup>
         <NavRow icon="clock" label="History" href="/workouts/history" />
         <NavRow icon="dumbbell" label="Exercises" href="/workouts/exercises" />
@@ -43,8 +52,12 @@ export function TrainHome() {
   );
 }
 
-/** Start a workout: resume the one in progress, start empty, or start from a template. */
-function LiftingHome() {
+/**
+ * Start a workout or a practice (`kind`): resume the one in progress, start empty, or start from
+ * one of that kind's templates (practices call them plans).
+ */
+function LiveHome({ kind }: { kind: LiveWorkoutKind }) {
+  const sport = kind === "sport";
   const active = useActiveWorkout();
   const templates = useTemplates();
   const exercises = useExercises();
@@ -52,8 +65,9 @@ function LiftingHome() {
   const [preview, setPreview] = useState<WorkoutTemplateDto | null>(null);
   const names = new Map((exercises.data ?? []).map((e) => [e.id, e]));
 
+  const mine = templates.data?.filter((t) => (t.kind ?? "strength") === kind);
   const begin = (templateId?: string) =>
-    start.mutate(templateId ? { templateId } : {}, {
+    start.mutate(templateId ? { templateId } : { kind }, {
       onSuccess: () => {
         setPreview(null);
         router.push("/workouts/active");
@@ -75,7 +89,9 @@ function LiftingHome() {
         </Pressable>
       ) : (
         <Button
-          title={start.isPending ? "Starting…" : "Start an empty workout"}
+          title={
+            start.isPending ? "Starting…" : sport ? "Start a practice" : "Start an empty workout"
+          }
           disabled={start.isPending}
           onPress={() => begin()}
         />
@@ -84,21 +100,34 @@ function LiftingHome() {
 
       <View style={{ gap: space.sm }}>
         <View style={styles.head}>
-          <Label>Templates{templates.data?.length ? ` (${templates.data.length})` : ""}</Label>
-          <Pressable onPress={() => router.push("/workouts/template")} hitSlop={6}>
-            <Text style={{ color: colors.neon, fontSize: 14 }}>+ Template</Text>
+          <Label>
+            {sport ? "Practice plans" : "Templates"}
+            {mine?.length ? ` (${mine.length})` : ""}
+          </Label>
+          <Pressable
+            onPress={() =>
+              router.push(
+                sport ? { pathname: "/workouts/template", params: { kind } } : "/workouts/template",
+              )
+            }
+            hitSlop={6}
+          >
+            <Text style={{ color: colors.neon, fontSize: 14 }}>
+              {sport ? "+ Plan" : "+ Template"}
+            </Text>
           </Pressable>
         </View>
         <ErrorNote error={templates.error} />
-        {templates.data?.length === 0 && (
+        {mine?.length === 0 && (
           <Card>
             <Muted style={{ textAlign: "center" }}>
-              Templates are workouts you repeat: Push Day, Leg Day, Shooting Drills. Make one here,
-              or save a finished workout as a template.
+              {sport
+                ? "Plans are practices you repeat: a shooting workout, footwork and first touch, speed and agility day. Make one here, or save a finished practice as one."
+                : "Templates are workouts you repeat: Push Day, Leg Day, Full Body. Make one here, or save a finished workout as a template."}
             </Muted>
           </Card>
         )}
-        {templates.data?.map((t) => (
+        {mine?.map((t) => (
           <Pressable key={t.id} onPress={() => setPreview(t)} accessibilityRole="button">
             <Card style={{ gap: 4 }}>
               <Text style={styles.template}>{t.name}</Text>
@@ -171,7 +200,7 @@ function TemplatePreview({
       {!canStart && <Muted>Finish the workout in progress to start another.</Muted>}
       <ErrorNote error={error ?? remove.error} />
       <Button
-        title={starting ? "Starting…" : "Start workout"}
+        title={starting ? "Starting…" : t.kind === "sport" ? "Start practice" : "Start workout"}
         disabled={!canStart || starting}
         onPress={onStart}
       />

@@ -14,6 +14,7 @@ const bench: ExerciseDto = {
   name: "Bench Press (Barbell)",
   category: "chest",
   tracking: "weight_reps",
+  sport: null,
   custom: false,
   timesDone: 1,
   lastDone: "2026-10-20",

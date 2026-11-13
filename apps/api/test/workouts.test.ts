@@ -1,6 +1,7 @@
 import {
   emptySet,
   type CardioOverviewDto,
+  type SportOverviewDto,
   type BodyDto,
   type DayDto,
   type ExerciseDetailDto,
@@ -382,6 +383,66 @@ describe("cardio", () => {
     expect(JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt)).toContain(
       "Running: 3.73 mi in 30:00 (8:03 /mi)",
     );
+  });
+});
+
+describe("sports", () => {
+  it("runs practices from practice plans and follows each drill", async () => {
+    const { request, start, save, finish } = await setup();
+    const library = await body<ExerciseDto[]>(await request("/exercises"));
+    expect(library.find((e) => e.id === "free-throws")).toMatchObject({
+      category: "sport",
+      sport: "basketball",
+    });
+
+    const plan = await body<WorkoutTemplateDto>(
+      await request("/workout-templates", {
+        method: "POST",
+        ...json({
+          kind: "sport",
+          name: "Shooting",
+          exercises: [{ exerciseId: "free-throws", sets: [set({ reps: 7, attempts: 10 })] }],
+        }),
+      }),
+    );
+    expect(plan.kind).toBe("sport");
+
+    const w = await start({ templateId: plan.id });
+    expect(w.kind).toBe("sport");
+    await save(w.id, {
+      exercises: [
+        {
+          exerciseId: "free-throws",
+          sets: [
+            set({ reps: 8, attempts: 10, done: true }),
+            set({ reps: 6, attempts: 10, done: true }),
+          ],
+        },
+        { exerciseId: "bench-press-barbell", sets: [set({ weightKg: 60, reps: 5, done: true })] },
+      ],
+    });
+    expect((await finish(w.id, { template: "new", templateName: "Shooting 2" })).status).toBe(200);
+    const templates = await body<WorkoutTemplateDto[]>(await request("/workout-templates"));
+    expect(templates.find((t) => t.name === "Shooting 2")?.kind).toBe("sport");
+
+    // An empty practice is named like one.
+    const empty = await start({ kind: "sport" });
+    expect(empty).toMatchObject({ kind: "sport", name: expect.stringMatching(/Practice$/) });
+    await request(`/workouts/${empty.id}`, { method: "DELETE" });
+
+    const o = await body<SportOverviewDto>(await request("/workouts/sport"));
+    expect(o.week.sessions).toBe(1);
+    expect(o.recent.map((r) => r.id)).toEqual([w.id]);
+    // Only sport & skill drills are skills.
+    expect(o.skills).toEqual([
+      expect.objectContaining({
+        exerciseId: "free-throws",
+        sessions: 1,
+        headline: "bestPct",
+        best: 80,
+        recent: { makes: 14, attempts: 20 },
+      }),
+    ]);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { WorkoutTemplateDto } from "@rlo/shared";
+import type { LiveWorkoutKind, WorkoutTemplateDto } from "@rlo/shared";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
@@ -18,6 +18,8 @@ import { FeatureGate } from "@/components/FeatureGate";
 function TemplateScreen() {
   const params = useLocalSearchParams<{
     id?: string;
+    /** New practice plans pass "sport". */
+    kind?: string;
     thread?: string;
     message?: string;
     index?: string;
@@ -37,7 +39,7 @@ function TemplateScreen() {
     }
     return <TemplateForm draft={{ ...d, messageId: params.message }} />;
   }
-  if (!id) return <TemplateForm />;
+  if (!id) return <TemplateForm kind={params.kind === "sport" ? "sport" : "strength"} />;
   if (templates.isPending) return <Loading />;
   if (templates.isError) {
     return (
@@ -54,14 +56,16 @@ function TemplateScreen() {
       </Screen>
     );
   }
-  return <TemplateForm template={template} />;
+  return <TemplateForm template={template} kind={template.kind ?? "strength"} />;
 }
 
 function TemplateForm({
   template,
   draft,
+  kind = "strength",
 }: {
   template?: WorkoutTemplateDto;
+  kind?: LiveWorkoutKind;
   /** A coach draft to review: saved through the coach instead of created directly. */
   draft?: Pick<WorkoutTemplateDto, "name" | "notes" | "exercises"> & {
     messageId: string;
@@ -88,20 +92,24 @@ function TemplateForm({
         done,
       );
     } else if (template) update.mutate({ id: template.id, ...body }, done);
-    else create.mutate(body, done);
+    else create.mutate({ ...body, kind }, done);
   };
 
   return (
     <Screen>
       <Stack.Screen
-        options={{ title: template ? "Edit template" : draft ? "Review template" : "New template" }}
+        options={{
+          title: draft
+            ? "Review template"
+            : `${template ? "Edit" : "New"} ${kind === "sport" ? "practice plan" : "template"}`,
+        }}
       />
       <FormRow label="Name">
         <Field
           value={name}
           autoFocus={!template}
           maxLength={80}
-          placeholder="Push Day"
+          placeholder={kind === "sport" ? "Shooting Workout" : "Push Day"}
           onChangeText={setName}
         />
       </FormRow>
@@ -121,6 +129,7 @@ function TemplateForm({
         library={library.data ?? []}
         units={units}
         mode="plan"
+        defaultCategory={kind === "sport" ? "sport" : undefined}
         onChange={setExercises}
       />
       <ErrorNote error={accept.error ?? create.error ?? update.error} />

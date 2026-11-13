@@ -1,23 +1,13 @@
 import {
   CATEGORY_LABELS,
-  formatDuration,
   formatSet,
   HEADLINE_RECORD,
   RECORD_LABELS,
   recordChartUnit,
   recordChartValue,
   SET_KIND_TAGS,
-  toDisplayDistance,
-  toDisplayWeight,
   TRACKING_LABELS,
-  distanceUnit,
-  lengthUnit,
-  usesLength,
-  toDisplayLength,
-  weightUnit,
   type ExerciseRecordsDto,
-  type ExerciseTracking,
-  type UnitSystem,
 } from "@rlo/shared";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -27,34 +17,10 @@ import { TrendChart } from "../../components/charts/TrendChart";
 import { StatTile } from "../../components/StatTile";
 import { dayLabel } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { formatRecord } from "./format";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
 import { DebugId, DebugJson } from "../../components/debug/Debug";
 import { ChartLink } from "../charts/ChartLink";
-
-/** A record's value in the user's units. */
-function formatRecord(
-  key: keyof ExerciseRecordsDto,
-  value: number,
-  units: UnitSystem,
-  tracking: ExerciseTracking,
-) {
-  switch (key) {
-    case "heaviestKg":
-    case "best1RmKg":
-    case "bestSetVolumeKg":
-      return `${(Math.round(toDisplayWeight(value, units) * 10) / 10).toLocaleString()} ${weightUnit(units)}`;
-    case "longestS":
-      return formatDuration(value);
-    case "longestM":
-      return usesLength(tracking)
-        ? `${toDisplayLength(value, units)} ${lengthUnit(units)}`
-        : `${toDisplayDistance(value, units)} ${distanceUnit(units)}`;
-    case "bestPct":
-      return `${Math.round(value)}%`;
-    default:
-      return String(value);
-  }
-}
 
 export function ExercisePage() {
   const { id = "" } = useParams();

@@ -2,6 +2,7 @@ import {
   CATEGORY_LABELS,
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
+  SPORT_LABELS,
   TRACKING_LABELS,
   type ExerciseCategory,
   type ExerciseDto,
@@ -61,15 +62,18 @@ export function CategoryChips({
 /** Picks one or more exercises to add, or creates a custom one. */
 export function ExercisePicker({
   exercises,
+  initialCategory = null,
   onAdd,
   onClose,
 }: {
   exercises: ExerciseDto[];
+  /** Opens filtered to this category (sport practices start on Sport & skill). */
+  initialCategory?: ExerciseCategory | null;
   onAdd: (ids: string[]) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<ExerciseCategory | null>(null);
+  const [category, setCategory] = useState<ExerciseCategory | null>(initialCategory);
   const [picked, setPicked] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const search = useRef<HTMLInputElement>(null);
@@ -101,7 +105,8 @@ export function ExercisePicker({
         <span className="min-w-0">
           <span className="block truncate">{e.name}</span>
           <span className="block text-xs text-court-500">
-            {CATEGORY_LABELS[e.category]} · {TRACKING_LABELS[e.tracking]}
+            {e.sport ? SPORT_LABELS[e.sport] : CATEGORY_LABELS[e.category]} ·{" "}
+            {TRACKING_LABELS[e.tracking]}
             {e.custom && " · custom"}
           </span>
         </span>

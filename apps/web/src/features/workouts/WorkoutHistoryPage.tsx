@@ -84,7 +84,14 @@ export function WorkoutCard({
       className="block space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-4 hover:border-neon"
     >
       <div>
-        <p className="font-display text-lg uppercase tracking-wide">{w.name}</p>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="font-display text-lg uppercase tracking-wide">{w.name}</p>
+          {w.kind === "sport" && (
+            <span className="shrink-0 rounded-full bg-neon/10 px-2 py-0.5 text-[11px] uppercase tracking-wider text-neon">
+              Practice
+            </span>
+          )}
+        </div>
         <p className="text-xs text-court-500">{dayLabel(w.localDate)}</p>
       </div>
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-court-300">

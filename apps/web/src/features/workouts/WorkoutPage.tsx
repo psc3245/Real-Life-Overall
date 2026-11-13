@@ -280,6 +280,7 @@ function EditWorkout({
         library={library}
         units={units}
         mode="log"
+        defaultCategory={w.kind === "sport" ? "sport" : undefined}
         previous={w.previous}
         onChange={setExercises}
       />

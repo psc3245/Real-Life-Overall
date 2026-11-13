@@ -9,6 +9,7 @@ import {
   usesLength,
   type ExerciseCategory,
   type ExerciseTracking,
+  type Sport,
 } from "../exercises";
 import {
   distanceUnit,
@@ -42,9 +43,16 @@ export const SET_KIND_TAGS: Record<Exclude<SetKind, "normal">, string> = {
   failure: "F",
 };
 
-/** Strength workouts are logged set by set; cardio sessions are one activity's distance and time. */
-export const WORKOUT_KINDS = ["strength", "cardio"] as const;
+/**
+ * Strength workouts and sport practices are logged set by set (practices start from sport
+ * templates and drills); cardio sessions are one activity's distance and time.
+ */
+export const WORKOUT_KINDS = ["strength", "cardio", "sport"] as const;
 export type WorkoutKind = (typeof WORKOUT_KINDS)[number];
+
+/** The kinds that run live and have templates. */
+export const LIVE_WORKOUT_KINDS = ["strength", "sport"] as const;
+export type LiveWorkoutKind = (typeof LIVE_WORKOUT_KINDS)[number];
 
 export const MAX_WORKOUT_EXERCISES = 40;
 export const MAX_SETS_PER_EXERCISE = 30;
@@ -77,6 +85,8 @@ export interface ExerciseDto {
   name: string;
   category: ExerciseCategory;
   tracking: ExerciseTracking;
+  /** Library sport & skill drills' sport; null otherwise. */
+  sport: Sport | null;
   custom: boolean;
   /** Completed workouts that included it. */
   timesDone: number;
@@ -115,6 +125,8 @@ export interface WorkoutDto {
 
 export interface WorkoutTemplateDto {
   id: string;
+  /** Missing from older API responses means "strength". */
+  kind: LiveWorkoutKind;
   name: string;
   notes: string;
   exercises: WorkoutExerciseDto[];
@@ -427,6 +439,8 @@ export const logWorkoutBodySchema = z.object({
 
 export const startWorkoutBodySchema = z.object({
   templateId: z.uuid().optional(),
+  /** Without a template; a template's own kind wins. */
+  kind: z.enum(LIVE_WORKOUT_KINDS).optional(),
   name: z.string().trim().min(1).max(80).optional(),
 });
 
@@ -514,6 +528,7 @@ export const finishWorkoutBodySchema = z.object({
 });
 
 export const templateBodySchema = z.object({
+  kind: z.enum(LIVE_WORKOUT_KINDS).default("strength"),
   name: z.string().trim().min(1).max(80),
   notes: z.string().max(MAX_WORKOUT_NOTES).default(""),
   exercises: exercisesSchema.default([]),

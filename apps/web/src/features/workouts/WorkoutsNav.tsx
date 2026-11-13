@@ -14,6 +14,9 @@ export function WorkoutsNav() {
       <NavLink to="/workouts/cardio" className={tab}>
         Cardio
       </NavLink>
+      <NavLink to="/workouts/sports" className={tab}>
+        Sports
+      </NavLink>
       <NavLink to="/workouts/history" className={tab}>
         History
       </NavLink>

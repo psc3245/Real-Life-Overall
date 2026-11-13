@@ -24,11 +24,16 @@ import {
   type CardioTotalsDto,
   type cardioBodySchema,
   type DayWorkoutDto,
+  type startWorkoutBodySchema,
   type ExerciseCategory,
   type ExerciseDetailDto,
   type ExerciseDto,
   type ExerciseRecordsDto,
   type ExerciseTracking,
+  type LiveWorkoutKind,
+  type Sport,
+  type SportOverviewDto,
+  type SportSkillDto,
   type UnitSystem,
   type WorkoutDto,
   type WorkoutExerciseDto,
@@ -56,6 +61,7 @@ interface ExerciseInfo {
   name: string;
   category: ExerciseCategory;
   tracking: ExerciseTracking;
+  sport: Sport | null;
   custom: boolean;
   archived: boolean;
 }
@@ -78,6 +84,7 @@ function lookupFrom(custom: ExerciseRow[]): Lookup {
       name: e.name,
       category: e.category,
       tracking: e.tracking,
+      sport: null,
       custom: true,
       archived: e.archivedAt !== null,
     });
@@ -217,15 +224,19 @@ async function touchDays(db: Database, userId: string, ...dates: string[]) {
   for (const date of new Set(dates)) await dayRepo.markStaleIfRecapped(db, userId, date);
 }
 
-function defaultName(timeZone: string, now: Date) {
+function defaultName(timeZone: string, now: Date, kind: LiveWorkoutKind) {
   const hour = Number(
     new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hourCycle: "h23" }).format(now),
   );
-  if (hour < 5) return "Night Workout";
-  if (hour < 12) return "Morning Workout";
-  if (hour < 17) return "Afternoon Workout";
-  return "Evening Workout";
+  const what = kind === "sport" ? "Practice" : "Workout";
+  if (hour < 5) return `Night ${what}`;
+  if (hour < 12) return `Morning ${what}`;
+  if (hour < 17) return `Afternoon ${what}`;
+  return `Evening ${what}`;
 }
+
+/** Templates are only for the kinds that run live. */
+const liveKind = (kind: string): LiveWorkoutKind => (kind === "sport" ? "sport" : "strength");
 
 // Workouts
 
@@ -243,7 +254,7 @@ export async function getWorkout(db: Database, userId: string, id: string): Prom
 export async function startWorkout(
   db: Database,
   userId: string,
-  input: { templateId?: string; name?: string },
+  input: z.infer<typeof startWorkoutBodySchema>,
 ): Promise<WorkoutDto> {
   if (await workoutRepo.findInProgress(db, userId)) {
     throw conflict("Finish or cancel the workout in progress first");
@@ -256,10 +267,12 @@ export async function startWorkout(
     if (!template) throw notFound("Template not found");
   }
   try {
+    const kind = template ? template.kind : (input.kind ?? "strength");
     const row = await db.transaction(async (tx) => {
       const created = await workoutRepo.insert(tx, {
         userId,
-        name: input.name ?? template?.name ?? defaultName(user.timezone, now),
+        kind,
+        name: input.name ?? template?.name ?? defaultName(user.timezone, now, liveKind(kind)),
         notes: template?.notes ?? "",
         localDate: localDateIn(user.timezone, now),
         startedAt: now,
@@ -334,6 +347,7 @@ export async function finishWorkout(
     if (action === "new") {
       await workoutRepo.insertTemplate(tx, {
         userId,
+        kind: liveKind(row.kind),
         name: options.templateName ?? row.name,
         notes: row.notes,
         exercises: asPlan(done),
@@ -594,11 +608,74 @@ function sessionOf(row: WorkoutRow) {
   });
 }
 
+// Sports
+
+const RECENT_PRACTICES = 20;
+
+/** Practice totals for the last 7 and 30 days, every sport drill done, and the latest practices. */
+export async function sportOverview(db: Database, userId: string): Promise<SportOverviewDto> {
+  const [user, completed, lookup] = await Promise.all([
+    userOf(db, userId),
+    workoutRepo.findCompleted(db, userId),
+    loadLookup(db, userId),
+  ]);
+  const today = localDateIn(user.timezone);
+  const practices = completed.filter((r) => r.kind === "sport");
+  const totals = (from: string) => {
+    const out = { sessions: 0, durationS: 0 };
+    for (const r of practices) {
+      if (r.localDate < from || r.localDate > today || !r.endedAt) continue;
+      out.sessions += 1;
+      out.durationS += Math.round((r.endedAt.getTime() - r.startedAt.getTime()) / 1000);
+    }
+    return out;
+  };
+
+  // Drills count wherever they were done, practice or not.
+  const monthStart = addDays(today, -29);
+  const skills = new Map<string, SportSkillDto & { records: ExerciseRecordsDto | null }>();
+  for (const w of completed) {
+    for (const e of exercisesOf(w)) {
+      const info = lookup.get(e.exerciseId);
+      if (!info || info.category !== "sport") continue;
+      const skill = skills.get(e.exerciseId) ?? {
+        exerciseId: e.exerciseId,
+        sessions: 0,
+        lastDone: w.localDate,
+        headline: HEADLINE_RECORD[info.tracking],
+        best: null,
+        recent: info.tracking === "makes_attempts" ? { makes: 0, attempts: 0 } : null,
+        records: null,
+      };
+      skill.sessions += 1;
+      if (w.localDate > skill.lastDone) skill.lastDone = w.localDate;
+      skill.records = mergeRecords(skill.records, recordsFromSets(info.tracking, e.sets));
+      if (skill.recent && w.localDate >= monthStart) {
+        for (const s of e.sets.filter((x) => x.done)) {
+          skill.recent.makes += s.reps ?? 0;
+          skill.recent.attempts += s.attempts ?? 0;
+        }
+      }
+      skills.set(e.exerciseId, skill);
+    }
+  }
+
+  return {
+    week: totals(addDays(today, -6)),
+    month: totals(monthStart),
+    skills: [...skills.values()]
+      .map(({ records, ...skill }) => ({ ...skill, best: records?.[skill.headline] ?? null }))
+      .sort((a, b) => b.lastDone.localeCompare(a.lastDone)),
+    recent: await buildDtos(db, userId, practices.slice(-RECENT_PRACTICES).reverse(), lookup),
+  };
+}
+
 // Templates
 
 function toTemplateDto(row: TemplateRow): WorkoutTemplateDto {
   return {
     id: row.id,
+    kind: liveKind(row.kind),
     name: row.name,
     notes: row.notes,
     exercises: exercisesOf(row),
@@ -619,8 +696,10 @@ export async function createTemplate(
   if ("fromWorkoutId" in input) {
     const workout = await workoutRepo.findById(db, userId, input.fromWorkoutId);
     if (!workout) throw notFound("Workout not found");
+    if (workout.kind === "cardio") throw badRequest("Cardio sessions can't be templates");
     const row = await workoutRepo.insertTemplate(db, {
       userId,
+      kind: liveKind(workout.kind),
       name: input.name ?? workout.name,
       notes: workout.notes,
       exercises: asPlan(exercisesOf(workout)),
@@ -629,6 +708,7 @@ export async function createTemplate(
   }
   const row = await workoutRepo.insertTemplate(db, {
     userId,
+    kind: input.kind,
     name: input.name,
     notes: input.notes,
     exercises: asPlan(normalizeExercises(input.exercises, lookup)),
@@ -684,6 +764,7 @@ const toExerciseDto = (
   name: info.name,
   category: info.category,
   tracking: info.tracking,
+  sport: info.sport,
   custom: info.custom,
   timesDone: u?.timesDone ?? 0,
   lastDone: u?.lastDone ?? null,

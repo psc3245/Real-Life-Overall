@@ -25,6 +25,7 @@ export const workoutRoutes = new Hono<AppEnv>()
     c.json(await workouts.listHistory(c.get("db"), c.get("userId"), c.req.query("before"))),
   )
   .get("/active", async (c) => c.json(await workouts.getActive(c.get("db"), c.get("userId"))))
+  .get("/sport", async (c) => c.json(await workouts.sportOverview(c.get("db"), c.get("userId"))))
   .get("/cardio", async (c) => c.json(await workouts.cardioOverview(c.get("db"), c.get("userId"))))
   .post("/cardio", async (c) => {
     const body = await parseJson(c, cardioBodySchema);
