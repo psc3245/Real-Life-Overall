@@ -1,6 +1,6 @@
-import type { WorkoutTemplateDto } from "@rlo/shared";
+import type { LiveWorkoutKind, WorkoutTemplateDto } from "@rlo/shared";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import {
   useCreateTemplate,
   useExercises,
@@ -16,16 +16,26 @@ import { useUnits } from "./WorkoutsNav";
 /** Creates (/workouts/templates/new) or edits a template. */
 export function TemplatePage() {
   const { id } = useParams();
+  const [search] = useSearchParams();
   const templates = useTemplates();
-  if (!id || id === "new") return <TemplateForm />;
+  if (!id || id === "new") {
+    return <TemplateForm kind={search.get("kind") === "sport" ? "sport" : "strength"} />;
+  }
   if (templates.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
   if (templates.isError) return <ErrorNote error={templates.error} />;
   const template = templates.data.find((t) => t.id === id);
   if (!template) return <p className="pt-10 text-court-500">Template not found.</p>;
-  return <TemplateForm template={template} />;
+  return <TemplateForm template={template} kind={template.kind ?? "strength"} />;
 }
 
-function TemplateForm({ template }: { template?: WorkoutTemplateDto }) {
+function TemplateForm({
+  template,
+  kind,
+}: {
+  template?: WorkoutTemplateDto;
+  kind: LiveWorkoutKind;
+}) {
+  const home = kind === "sport" ? "/workouts/sports" : "/workouts";
   const units = useUnits();
   const library = useExercises();
   const create = useCreateTemplate();
@@ -43,17 +53,17 @@ function TemplateForm({ template }: { template?: WorkoutTemplateDto }) {
       onSubmit={(e) => {
         e.preventDefault();
         const body = { name: name.trim(), notes, exercises };
-        const done = { onSuccess: () => navigate("/workouts") };
+        const done = { onSuccess: () => navigate(home) };
         if (template) update.mutate({ id: template.id, ...body }, done);
-        else create.mutate(body, done);
+        else create.mutate({ ...body, kind }, done);
       }}
     >
       <div>
-        <Link to="/workouts" className="text-sm text-court-300 hover:text-neon">
-          ← Workouts
+        <Link to={home} className="text-sm text-court-300 hover:text-neon">
+          ← {kind === "sport" ? "Sports" : "Workouts"}
         </Link>
         <p className="text-sm uppercase tracking-[0.3em] text-neon">
-          {template ? "Edit template" : "New template"}
+          {template ? "Edit" : "New"} {kind === "sport" ? "practice template" : "template"}
         </p>
         <input
           aria-label="Template name"
@@ -61,7 +71,7 @@ function TemplateForm({ template }: { template?: WorkoutTemplateDto }) {
           required
           autoFocus={!template}
           maxLength={80}
-          placeholder="Push Day"
+          placeholder={kind === "sport" ? "Shooting Workout" : "Push Day"}
           onChange={(e) => setName(e.target.value)}
           className="w-full bg-transparent font-display text-4xl font-bold uppercase outline-none placeholder:text-court-700 focus:text-neon"
         />
@@ -83,11 +93,12 @@ function TemplateForm({ template }: { template?: WorkoutTemplateDto }) {
         library={library.data ?? []}
         units={units}
         mode="plan"
+        defaultCategory={kind === "sport" ? "sport" : undefined}
         onChange={setExercises}
       />
       <ErrorNote error={create.error ?? update.error} />
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={() => navigate("/workouts")}>
+        <Button variant="ghost" onClick={() => navigate(home)}>
           Cancel
         </Button>
         <Button type="submit" variant="primary" disabled={!name.trim() || saving}>

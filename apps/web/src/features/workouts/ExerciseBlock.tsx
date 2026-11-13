@@ -1,5 +1,6 @@
 import {
   distanceUnit,
+  lengthUnit,
   emptySet,
   formatSet,
   MAX_SETS_PER_EXERCISE,
@@ -29,6 +30,7 @@ const FIELD_KEY: Record<SetField, keyof WorkoutSetDto> = {
   reps: "reps",
   duration: "durationS",
   distance: "distanceM",
+  length: "distanceM",
   attempts: "attempts",
 };
 
@@ -42,6 +44,8 @@ function fieldHeader(field: SetField, units: UnitSystem, makes: boolean) {
       return "Time";
     case "distance":
       return distanceUnit(units);
+    case "length":
+      return lengthUnit(units);
     case "attempts":
       return "Att.";
   }

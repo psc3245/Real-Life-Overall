@@ -1,17 +1,11 @@
 import {
-  distanceUnit,
-  formatDuration,
   formatSet,
   HEADLINE_RECORD,
   RECORD_LABELS,
   recordChartUnit,
   recordChartValue,
   SET_KIND_TAGS,
-  toDisplayDistance,
-  toDisplayWeight,
-  weightUnit,
   type ExerciseRecordsDto,
-  type UnitSystem,
 } from "@rlo/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
@@ -24,26 +18,10 @@ import { exerciseDetail } from "@/components/workouts/ExercisePicker";
 import { dayLabel } from "@/lib/format";
 import { colors, space } from "@/lib/theme";
 import { useUnits } from "@/lib/workouts";
+import { formatRecord } from "@/lib/workouts";
 import { FeatureGate } from "@/components/FeatureGate";
 
 /** A record's value in the user's units. */
-function formatRecord(key: keyof ExerciseRecordsDto, value: number, units: UnitSystem) {
-  switch (key) {
-    case "heaviestKg":
-    case "best1RmKg":
-    case "bestSetVolumeKg":
-      return `${(Math.round(toDisplayWeight(value, units) * 10) / 10).toLocaleString()} ${weightUnit(units)}`;
-    case "longestS":
-      return formatDuration(value);
-    case "longestM":
-      return `${toDisplayDistance(value, units)} ${distanceUnit(units)}`;
-    case "bestPct":
-      return `${Math.round(value)}%`;
-    default:
-      return String(value);
-  }
-}
-
 function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const detail = useExercise(id);
@@ -66,8 +44,11 @@ function ExerciseScreen() {
   const points = [...history]
     .reverse()
     .filter((h) => h.best !== null)
-    .map((h) => ({ date: h.localDate, value: recordChartValue(headline, h.best!, units) }));
-  const unit = recordChartUnit(headline, units);
+    .map((h) => ({
+      date: h.localDate,
+      value: recordChartValue(headline, h.best!, units, e.tracking),
+    }));
+  const unit = recordChartUnit(headline, units, e.tracking);
 
   const remove = () =>
     Alert.alert("Remove from your library?", "Past workouts keep it.", [
@@ -95,7 +76,7 @@ function ExerciseScreen() {
             <StatTile
               key={k}
               label={RECORD_LABELS[k]}
-              value={formatRecord(k, records[k]!, units)}
+              value={formatRecord(k, records[k]!, units, e.tracking)}
             />
           ))}
         </StatGrid>

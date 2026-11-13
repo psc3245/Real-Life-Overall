@@ -8,6 +8,7 @@ export type UnitSystem = (typeof UNIT_SYSTEMS)[number];
 export const KG_PER_LB = 0.45359237;
 export const M_PER_MILE = 1609.344;
 export const CM_PER_INCH = 2.54;
+export const M_PER_FOOT = 0.3048;
 
 export const weightUnit = (system: UnitSystem) => (system === "imperial" ? "lb" : "kg");
 export const distanceUnit = (system: UnitSystem) => (system === "imperial" ? "mi" : "km");
@@ -30,6 +31,18 @@ export function toDisplayDistance(m: number, system: UnitSystem): number {
 
 export function fromDisplayDistance(value: number, system: UnitSystem): number {
   return value * (system === "imperial" ? M_PER_MILE : 1000);
+}
+
+/** Short distances (sled pushes, carries, jumps) are shown in feet or meters. */
+export const lengthUnit = (system: UnitSystem) => (system === "imperial" ? "ft" : "m");
+
+/** meters → feet or meters, to 0.1. */
+export function toDisplayLength(m: number, system: UnitSystem): number {
+  return round(system === "imperial" ? m / M_PER_FOOT : m, 1);
+}
+
+export function fromDisplayLength(value: number, system: UnitSystem): number {
+  return system === "imperial" ? value * M_PER_FOOT : value;
 }
 
 /** "5′11″" or "180 cm" */

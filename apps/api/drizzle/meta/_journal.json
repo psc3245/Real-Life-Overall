@@ -267,6 +267,20 @@
       "when": 1794516203715,
       "tag": "0037_coach_threads",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794581264978,
+      "tag": "0038_workout_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794583568217,
+      "tag": "0039_sport_workouts",
+      "breakpoints": true
     }
   ]
 }

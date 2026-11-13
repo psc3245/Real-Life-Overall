@@ -28,10 +28,12 @@ export function StartWorkoutPage() {
   const names = new Map((exercises.data ?? []).map((e) => [e.id, e]));
 
   const begin = (templateId?: string) =>
-    start.mutate(templateId ? { templateId } : {}, {
+    start.mutate(templateId ? { templateId } : { kind: "strength" }, {
       onSuccess: () => navigate("/workouts/active"),
     });
   const inProgress = active.data;
+  // Practice templates live on the Sports tab.
+  const lifting = templates.data?.filter((t) => t.kind !== "sport");
 
   return (
     <div className="space-y-8 pt-4">
@@ -75,8 +77,8 @@ export function StartWorkoutPage() {
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-display text-xl uppercase tracking-wider">
             Templates{" "}
-            {templates.data && templates.data.length > 0 && (
-              <span className="text-court-500">({templates.data.length})</span>
+            {lifting && lifting.length > 0 && (
+              <span className="text-court-500">({lifting.length})</span>
             )}
           </h2>
           <Link to="/workouts/templates/new" className="text-sm text-neon hover:underline">
@@ -85,14 +87,14 @@ export function StartWorkoutPage() {
         </div>
         {templates.isPending && <p className="text-court-500">Loading…</p>}
         <ErrorNote error={templates.error} />
-        {templates.data?.length === 0 && (
+        {lifting?.length === 0 && (
           <p className="rounded-xl border border-dashed border-court-700 p-6 text-center text-court-500">
             Templates are workouts you repeat: Push Day, Leg Day, Shooting Drills. Make one here, or
             save a finished workout as a template.
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {templates.data?.map((t) => (
+          {lifting?.map((t) => (
             <TemplateCard key={t.id} template={t} names={names} onOpen={() => setPreview(t)} />
           ))}
         </div>
@@ -118,7 +120,7 @@ export function StartWorkoutPage() {
   );
 }
 
-function TemplateCard({
+export function TemplateCard({
   template: t,
   names,
   onOpen,
@@ -142,7 +144,7 @@ function TemplateCard({
   );
 }
 
-function TemplatePreview({
+export function TemplatePreview({
   template: t,
   names,
   canStart,
@@ -207,7 +209,7 @@ function TemplatePreview({
             Close
           </Button>
           <Button variant="primary" disabled={!canStart || starting} onClick={onStart}>
-            {starting ? "Starting…" : "Start workout"}
+            {starting ? "Starting…" : t.kind === "sport" ? "Start practice" : "Start workout"}
           </Button>
         </span>
       </div>

@@ -13,6 +13,7 @@ import { Card, Muted } from "@/components/ui";
 import { dayLabel } from "@/lib/format";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
 import { formatElapsed, formatVolume } from "@/lib/workouts";
+import { CardioCard } from "./Cardio";
 
 /** A finished workout in a list: time, volume, PRs and each exercise's best set. */
 export function WorkoutCard({
@@ -24,6 +25,7 @@ export function WorkoutCard({
   byId: Map<string, ExerciseDto>;
   units: UnitSystem;
 }) {
+  if (w.kind === "cardio") return <CardioCard workout={w} byId={byId} units={units} />;
   return (
     <Pressable
       onPress={() => router.push({ pathname: "/workouts/[id]", params: { id: w.id } })}
@@ -31,7 +33,10 @@ export function WorkoutCard({
     >
       <Card style={{ gap: space.sm }}>
         <View>
-          <Text style={styles.title}>{w.name}</Text>
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>
+            <Text style={[styles.title, { flex: 1 }]}>{w.name}</Text>
+            {w.kind === "sport" && <Text style={styles.tag}>Practice</Text>}
+          </View>
           <Muted style={{ fontSize: 12 }}>{dayLabel(w.localDate)}</Muted>
         </View>
         <View style={styles.meta}>
@@ -102,6 +107,7 @@ export function ExerciseSummary({
 }
 
 const styles = StyleSheet.create({
+  tag: { color: colors.neon, fontSize: 11, letterSpacing: 1, textTransform: "uppercase" },
   title: {
     color: colors.court100,
     fontFamily: fonts.display,

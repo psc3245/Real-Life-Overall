@@ -1,6 +1,7 @@
 import {
   emptySet,
   MAX_WORKOUT_EXERCISES,
+  type ExerciseCategory,
   type ExerciseDto,
   type UnitSystem,
   type WorkoutExerciseDto,
@@ -18,10 +19,13 @@ export function WorkoutEditor({
   previous = {},
   units,
   mode,
+  defaultCategory,
   onChange,
   onSetDone,
 }: {
   exercises: WorkoutExerciseDto[];
+  /** The picker's starting category. */
+  defaultCategory?: ExerciseCategory;
   library: ExerciseDto[];
   previous?: Record<string, WorkoutSetDto[]>;
   units: UnitSystem;
@@ -88,7 +92,12 @@ export function WorkoutEditor({
         + Add exercises
       </button>
       <Modal open={picking} onClose={() => setPicking(false)} label="Add exercises" size="lg">
-        <ExercisePicker exercises={library} onAdd={add} onClose={() => setPicking(false)} />
+        <ExercisePicker
+          exercises={library}
+          initialCategory={defaultCategory}
+          onAdd={add}
+          onClose={() => setPicking(false)}
+        />
       </Modal>
     </div>
   );

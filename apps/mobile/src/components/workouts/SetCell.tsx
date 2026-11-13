@@ -1,9 +1,11 @@
 import {
   formatDuration,
   fromDisplayDistance,
+  fromDisplayLength,
   fromDisplayWeight,
   parseDuration,
   toDisplayDistance,
+  toDisplayLength,
   toDisplayWeight,
   type SetField,
   type UnitSystem,
@@ -20,6 +22,8 @@ export function displayValue(field: SetField, value: number | null, units: UnitS
       return String(toDisplayWeight(value, units));
     case "distance":
       return String(toDisplayDistance(value, units));
+    case "length":
+      return String(toDisplayLength(value, units));
     case "duration":
       return formatDuration(value);
     default:
@@ -36,6 +40,7 @@ function parseValue(field: SetField, text: string, units: UnitSystem): number | 
   if (!Number.isFinite(n) || n < 0) return undefined;
   if (field === "weight") return fromDisplayWeight(n, units);
   if (field === "distance") return fromDisplayDistance(n, units);
+  if (field === "length") return fromDisplayLength(n, units);
   return Math.round(n);
 }
 

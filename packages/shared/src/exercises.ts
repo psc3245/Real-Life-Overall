@@ -10,6 +10,9 @@ export const EXERCISE_TRACKING = [
   "duration",
   "distance_duration",
   "makes_attempts",
+  "weight_duration",
+  "weight_distance",
+  "distance",
 ] as const;
 export type ExerciseTracking = (typeof EXERCISE_TRACKING)[number];
 
@@ -19,18 +22,35 @@ export const TRACKING_LABELS: Record<ExerciseTracking, string> = {
   duration: "Time",
   distance_duration: "Distance + time",
   makes_attempts: "Makes / attempts",
+  weight_duration: "Weight + time",
+  weight_distance: "Weight + distance",
+  distance: "Distance",
 };
 
-export type SetField = "weight" | "reps" | "duration" | "distance" | "attempts";
+export type SetField = "weight" | "reps" | "duration" | "distance" | "length" | "attempts";
 
-/** The columns a set shows, in order. `reps` doubles as makes for makes_attempts. */
+/**
+ * The columns a set shows, in order. `reps` doubles as makes for makes_attempts; `distance` (mi
+ * or km) and `length` (ft or m, for short distances) are both stored as `distanceM`.
+ */
 export const TRACKING_FIELDS: Record<ExerciseTracking, SetField[]> = {
   weight_reps: ["weight", "reps"],
   reps: ["reps"],
   duration: ["duration"],
   distance_duration: ["distance", "duration"],
   makes_attempts: ["reps", "attempts"],
+  weight_duration: ["weight", "duration"],
+  weight_distance: ["weight", "length"],
+  distance: ["length"],
 };
+
+/** Whether a tracking kind's sets record `distanceM` (as a distance or a length). */
+export const recordsDistance = (tracking: ExerciseTracking) =>
+  TRACKING_FIELDS[tracking].some((f) => f === "distance" || f === "length");
+
+/** Whether a tracking kind shows its distance as a length (ft or m). */
+export const usesLength = (tracking: ExerciseTracking) =>
+  TRACKING_FIELDS[tracking].includes("length");
 
 export const EXERCISE_CATEGORIES = [
   "chest",
@@ -61,11 +81,43 @@ export const CATEGORY_LABELS: Record<ExerciseCategory, string> = {
   other: "Other",
 };
 
+/** Sports that sport & skill drills belong to; "athletic" is speed, agility and power for any. */
+export const SPORTS = [
+  "athletic",
+  "basketball",
+  "soccer",
+  "football",
+  "baseball",
+  "tennis",
+  "golf",
+  "volleyball",
+  "hockey",
+  "boxing",
+  "track",
+] as const;
+export type Sport = (typeof SPORTS)[number];
+
+export const SPORT_LABELS: Record<Sport, string> = {
+  athletic: "Athleticism",
+  basketball: "Basketball",
+  soccer: "Soccer",
+  football: "Football",
+  baseball: "Baseball & softball",
+  tennis: "Tennis",
+  golf: "Golf",
+  volleyball: "Volleyball",
+  hockey: "Hockey",
+  boxing: "Boxing & combat",
+  track: "Track & field",
+};
+
 export interface CatalogExercise {
   id: string;
   name: string;
   category: ExerciseCategory;
   tracking: ExerciseTracking;
+  /** Sport & skill drills only; null for drills that fit any sport. */
+  sport: Sport | null;
 }
 
 const ex = (
@@ -73,7 +125,8 @@ const ex = (
   name: string,
   category: ExerciseCategory,
   tracking: ExerciseTracking = "weight_reps",
-): CatalogExercise => ({ id, name, category, tracking });
+  sport: Sport | null = null,
+): CatalogExercise => ({ id, name, category, tracking, sport });
 
 export const EXERCISE_CATALOG: CatalogExercise[] = [
   // Chest
@@ -131,6 +184,7 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("ab-wheel", "Ab Wheel Rollout", "core", "reps"),
   ex("russian-twist", "Russian Twist", "core", "reps"),
   ex("cable-crunch", "Cable Crunch", "core"),
+  ex("weighted-plank", "Weighted Plank", "core", "weight_duration"),
   // Full body
   ex("clean-and-jerk", "Clean and Jerk", "full_body"),
   ex("power-clean", "Power Clean", "full_body"),
@@ -138,7 +192,12 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("kettlebell-swing", "Kettlebell Swing", "full_body"),
   ex("thruster", "Thruster", "full_body"),
   ex("burpee", "Burpee", "full_body", "reps"),
-  ex("farmers-carry", "Farmer's Carry", "full_body", "duration"),
+  ex("farmers-carry", "Farmer's Carry", "full_body", "weight_duration"),
+  ex("farmers-walk-distance", "Farmer's Walk (Distance)", "full_body", "weight_distance"),
+  ex("sled-push", "Sled Push", "full_body", "weight_distance"),
+  ex("sled-pull", "Sled Pull", "full_body", "weight_distance"),
+  ex("dead-hang", "Dead Hang", "back", "duration"),
+  ex("weighted-dead-hang", "Weighted Dead Hang", "back", "weight_duration"),
   // Cardio
   ex("running", "Running", "cardio", "distance_duration"),
   ex("treadmill", "Treadmill", "cardio", "distance_duration"),
@@ -150,21 +209,81 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("stair-climber", "Stair Climber", "cardio", "duration"),
   ex("jump-rope", "Jump Rope", "cardio", "duration"),
   ex("sprints", "Sprints", "cardio", "distance_duration"),
-  // Sport & skill
-  ex("free-throws", "Free Throws", "sport", "makes_attempts"),
-  ex("jump-shots", "Jump Shots", "sport", "makes_attempts"),
-  ex("three-pointers", "Three-Pointers", "sport", "makes_attempts"),
-  ex("penalty-kicks", "Penalty Kicks", "sport", "makes_attempts"),
-  ex("serves", "Serves", "sport", "makes_attempts"),
-  ex("putting", "Putting", "sport", "makes_attempts"),
-  ex("ball-handling", "Ball Handling Drills", "sport", "duration"),
-  ex("agility-ladder", "Agility Ladder", "sport", "duration"),
-  ex("shuttle-run", "Shuttle Run", "sport", "duration"),
-  ex("box-jump", "Box Jump", "sport", "reps"),
+  ex("hiking", "Hiking", "cardio", "distance_duration"),
+  ex("indoor-cycling", "Indoor Cycling", "cardio", "distance_duration"),
+  // Sport & skill: athleticism (speed, agility, power)
+  ex("agility-ladder", "Agility Ladder", "sport", "duration", "athletic"),
+  ex("cone-drills", "Cone Drills", "sport", "duration", "athletic"),
+  ex("shuttle-run", "Shuttle Run", "sport", "duration", "athletic"),
+  ex("forty-yard-dash", "40-Yard Dash", "sport", "duration", "athletic"),
+  ex("reaction-drills", "Reaction Drills", "sport", "duration", "athletic"),
+  ex("box-jump", "Box Jump", "sport", "reps", "athletic"),
+  ex("depth-jump", "Depth Jump", "sport", "reps", "athletic"),
+  ex("lateral-bounds", "Lateral Bounds", "sport", "reps", "athletic"),
+  ex("skater-jumps", "Skater Jumps", "sport", "reps", "athletic"),
+  ex("vertical-jump", "Vertical Jump", "sport", "distance", "athletic"),
+  ex("broad-jump", "Broad Jump", "sport", "distance", "athletic"),
+  ex("med-ball-slam", "Medicine Ball Slam", "sport", "weight_reps", "athletic"),
+  ex("med-ball-throw", "Medicine Ball Rotational Throw", "sport", "weight_reps", "athletic"),
+  ex("resisted-sprint", "Resisted Sprint (Sled)", "sport", "weight_distance", "athletic"),
+  // Basketball
+  ex("free-throws", "Free Throws", "sport", "makes_attempts", "basketball"),
+  ex("jump-shots", "Jump Shots", "sport", "makes_attempts", "basketball"),
+  ex("three-pointers", "Three-Pointers", "sport", "makes_attempts", "basketball"),
+  ex("mid-range-shots", "Mid-Range Shots", "sport", "makes_attempts", "basketball"),
+  ex("layups", "Layups", "sport", "makes_attempts", "basketball"),
+  ex("mikan-drill", "Mikan Drill", "sport", "reps", "basketball"),
+  ex("ball-handling", "Ball Handling Drills", "sport", "duration", "basketball"),
+  ex("defensive-slides", "Defensive Slides", "sport", "duration", "basketball"),
+  // Soccer
+  ex("penalty-kicks", "Penalty Kicks", "sport", "makes_attempts", "soccer"),
+  ex("shots-on-target", "Shots on Target", "sport", "makes_attempts", "soccer"),
+  ex("crossing", "Crossing", "sport", "makes_attempts", "soccer"),
+  ex("juggling", "Juggling", "sport", "reps", "soccer"),
+  ex("soccer-dribbling", "Dribbling Drills (Soccer)", "sport", "duration", "soccer"),
+  ex("passing-drills", "Passing Drills (Soccer)", "sport", "duration", "soccer"),
+  // Football
+  ex("passing-accuracy", "Passing Accuracy", "sport", "makes_attempts", "football"),
+  ex("catching-drills", "Catching Drills", "sport", "makes_attempts", "football"),
+  ex("field-goals", "Field Goals", "sport", "makes_attempts", "football"),
+  ex("route-running", "Route Running", "sport", "duration", "football"),
+  // Baseball & softball
+  ex("batting-practice", "Batting Practice (Solid Contact)", "sport", "makes_attempts", "baseball"),
+  ex("pitching-strikes", "Pitching (Strikes)", "sport", "makes_attempts", "baseball"),
+  ex("tee-work", "Tee Work", "sport", "reps", "baseball"),
+  ex("fielding-drills", "Fielding Drills", "sport", "duration", "baseball"),
+  // Tennis
+  ex("serves", "Serves", "sport", "makes_attempts", "tennis"),
+  ex("groundstrokes", "Groundstroke Rally", "sport", "duration", "tennis"),
+  ex("volleys", "Volley Drills", "sport", "duration", "tennis"),
+  // Golf
+  ex("putting", "Putting", "sport", "makes_attempts", "golf"),
+  ex("chipping", "Chipping (Inside 6 ft)", "sport", "makes_attempts", "golf"),
+  ex("driving-range", "Driving Range (Balls)", "sport", "reps", "golf"),
+  ex("golf-drive", "Golf Drive", "sport", "distance", "golf"),
+  // Volleyball
+  ex("volleyball-serves", "Serves (Volleyball)", "sport", "makes_attempts", "volleyball"),
+  ex("volleyball-passing", "Passing (Volleyball)", "sport", "makes_attempts", "volleyball"),
+  ex("approach-jumps", "Approach Jumps", "sport", "reps", "volleyball"),
+  // Hockey
+  ex("hockey-shots", "Shots on Net (Hockey)", "sport", "makes_attempts", "hockey"),
+  ex("stickhandling", "Stickhandling", "sport", "duration", "hockey"),
+  ex("skating-drills", "Skating Drills", "sport", "duration", "hockey"),
+  // Boxing & combat
+  ex("shadowboxing", "Shadowboxing", "sport", "duration", "boxing"),
+  ex("heavy-bag", "Heavy Bag Rounds", "sport", "duration", "boxing"),
+  ex("mitt-work", "Mitt Work", "sport", "duration", "boxing"),
+  ex("speed-bag", "Speed Bag", "sport", "duration", "boxing"),
+  ex("sparring", "Sparring Rounds", "sport", "duration", "boxing"),
+  // Track & field
+  ex("long-jump", "Long Jump", "sport", "distance", "track"),
+  ex("triple-jump", "Triple Jump", "sport", "distance", "track"),
+  ex("high-jump", "High Jump", "sport", "distance", "track"),
+  ex("shot-put", "Shot Put", "sport", "distance", "track"),
+  ex("discus", "Discus", "sport", "distance", "track"),
+  // Any sport
   ex("scrimmage", "Scrimmage / Game", "sport", "duration"),
   ex("practice", "Team Practice", "sport", "duration"),
-  ex("shadowboxing", "Shadowboxing", "sport", "duration"),
-  ex("heavy-bag", "Heavy Bag Rounds", "sport", "duration"),
   // Mobility
   ex("stretching", "Stretching", "mobility", "duration"),
   ex("yoga", "Yoga", "mobility", "duration"),

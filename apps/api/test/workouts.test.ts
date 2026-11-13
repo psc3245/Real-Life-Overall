@@ -1,5 +1,7 @@
 import {
   emptySet,
+  type CardioOverviewDto,
+  type SportOverviewDto,
   type BodyDto,
   type DayDto,
   type ExerciseDetailDto,
@@ -289,6 +291,158 @@ describe("workouts", () => {
     expect(moved).toMatchObject({ localDate: yesterday, summary: { durationS: 3000 } });
     expect((await body<DayDto>(await request(`/days/${yesterday}`))).workouts).toHaveLength(1);
     expect((await body<DayDto>(await request("/days/today"))).workouts).toHaveLength(0);
+  });
+});
+
+describe("cardio", () => {
+  it("logs, edits and summarizes cardio sessions alongside workouts", async () => {
+    const t = await createRatedApp([
+      jsonResult({ changes: [], narrative: "Ran.", flags: [], nextPrompts: [] }),
+    ]);
+    const today = (await body<DayDto>(await t.request("/days/today"))).today;
+    const log = (input: Record<string, unknown>) =>
+      t.request("/workouts/cardio", { method: "POST", ...json(input) });
+
+    // Activities must record time.
+    expect(
+      (await log({ activity: "bench-press-barbell", localDate: today, durationS: 600 })).status,
+    ).toBe(400);
+    expect(
+      (await log({ activity: "running", localDate: "2999-01-01", durationS: 600 })).status,
+    ).toBe(400);
+
+    const res = await log({
+      activity: "running",
+      localDate: today,
+      durationS: 1500,
+      distanceM: 5000,
+      avgHeartRate: 150,
+      effort: 7,
+    });
+    expect(res.status).toBe(201);
+    const run = await body<WorkoutDto>(res);
+    expect(run).toMatchObject({
+      kind: "cardio",
+      name: "Running",
+      summary: { durationS: 1500 },
+      cardio: { avgHeartRate: 150, effort: 7, calories: null },
+      exercises: [
+        { exerciseId: "running", sets: [{ distanceM: 5000, durationS: 1500, done: true }] },
+      ],
+    });
+
+    // Distance is dropped for activities that only record time.
+    const elliptical = await body<WorkoutDto>(
+      await log({ activity: "elliptical", localDate: today, durationS: 1200, distanceM: 3000 }),
+    );
+    expect(elliptical.exercises[0]!.sets[0]!.distanceM).toBeNull();
+
+    const edited = await body<WorkoutDto>(
+      await t.request(`/workouts/cardio/${run.id}`, {
+        method: "PUT",
+        ...json({
+          activity: "running",
+          name: "Tempo run",
+          localDate: today,
+          durationS: 1800,
+          distanceM: 6000,
+        }),
+      }),
+    );
+    expect(edited).toMatchObject({
+      name: "Tempo run",
+      summary: { durationS: 1800 },
+      cardio: { effort: null },
+    });
+    // Strength workouts can't be edited as cardio.
+    const w = await body<WorkoutDto>(await t.request("/workouts", { method: "POST" }));
+    expect(
+      (
+        await t.request(`/workouts/cardio/${w.id}`, {
+          method: "PUT",
+          ...json({ activity: "running", localDate: today, durationS: 60 }),
+        })
+      ).status,
+    ).toBe(404);
+
+    const overview = await body<CardioOverviewDto>(await t.request("/workouts/cardio"));
+    expect(overview.week).toEqual({ sessions: 2, distanceM: 6000, durationS: 3000 });
+    expect(overview.recent.map((r) => r.id)).toEqual([elliptical.id, run.id]);
+    expect(overview.activities.find((a) => a.activityId === "running")).toMatchObject({
+      sessions: 1,
+      longestM: 6000,
+      bestPaceSPerKm: 300,
+    });
+
+    const day = await body<DayDto>(await t.request("/days/today"));
+    expect(day.workouts[0]).toMatchObject({
+      kind: "cardio",
+      lines: ["Running: 3.73 mi in 30:00 (8:03 /mi)"],
+    });
+    expect((await t.request(`/days/${today}/recap`, { method: "POST" })).status).toBe(200);
+    expect(JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt)).toContain(
+      "Running: 3.73 mi in 30:00 (8:03 /mi)",
+    );
+  });
+});
+
+describe("sports", () => {
+  it("runs practices from practice plans and follows each drill", async () => {
+    const { request, start, save, finish } = await setup();
+    const library = await body<ExerciseDto[]>(await request("/exercises"));
+    expect(library.find((e) => e.id === "free-throws")).toMatchObject({
+      category: "sport",
+      sport: "basketball",
+    });
+
+    const plan = await body<WorkoutTemplateDto>(
+      await request("/workout-templates", {
+        method: "POST",
+        ...json({
+          kind: "sport",
+          name: "Shooting",
+          exercises: [{ exerciseId: "free-throws", sets: [set({ reps: 7, attempts: 10 })] }],
+        }),
+      }),
+    );
+    expect(plan.kind).toBe("sport");
+
+    const w = await start({ templateId: plan.id });
+    expect(w.kind).toBe("sport");
+    await save(w.id, {
+      exercises: [
+        {
+          exerciseId: "free-throws",
+          sets: [
+            set({ reps: 8, attempts: 10, done: true }),
+            set({ reps: 6, attempts: 10, done: true }),
+          ],
+        },
+        { exerciseId: "bench-press-barbell", sets: [set({ weightKg: 60, reps: 5, done: true })] },
+      ],
+    });
+    expect((await finish(w.id, { template: "new", templateName: "Shooting 2" })).status).toBe(200);
+    const templates = await body<WorkoutTemplateDto[]>(await request("/workout-templates"));
+    expect(templates.find((t) => t.name === "Shooting 2")?.kind).toBe("sport");
+
+    // An empty practice is named like one.
+    const empty = await start({ kind: "sport" });
+    expect(empty).toMatchObject({ kind: "sport", name: expect.stringMatching(/Practice$/) });
+    await request(`/workouts/${empty.id}`, { method: "DELETE" });
+
+    const o = await body<SportOverviewDto>(await request("/workouts/sport"));
+    expect(o.week.sessions).toBe(1);
+    expect(o.recent.map((r) => r.id)).toEqual([w.id]);
+    // Only sport & skill drills are skills.
+    expect(o.skills).toEqual([
+      expect.objectContaining({
+        exerciseId: "free-throws",
+        sessions: 1,
+        headline: "bestPct",
+        best: 80,
+        recent: { makes: 14, attempts: 20 },
+      }),
+    ]);
   });
 });
 

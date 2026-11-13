@@ -1,4 +1,16 @@
-import { toDisplayWeight, weightUnit, type UnitSystem } from "@rlo/shared";
+import {
+  distanceUnit,
+  formatDuration,
+  lengthUnit,
+  toDisplayDistance,
+  toDisplayLength,
+  toDisplayWeight,
+  usesLength,
+  weightUnit,
+  type ExerciseRecordsDto,
+  type ExerciseTracking,
+  type UnitSystem,
+} from "@rlo/shared";
 
 /** "12,450 lb" */
 export function formatVolume(kg: number, units: UnitSystem) {
@@ -22,4 +34,29 @@ export function since(value: string | null, today: Date = new Date()) {
   if (days < 30) return `${days} days ago`;
   const months = Math.floor(days / 30);
   return months === 1 ? "A month ago" : `${months} months ago`;
+}
+
+/** A record's value in the user's units. */
+export function formatRecord(
+  key: keyof ExerciseRecordsDto,
+  value: number,
+  units: UnitSystem,
+  tracking: ExerciseTracking,
+) {
+  switch (key) {
+    case "heaviestKg":
+    case "best1RmKg":
+    case "bestSetVolumeKg":
+      return `${(Math.round(toDisplayWeight(value, units) * 10) / 10).toLocaleString()} ${weightUnit(units)}`;
+    case "longestS":
+      return formatDuration(value);
+    case "longestM":
+      return usesLength(tracking)
+        ? `${toDisplayLength(value, units)} ${lengthUnit(units)}`
+        : `${toDisplayDistance(value, units)} ${distanceUnit(units)}`;
+    case "bestPct":
+      return `${Math.round(value)}%`;
+    default:
+      return String(value);
+  }
 }

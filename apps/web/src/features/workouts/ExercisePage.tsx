@@ -1,19 +1,13 @@
 import {
   CATEGORY_LABELS,
-  formatDuration,
   formatSet,
   HEADLINE_RECORD,
   RECORD_LABELS,
   recordChartUnit,
   recordChartValue,
   SET_KIND_TAGS,
-  toDisplayDistance,
-  toDisplayWeight,
   TRACKING_LABELS,
-  distanceUnit,
-  weightUnit,
   type ExerciseRecordsDto,
-  type UnitSystem,
 } from "@rlo/shared";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -23,27 +17,10 @@ import { TrendChart } from "../../components/charts/TrendChart";
 import { StatTile } from "../../components/StatTile";
 import { dayLabel } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { formatRecord } from "./format";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
 import { DebugId, DebugJson } from "../../components/debug/Debug";
 import { ChartLink } from "../charts/ChartLink";
-
-/** A record's value in the user's units. */
-function formatRecord(key: keyof ExerciseRecordsDto, value: number, units: UnitSystem) {
-  switch (key) {
-    case "heaviestKg":
-    case "best1RmKg":
-    case "bestSetVolumeKg":
-      return `${(Math.round(toDisplayWeight(value, units) * 10) / 10).toLocaleString()} ${weightUnit(units)}`;
-    case "longestS":
-      return formatDuration(value);
-    case "longestM":
-      return `${toDisplayDistance(value, units)} ${distanceUnit(units)}`;
-    case "bestPct":
-      return `${Math.round(value)}%`;
-    default:
-      return String(value);
-  }
-}
 
 export function ExercisePage() {
   const { id = "" } = useParams();
@@ -63,8 +40,11 @@ export function ExercisePage() {
   const points = [...history]
     .reverse()
     .filter((h) => h.best !== null)
-    .map((h) => ({ date: h.localDate, value: recordChartValue(headline, h.best!, units) }));
-  const unit = recordChartUnit(headline, units);
+    .map((h) => ({
+      date: h.localDate,
+      value: recordChartValue(headline, h.best!, units, e.tracking),
+    }));
+  const unit = recordChartUnit(headline, units, e.tracking);
   const chartUnit = unit === "%" ? "%" : unit === "reps" ? "" : ` ${unit}`;
 
   return (
@@ -103,7 +83,7 @@ export function ExercisePage() {
             <StatTile
               key={k}
               label={RECORD_LABELS[k]}
-              value={formatRecord(k, records[k]!, units)}
+              value={formatRecord(k, records[k]!, units, e.tracking)}
             />
           ))}
         </dl>

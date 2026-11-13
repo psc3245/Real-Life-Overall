@@ -178,6 +178,7 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
         previous={previous}
         units={units}
         mode="live"
+        defaultCategory={workout.kind === "sport" ? "sport" : undefined}
         onChange={(exercises) => update({ exercises })}
         onSetDone={timer.start}
       />
