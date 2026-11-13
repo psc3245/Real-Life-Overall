@@ -1,4 +1,9 @@
-import { GROUP_RULE_LABELS, HABIT_TYPE_LABELS, type HabitDto } from "@rlo/shared";
+import {
+  describeHabitGoal,
+  GROUP_RULE_LABELS,
+  HABIT_TYPE_LABELS,
+  type HabitDto,
+} from "@rlo/shared";
 import { router } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useArchiveHabit, useHabits } from "@/api/days";
@@ -49,6 +54,8 @@ function ManageHabitsScreen() {
             {HABIT_TYPE_LABELS[h.type]}
             {h.type === "group" &&
               ` · ${GROUP_RULE_LABELS[h.config.rule ?? "all"]}${h.config.rule === "count" ? ` (${h.config.target})` : ""}`}
+            {describeHabitGoal(h.type, h.config) &&
+              ` · goal ${describeHabitGoal(h.type, h.config)}`}
             {!h.parentId && ` · ${scheduleLabel(h.days)} · since ${h.startsOn}`}
             {h.links.length > 0 && ` · ${h.links.map((id) => names.get(id) ?? "?").join(", ")}`}
           </Muted>

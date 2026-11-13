@@ -54,7 +54,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Coaching | **Weekly focus goals and habit proposals** (the user accepts proposals), plus an on-demand **coach chat** that suggests habits, goals and Scouting Report lines added with one tap (decided 2026-10-26, §5.9). |
 | LLM persona | **Neutral**, informative tone. |
 | Habit ↔ attribute links | **LLM suggests, user confirms.** |
-| Habit input types | All 8 from Habit Tracker: checkbox, checknote, counter, duration, slider, rating, shorttext, journal. |
+| Habit input types | All 8 from Habit Tracker: checkbox, checknote, counter, duration, slider, rating, shorttext, journal; plus time of day (§7.13) and groups. |
 | LLM memory | **Full-history retrieval (RAG)**. |
 | Day boundary | **User's timezone.** The recap runs on "End my day", otherwise automatically the next morning. |
 | Social (eventual) | Public card sharing, friends and compare, leaderboards. |
@@ -486,6 +486,16 @@ A spotlight tour of the main features, shown once. (A walkthrough is the practic
 - **Controls:** Next and Back, arrow keys, Escape or Skip to end it. The page underneath can't be clicked while it runs.
 - Web only for now; iOS reads the same flag.
 
+### 7.13 Goal comparisons and time-of-day habits (added 2026-11-13)
+- **Win when:** every numeric build habit (counter, duration, slider, stars, time of day) has `config.compare`: `atLeast` (reach it), `moreThan` (beat it), `atMost` / `lessThan` (stay under it). Missing means `atLeast`, which is what every older habit meant, so nothing migrates. "At most" and "more than" goals may be 0; "at least" and "less than" can't. It can be changed after creation, like the target. Avoid habits keep their own rule (kept at or under the limit, no entry = kept) and have no `compare`.
+- **Optional goals on scales and stars:** a build slider or stars habit may set a target ("4+ stars", "stress at most 3"); without one, any logged value counts as done, as before.
+- **Time of day** (`time`, e.g. wake-up, bedtime): the entry is minutes after midnight (0–1439). With no target it's just tracked (any logged time is done); with one, `compare` reads as at or after / after / by / before (default "by"). Comparisons wrap around midnight (a time within 12 hours after the target is "later"), so a 12:30 AM bedtime misses an 11:30 PM "by". Time habits are always build: earlier or later is the goal either way. Stats average times around the target, charts plot hours after midnight (unwrapped around the target), and recaps and the coach read times as clock times.
+- Entries show the goal after a slash: "1800/≤2000 cal", "6:25 AM (by 6:30 AM)", "4/5 (≥4)"; elsewhere it reads "goal at most 2000 cal".
+
+### 7.14 Haptics (iOS, added 2026-11-13)
+- **Rule of thumb:** reasonably important actions are felt; routine taps (navigation, typing, opening menus) aren't. One helper (`lib/haptics.ts`) names feels by meaning: *tap* (steppers, stars, scale steps, adding a set, undoing a check), *impact* (checking off a set or habit, a clean avoid day, adding exercises, starting a workout, accepting a coach draft), *remove* (deleting a set, exercise, workout, habit, goal, template, chart, report or question), *success*, *warning* (rest timer done) and *error*.
+- **Actions that take time buzz when they finish, not when tapped:** a mutation declares `meta: { haptic }` and the query client's `MutationCache` fires it once the server answers (success for finishing a workout, ending the day, the weekly review, initial ratings, a report run, saving a habit or goal; a light tap when the coach replies), and any failure of such a mutation is felt as an error. Debounced saves (habit entries, the journal) don't buzz on save; their controls already did on the tap.
+
 ## 8. Architecture
 
 ### 8.1 Constraints
@@ -818,6 +828,8 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Cross-device sync: feature toggles merge per feature on the server; the web refetches on every tab focus; the live workout and the journal adopt edits from the other device whenever nothing local is unsaved or in flight.
 - [x] The walkthrough: a once-per-account spotlight tour of the main features, replayable from the account menu (§7.12)
 - [ ] iOS: the walkthrough
+- [x] Goal comparisons (reach, beat or stay under) for every numeric habit, optional goals on scales and stars, and a time-of-day habit type (§7.13)
+- [x] iOS: haptics for important actions, felt on completion for waited-on ones (§7.14)
 
 ---
 

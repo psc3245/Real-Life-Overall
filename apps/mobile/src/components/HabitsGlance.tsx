@@ -1,4 +1,5 @@
 import {
+  formatStatAverage,
   HABIT_STAT_RANGES,
   HABIT_TYPE_LABELS,
   type HabitStatRange,
@@ -107,6 +108,7 @@ function HabitCard({
 }) {
   const [open, setOpen] = useState(false);
   const { habit } = s;
+  const average = formatStatAverage(s);
   return (
     <Card style={{ gap: space.md }}>
       <View style={styles.cardHead}>
@@ -138,13 +140,7 @@ function HabitCard({
 
       <View style={styles.facts}>
         <Fact label={`Left this ${range}`} value={`${s.remaining}`} />
-        {s.average !== null && (
-          <Fact
-            label="Avg"
-            value={`${s.average}${s.target !== null ? ` / ${s.target}` : ""}`}
-            suffix={habit.type === "duration" ? "min" : (habit.config.unit ?? "")}
-          />
-        )}
+        {average && <Fact label="Avg" value={average.value} suffix={average.suffix} />}
         <Fact label="Streak" value={String(s.currentStreak)} />
         <Fact
           label="Best"

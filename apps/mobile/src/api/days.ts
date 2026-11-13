@@ -10,6 +10,7 @@ import type {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { changesKey, ratingsKey } from "./ratings";
+import type { HapticKind } from "@/lib/haptics";
 
 export const dayKey = (date: string | null) => ["day", date ?? "today"] as const;
 export const habitsKey = ["habits"] as const;
@@ -64,9 +65,13 @@ export function useHabits() {
   return useQuery({ queryKey: habitsKey, queryFn: () => api<HabitDto[]>("/habits") });
 }
 
-function useHabitMutation<TInput, TOutput>(request: (input: TInput) => Promise<TOutput>) {
+function useHabitMutation<TInput, TOutput>(
+  request: (input: TInput) => Promise<TOutput>,
+  haptic: HapticKind = "success",
+) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic },
     mutationFn: request,
     onSuccess: () =>
       Promise.all([
@@ -103,7 +108,10 @@ export function useUpdateHabit() {
 }
 
 export function useArchiveHabit() {
-  return useHabitMutation((id: string) => api<null>(`/habits/${id}`, { method: "DELETE" }));
+  return useHabitMutation(
+    (id: string) => api<null>(`/habits/${id}`, { method: "DELETE" }),
+    "remove",
+  );
 }
 
 export function useSuggestLinks() {
@@ -126,6 +134,7 @@ export function useSavePromptAnswers(date: string) {
 export function useEndDay(date: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: () => api<DayDto>(`/days/${date}/recap`, { method: "POST" }),
     onSuccess: async (day) => {
       queryClient.setQueryData(dayKey(day.date), day);

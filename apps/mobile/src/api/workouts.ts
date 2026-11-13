@@ -22,6 +22,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { api } from "./client";
+import type { HapticKind } from "@/lib/haptics";
 
 export const workoutsKey = ["workouts"] as const;
 export const activeWorkoutKey = ["workouts", "active"] as const;
@@ -70,6 +71,7 @@ export function useWorkoutHistory() {
 export function useStartWorkout() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "impact" },
     mutationFn: (input: { templateId?: string; kind?: LiveWorkoutKind } = {}) =>
       api<WorkoutDto>("/workouts", { method: "POST", body: JSON.stringify(input) }),
     onSuccess: async (workout) => {
@@ -106,6 +108,7 @@ export function useSaveWorkout(id: string) {
 export function useFinishWorkout(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: (options: { template: TemplateAction; templateName?: string }) =>
       api<WorkoutDto>(`/workouts/${id}/finish`, {
         method: "POST",
@@ -125,6 +128,7 @@ export function useFinishWorkout(id: string) {
 export function useDeleteWorkout() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "remove" },
     mutationFn: (id: string) => api<null>(`/workouts/${id}`, { method: "DELETE" }),
     onSuccess: async () => {
       queryClient.setQueryData(activeWorkoutKey, null);
@@ -155,6 +159,7 @@ export function useCardioOverview() {
 export function useSaveCardio(id?: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: (input: CardioInput) =>
       api<WorkoutDto>(id ? `/workouts/cardio/${id}` : "/workouts/cardio", {
         method: id ? "PUT" : "POST",
@@ -183,9 +188,13 @@ export interface TemplateInput {
   exercises: WorkoutExerciseDto[];
 }
 
-function useTemplateMutation<TInput, TOutput>(request: (input: TInput) => Promise<TOutput>) {
+function useTemplateMutation<TInput, TOutput>(
+  request: (input: TInput) => Promise<TOutput>,
+  haptic: HapticKind = "success",
+) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic },
     mutationFn: request,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templatesKey }),
   });
@@ -210,8 +219,9 @@ export function useUpdateTemplate() {
 }
 
 export function useDeleteTemplate() {
-  return useTemplateMutation((id: string) =>
-    api<null>(`/workout-templates/${id}`, { method: "DELETE" }),
+  return useTemplateMutation(
+    (id: string) => api<null>(`/workout-templates/${id}`, { method: "DELETE" }),
+    "remove",
   );
 }
 
@@ -231,6 +241,7 @@ export function useExercise(id: string) {
 export function useCreateExercise() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "impact" },
     mutationFn: (input: { name: string; category: ExerciseCategory; tracking: ExerciseTracking }) =>
       api<ExerciseDto>("/exercises", { method: "POST", body: JSON.stringify(input) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exercisesKey }),
@@ -240,6 +251,7 @@ export function useCreateExercise() {
 export function useArchiveExercise() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "remove" },
     mutationFn: (id: string) => api<null>(`/exercises/${id}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exercisesKey }),
   });
@@ -254,6 +266,7 @@ export function useBody() {
 export function useSaveBody() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: ({
       date,
       ...values

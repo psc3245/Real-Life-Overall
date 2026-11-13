@@ -6,6 +6,7 @@ import { api } from "./client";
 /** Dev and admin accounts send bug reports (DESIGN.md §8.9). */
 export function useSendBugReport() {
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: (body: BugReportBody) =>
       api<{ id: string }>("/bug-reports", { method: "POST", body: JSON.stringify(body) }),
   });

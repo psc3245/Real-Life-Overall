@@ -16,13 +16,13 @@ import {
   type WorkoutExerciseDto,
   type WorkoutSetDto,
 } from "@rlo/shared";
-import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { Field } from "@/components/ui";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { haptics } from "@/lib/haptics";
 import { PopMenu, usePopAnchor, type PopOption } from "./PopMenu";
 import { REST_CHOICES } from "./RestTimer";
 import { displayValue, SetCell } from "./SetCell";
@@ -123,9 +123,12 @@ export function ExerciseBlock({
       ? { ...prior, kind: prior.kind === "warmup" ? "normal" : prior.kind, done: mode === "log" }
       : { ...emptySet(), done: mode === "log" };
     onChange({ ...exercise, sets: [...exercise.sets, next] });
+    haptics.tap();
   };
-  const removeSet = (i: number) =>
+  const removeSet = (i: number) => {
     onChange({ ...exercise, sets: exercise.sets.filter((_, j) => j !== i) });
+    haptics.remove();
+  };
   /** Copies a previous set's numbers into a set (empty fields only when checking off). */
   const fromPrevious = (i: number, onlyEmpty: boolean): Partial<WorkoutSetDto> => {
     const prev = previous?.[i];
@@ -141,7 +144,7 @@ export function ExerciseBlock({
     const done = !exercise.sets[i]!.done;
     setAt(i, { done, ...(done && fromPrevious(i, true)) });
     if (!done) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.impact();
     onSetDone?.(restS);
   };
 
@@ -158,7 +161,14 @@ export function ExerciseBlock({
           },
         ]),
     ...(info ? [{ label: "History and records", onPress: () => openExercise(info.id) }] : []),
-    { label: "Remove exercise", onPress: onRemove, destructive: true },
+    {
+      label: "Remove exercise",
+      onPress: () => {
+        onRemove();
+        haptics.remove();
+      },
+      destructive: true,
+    },
   ];
   const restOptions: PopOption[] = [null, ...REST_CHOICES].map((r) => ({
     label: r ? formatDuration(r) : "Off",

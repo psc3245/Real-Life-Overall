@@ -27,6 +27,7 @@ export function useFocus() {
 export function useRunWeekly() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: () => api<WeeklyStateDto>("/weekly/run", { method: "POST" }),
     onSuccess: async (state) => {
       queryClient.setQueryData(weeklyKey, state);
@@ -42,6 +43,7 @@ export function useRunWeekly() {
 export function useResolveProposal() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "impact" },
     mutationFn: ({
       id,
       index,

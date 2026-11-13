@@ -1,6 +1,7 @@
 import type { ChartConfig, ChartViewDto, MetricDto, MetricSeriesResponseDto } from "@rlo/shared";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
+import type { HapticKind } from "@/lib/haptics";
 
 export const metricsKey = ["metrics"] as const;
 export const chartViewsKey = ["chart-views"] as const;
@@ -26,9 +27,13 @@ export function useChartViews() {
   return useQuery({ queryKey: chartViewsKey, queryFn: () => api<ChartViewDto[]>("/chart-views") });
 }
 
-function useViewMutation<TInput, TOutput>(request: (input: TInput) => Promise<TOutput>) {
+function useViewMutation<TInput, TOutput>(
+  request: (input: TInput) => Promise<TOutput>,
+  haptic: HapticKind = "success",
+) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic },
     mutationFn: request,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: chartViewsKey }),
   });
@@ -48,5 +53,8 @@ export function useUpdateChartView() {
 }
 
 export function useDeleteChartView() {
-  return useViewMutation((id: string) => api<null>(`/chart-views/${id}`, { method: "DELETE" }));
+  return useViewMutation(
+    (id: string) => api<null>(`/chart-views/${id}`, { method: "DELETE" }),
+    "remove",
+  );
 }

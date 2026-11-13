@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { isValidDate } from "../dates";
-import { HABIT_TYPES, type HabitType } from "./habits";
+import {
+  describeHabitGoal,
+  HABIT_TYPES,
+  normalizeHabitConfig,
+  type HabitCompare,
+  type HabitConfig,
+  type HabitType,
+} from "./habits";
 import type { WorkoutExerciseDto } from "./workouts";
 
 /**
@@ -45,12 +52,14 @@ export type CoachSuggestionDto = SuggestionBase &
         name: string;
         habitType: HabitType;
         days: number[];
-        /** counter/duration goal (the daily limit for an avoid habit). */
+        /** The goal (the daily limit for an avoid habit); minutes after midnight for time. */
         target: number | null;
         unit: string | null;
         nodeIds: string[];
         /** A habit to cut back on (missing on older suggestions: build). */
         avoid?: boolean;
+        /** How a build habit meets its target (missing: the type's default). */
+        compare?: HabitCompare | null;
       }
     | {
         kind: "goal";
@@ -191,3 +200,27 @@ export const coachReplyOutputSchema = z.object({
       `0-${MAX_COACH_SUGGESTIONS}; only when the user asks for ideas or one clearly helps. Usually []`,
     ),
 });
+
+type HabitSuggestion = Extract<CoachSuggestionDto, { kind: "habit" }>;
+
+/** A habit suggestion's settings, as the habit would be created. */
+export function suggestedHabitConfig(s: HabitSuggestion): HabitConfig {
+  return normalizeHabitConfig(s.habitType, {
+    target: s.target,
+    unit: s.unit,
+    direction: s.avoid ? "avoid" : "build",
+    compare: s.compare ?? null,
+  });
+}
+
+/** " · at most 2 coffees", " · by 6:30 AM": a habit suggestion's goal for its card. */
+export function suggestedHabitGoal(s: HabitSuggestion): string {
+  const config = suggestedHabitConfig(s);
+  if (s.avoid) {
+    if (config.target === null) return "";
+    const unit = s.habitType === "duration" ? " min" : config.unit ? ` ${config.unit}` : "";
+    return ` · at most ${config.target}${unit}`;
+  }
+  const goal = describeHabitGoal(s.habitType, config);
+  return goal ? ` · goal ${goal}` : "";
+}

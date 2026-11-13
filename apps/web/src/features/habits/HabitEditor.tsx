@@ -2,11 +2,19 @@ import {
   ALL_DAYS,
   GROUP_RULE_LABELS,
   GROUP_RULES,
+  HABIT_COMPARE_LABELS,
+  HABIT_COMPARES,
   HABIT_DIRECTIONS,
   HABIT_TYPE_LABELS,
   HABIT_TYPES,
   MAX_HABIT_LINKS,
+  habitCompare,
   normalizeHabitConfig,
+  parseTimeOfDay,
+  TARGETED_TYPES,
+  TIME_COMPARE_LABELS,
+  timeInputValue,
+  type HabitCompare,
   type HabitConfig,
   type HabitDirection,
   type HabitDto,
@@ -87,6 +95,7 @@ export function HabitEditor({
   const saving = submit?.pending || create.isPending || update.isPending;
 
   const avoid = config.direction === "avoid";
+  const compare = habitCompare(type, config);
   const changeType = (next: HabitType) => {
     setType(next);
     setConfig(normalizeHabitConfig(next, { direction: config.direction }));
@@ -141,13 +150,36 @@ export function HabitEditor({
       })),
     className: `${compactFieldClass} w-24`,
   });
+  const label = (text: string) => (
+    <span className="block text-xs uppercase tracking-wider text-court-300">{text}</span>
+  );
+  // Build goals: reach it, beat it or stay under it.
+  const compareSelect = !avoid && (
+    <label className="space-y-1">
+      {label("Win when")}
+      <select
+        aria-label="Win when"
+        value={compare}
+        onChange={(e) => setConfig((c) => ({ ...c, compare: e.target.value as HabitCompare }))}
+        className={compactFieldClass}
+      >
+        {HABIT_COMPARES.map((c) => (
+          <option key={c} value={c}>
+            {(type === "time" ? TIME_COMPARE_LABELS : HABIT_COMPARE_LABELS)[c]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  // "Less than 0" can't be won and "at least 0" always is.
+  const minGoal = avoid || compare === "atMost" || compare === "moreThan" ? 0 : 1;
 
   return (
     <form
       onSubmit={onSubmit}
       className="space-y-6 rounded-xl border border-neon/40 bg-court-900 p-5"
     >
-      {type !== "group" && (
+      {type !== "group" && type !== "time" && (
         <fieldset className="space-y-2">
           <legend className="text-xs uppercase tracking-wider text-court-300">Goal</legend>
           <div className="flex flex-wrap gap-2">
@@ -206,17 +238,18 @@ export function HabitEditor({
         </label>
       </div>
 
-      {(type === "counter" || type === "duration" || type === "slider" || type === "rating") && (
+      {TARGETED_TYPES.includes(type) && (
         <div className="flex flex-wrap items-end gap-4 text-sm">
           {type === "counter" && (
             <>
+              {compareSelect}
               <label className="space-y-1">
                 <span className="block text-xs uppercase tracking-wider text-court-300">
                   {avoid ? "Daily limit (at most)" : "Daily goal"}
                 </span>
                 <input
                   aria-label={avoid ? "Daily limit" : "Daily goal"}
-                  min={avoid ? 0 : 1}
+                  min={minGoal}
                   {...num("target")}
                 />
               </label>
@@ -234,16 +267,41 @@ export function HabitEditor({
             </>
           )}
           {type === "duration" && (
-            <label className="space-y-1">
-              <span className="block text-xs uppercase tracking-wider text-court-300">
-                {avoid ? "Daily limit (min)" : "Daily goal (min)"}
-              </span>
-              <input
-                aria-label={avoid ? "Daily limit in minutes" : "Daily goal in minutes"}
-                min={avoid ? 0 : 1}
-                {...num("target")}
-              />
-            </label>
+            <>
+              {compareSelect}
+              <label className="space-y-1">
+                <span className="block text-xs uppercase tracking-wider text-court-300">
+                  {avoid ? "Daily limit (min)" : "Daily goal (min)"}
+                </span>
+                <input
+                  aria-label={avoid ? "Daily limit in minutes" : "Daily goal in minutes"}
+                  min={minGoal}
+                  {...num("target")}
+                />
+              </label>
+            </>
+          )}
+          {type === "time" && (
+            <>
+              {compareSelect}
+              <label className="space-y-1">
+                {label("Target time")}
+                <input
+                  type="time"
+                  aria-label="Target time"
+                  value={config.target !== null ? timeInputValue(config.target) : ""}
+                  onChange={(e) =>
+                    setConfig((c) => ({ ...c, target: parseTimeOfDay(e.target.value) }))
+                  }
+                  className={compactFieldClass}
+                />
+              </label>
+              <p className="basis-full text-court-500">
+                {config.target === null
+                  ? "No target: just track the time. Add one to win days, earlier or later."
+                  : "Times just past midnight count as later than a late-night target."}
+              </p>
+            </>
           )}
           {type === "slider" && (
             <>
@@ -262,6 +320,15 @@ export function HabitEditor({
               <span className="block text-xs uppercase tracking-wider text-court-300">Stars</span>
               <input aria-label="Number of stars" min={3} max={10} {...num("max")} />
             </label>
+          )}
+          {!avoid && (type === "slider" || type === "rating") && (
+            <>
+              {compareSelect}
+              <label className="space-y-1">
+                {label("Goal (optional)")}
+                <input aria-label="Goal" placeholder="None" {...num("target")} />
+              </label>
+            </>
           )}
           {avoid && (type === "slider" || type === "rating") && (
             <label className="space-y-1">

@@ -1,8 +1,14 @@
 import {
+  COMPARE_SYMBOLS,
+  describeHabitGoal,
+  habitCompare,
+  isHabitDone,
   MAX_HABIT_JOURNAL,
   MAX_HABIT_NOTE,
   MAX_HABIT_SHORT_TEXT,
   type HabitDto,
+  parseTimeOfDay,
+  timeInputValue,
   type HabitEntryValue,
 } from "@rlo/shared";
 import { useEffect, useRef, useState } from "react";
@@ -37,6 +43,12 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
   const { config } = habit;
 
   const avoid = config.direction === "avoid";
+  // Over a limit, or missing a stay-under goal: shown in the warning color.
+  const compare = habitCompare(habit.type, config);
+  const over =
+    num !== null &&
+    (avoid || compare === "atMost" || compare === "lessThan") &&
+    !isHabitDone(habit.type, config, { num, text: null });
 
   switch (habit.type) {
     case "checkbox":
@@ -169,10 +181,8 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
           >
             +
           </button>
-          <span
-            className={`text-sm ${avoid && value > (config.target ?? 0) ? "text-flare" : "text-court-300"}`}
-          >
-            {avoid ? `/ ≤${config.target}` : `/ ${config.target}`} {unit}
+          <span className={`text-sm ${over ? "text-flare" : "text-court-300"}`}>
+            {`/ ${avoid ? "≤" : COMPARE_SYMBOLS[compare]}${config.target}`} {unit}
           </span>
         </div>
       );
@@ -200,10 +210,47 @@ export function HabitEntryInput({ habit, entry, disabled, onSave }: Props) {
             className={`w-full accent-[var(--color-neon)] ${num === null ? "opacity-40" : ""}`}
           />
           <span
-            className={`w-8 text-right font-display text-lg tabular-nums ${avoid && num !== null && num > (config.target ?? 0) ? "text-flare" : "text-neon"}`}
+            className={`w-8 text-right font-display text-lg tabular-nums ${over ? "text-flare" : "text-neon"}`}
           >
             {num ?? "–"}
           </span>
+        </div>
+      );
+    }
+
+    case "time": {
+      const goal = describeHabitGoal(habit.type, config);
+      const missed = num !== null && !isHabitDone(habit.type, config, { num, text: null });
+      const set = (next: number | null) => {
+        setNum(next);
+        debounced({ num: next, text: null });
+      };
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="time"
+            aria-label={`${habit.name} time`}
+            value={num !== null ? timeInputValue(num) : ""}
+            disabled={disabled}
+            onChange={(e) => set(parseTimeOfDay(e.target.value))}
+            className="rounded-lg border border-court-700 bg-court-950 px-2 py-1.5 tabular-nums outline-none focus:border-neon"
+          />
+          {num === null && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                const now = new Date();
+                set(now.getHours() * 60 + now.getMinutes());
+              }}
+              className="rounded-lg border border-court-700 px-2.5 py-1.5 text-sm text-court-300 hover:border-neon disabled:opacity-40"
+            >
+              Now
+            </button>
+          )}
+          {goal && (
+            <span className={`text-sm ${missed ? "text-flare" : "text-court-300"}`}>{goal}</span>
+          )}
         </div>
       );
     }

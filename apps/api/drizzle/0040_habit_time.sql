@@ -1,0 +1,1 @@
+ALTER TYPE "public"."habit_type" ADD VALUE 'time';

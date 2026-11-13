@@ -1,4 +1,5 @@
 import {
+  formatStatAverage,
   HABIT_STAT_RANGES,
   HABIT_TYPE_LABELS,
   type HabitStatRange,
@@ -145,6 +146,7 @@ function HabitCard({
 }) {
   const [open, setOpen] = useState(false);
   const { habit } = s;
+  const average = formatStatAverage(s);
   return (
     <li className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -178,13 +180,7 @@ function HabitCard({
 
       <dl className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
         <Fact label={`Left this ${range}`} value={`${s.remaining}`} />
-        {s.average !== null && (
-          <Fact
-            label="Avg"
-            value={`${s.average}${s.target !== null ? ` / ${s.target}` : ""}`}
-            suffix={habit.type === "duration" ? "min" : (habit.config.unit ?? "")}
-          />
-        )}
+        {average && <Fact label="Avg" value={average.value} suffix={average.suffix} />}
         <Fact label="Streak" value={String(s.currentStreak)} />
         <Fact
           label="Best"

@@ -23,6 +23,7 @@ export function useScoutingReport() {
 export function useSaveScoutingReport() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: (body: ScoutingReportBody) =>
       api<ScoutingReportDto>("/scouting-report", { method: "PUT", body: JSON.stringify(body) }),
     onSuccess: (report) => queryClient.setQueryData(scoutingReportKey, report),
@@ -36,6 +37,7 @@ export function useWeights() {
 export function useUndoWeightChange() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "tap" },
     mutationFn: (id: string) => api<WeightsDto>(`/weights/changes/${id}/undo`, { method: "POST" }),
     onSuccess: async (weights) => {
       queryClient.setQueryData(weightsKey, weights);
@@ -56,6 +58,7 @@ export function useTreeProposals() {
 export function useResolveTreeProposal() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "impact" },
     mutationFn: ({ id, action }: { id: string; action: "accept" | "dismiss" }) =>
       api<TreeProposalDto>(`/tree-proposals/${id}/${action}`, { method: "POST" }),
     // A new tree touches almost everything (ratings, habits' links, charts, the report's links).

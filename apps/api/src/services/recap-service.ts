@@ -10,6 +10,8 @@ import {
   isDayHabitDone,
   isAvoid,
   isHabitDone,
+  describeHabitGoal,
+  formatTimeOfDay,
   leafValuesFromEvents,
   MAX_RECAPS_PER_DAY,
   type DayDto,
@@ -77,10 +79,12 @@ function describeEntry(item: DayHabitDto): string {
       return `${entry.num} ${config.unit}${done}`;
     case "duration":
       return `${entry.num} min${done}`;
+    case "time":
+      return `${formatTimeOfDay(entry.num ?? 0)}${config.target !== null ? (done ? ", on target" : ", missed target") : ""}`;
     case "slider":
-      return `${entry.num} on a ${config.min}-${config.max} scale`;
+      return `${entry.num} on a ${config.min}-${config.max} scale${config.target !== null ? done : ""}`;
     case "rating":
-      return `${entry.num}/${config.max} stars`;
+      return `${entry.num}/${config.max} stars${config.target !== null ? done : ""}`;
     default:
       return `"${entry.text}"`;
   }
@@ -110,9 +114,8 @@ function describeBody(body: DayBodyDto, units: UnitSystem): string | null {
 function describeGoal({ habit }: DayHabitDto): string {
   const { config } = habit;
   if (isAvoid(config)) return ", trying to avoid";
-  if (habit.type === "counter") return `, goal ${config.target} ${config.unit}`;
-  if (habit.type === "duration") return `, goal ${config.target} min`;
-  return "";
+  const goal = describeHabitGoal(habit.type, config);
+  return goal ? `, goal ${goal}` : "";
 }
 
 /** Every habit on the day, with groups' sub-habits listed after their group. */

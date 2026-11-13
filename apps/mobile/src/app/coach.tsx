@@ -4,6 +4,7 @@ import {
   HABIT_TYPE_LABELS,
   IMPORTANCE_LABELS,
   MAX_COACH_MESSAGE,
+  suggestedHabitGoal,
   WEEKDAY_SHORT,
   type CoachActionDto,
   type CoachMessageDto,
@@ -435,10 +436,7 @@ function draftFacts(
     case "habit": {
       const schedule =
         d.days.length === 7 ? "Every day" : d.days.map((x) => WEEKDAY_SHORT[x]).join(", ");
-      const amount =
-        d.target !== null
-          ? ` · ${d.avoid ? "at most" : "goal"} ${d.target} ${d.habitType === "duration" ? "min" : (d.unit ?? "")}`
-          : "";
+      const amount = suggestedHabitGoal(d);
       return [
         `${HABIT_TYPE_LABELS[d.habitType]}${d.avoid ? " (avoid)" : ""} · ${schedule}${amount}`,
         ...builds(d.nodeIds),

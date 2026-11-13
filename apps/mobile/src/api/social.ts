@@ -61,6 +61,7 @@ export function useFriends(enabled = true) {
 export function useFriendAction() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "impact" },
     mutationFn: ({ username, action }: { username: string; action: "add" | "remove" }) =>
       api<{ state: FriendshipState }>(`/friends/${encodeURIComponent(username)}`, {
         method: action === "add" ? "POST" : "DELETE",

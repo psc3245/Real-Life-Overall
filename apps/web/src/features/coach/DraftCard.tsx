@@ -3,7 +3,8 @@ import {
   formatDuration,
   formatSet,
   HABIT_TYPE_LABELS,
-  normalizeHabitConfig,
+  suggestedHabitConfig,
+  suggestedHabitGoal,
   WEEKDAY_SHORT,
   type CoachSuggestionDto,
   type ExerciseDto,
@@ -81,11 +82,7 @@ function habitDraft(d: Extract<Draft, { kind: "habit" }>): HabitDraft {
   return {
     name: d.name,
     type: d.habitType,
-    config: normalizeHabitConfig(d.habitType, {
-      target: d.target,
-      unit: d.unit,
-      direction: d.avoid ? "avoid" : "build",
-    }),
+    config: suggestedHabitConfig(d),
     days: d.days,
     links: d.nodeIds,
   };
@@ -134,10 +131,7 @@ export function DraftCard({ messageId, draft: d }: { messageId: string; draft: D
   } else if (d.kind === "habit") {
     const schedule =
       d.days.length === 7 ? "Every day" : d.days.map((x) => WEEKDAY_SHORT[x]).join(", ");
-    const amount =
-      d.target !== null
-        ? ` · ${d.avoid ? "at most" : "goal"} ${d.target} ${d.habitType === "duration" ? "min" : (d.unit ?? "")}`
-        : "";
+    const amount = suggestedHabitGoal(d);
     facts = [
       `${HABIT_TYPE_LABELS[d.habitType]}${d.avoid ? " (avoid)" : ""} · ${schedule}${amount}`,
     ];

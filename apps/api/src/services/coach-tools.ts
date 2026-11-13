@@ -7,9 +7,12 @@ import {
   fromDisplayLength,
   fromDisplayWeight,
   HABIT_TYPE_LABELS,
+  HABIT_COMPARES,
   HABIT_TYPES,
   isValidDate,
   isAvoid,
+  describeHabitGoal,
+  formatTimeOfDay,
   isEntryDone,
   MAX_COACH_ACTIONS,
   MAX_HABIT_LINKS,
@@ -66,6 +69,13 @@ export function refsForDay(day: DayDto): CoachRefs {
   };
 }
 
+const goalHint = (h: HabitDto) => {
+  if (isAvoid(h.config))
+    return h.config.target !== null ? `, limit at most ${h.config.target}` : "";
+  const goal = describeHabitGoal(h.type, h.config);
+  return goal ? `, goal ${goal}` : "";
+};
+
 /** What a habit's number means, so the model logs it in the right shape. */
 function entryHint(h: HabitDto) {
   const avoid = isAvoid(h.config);
@@ -76,13 +86,15 @@ function entryHint(h: HabitDto) {
         ? "num 0 = stayed clean, 1 = slipped" + (h.type === "checknote" ? "; text a note" : "")
         : "num 1 = done, 0 = not done" + (h.type === "checknote" ? "; text a note" : "");
     case "counter":
-      return `num = count${h.config.unit ? ` of ${h.config.unit}` : ""}${h.config.target ? `, goal ${avoid ? "at most" : ""} ${h.config.target}` : ""}`;
+      return `num = count${h.config.unit ? ` of ${h.config.unit}` : ""}${goalHint(h)}`;
     case "duration":
-      return `num = minutes${h.config.target ? `, goal ${h.config.target}` : ""}`;
+      return `num = minutes${goalHint(h)}`;
+    case "time":
+      return `num = minutes after midnight (6:30 AM = 390)${goalHint(h)}`;
     case "slider":
-      return `num ${h.config.min ?? 0}-${h.config.max ?? 10}`;
+      return `num ${h.config.min ?? 0}-${h.config.max ?? 10}${goalHint(h)}`;
     case "rating":
-      return `num 1-${h.config.max ?? 5}`;
+      return `num 1-${h.config.max ?? 5}${goalHint(h)}`;
     default:
       return "text = what they wrote";
   }
@@ -456,7 +468,9 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
                   : isAvoid(habit.config)
                     ? "Slipped"
                     : "Not done"
-                : `${input.num}${habit.type === "duration" ? " min" : habit.config.unit ? ` ${habit.config.unit}` : ""}`;
+                : habit.type === "time"
+                  ? formatTimeOfDay(input.num ?? 0)
+                  : `${input.num}${habit.type === "duration" ? " min" : habit.config.unit ? ` ${habit.config.unit}` : ""}`;
             c.actions.push({
               index: c.actions.length,
               kind: "habit",
@@ -538,12 +552,24 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
         name: z.string().describe("Short, e.g. 'Read' or 'No soda'"),
         type: z
           .enum(HABIT_TYPES.filter((t) => t !== "group") as [HabitType, ...HabitType[]])
-          .describe("Prefer checkbox, counter or duration"),
+          .describe(
+            "Prefer checkbox, counter or duration; time for a time of day (wake-up, bedtime)",
+          ),
         days: z.array(z.number()).describe("Weekdays 0=Sunday..6=Saturday; [] for every day"),
         target: z
           .number()
           .nullable()
-          .describe("counter: daily count; duration: daily minutes; avoid: the daily limit"),
+          .describe(
+            "counter: daily count; duration: daily minutes; time: minutes after midnight " +
+              "(6:30 AM = 390); slider/rating: optional line; avoid: the daily limit",
+          ),
+        compare: z
+          .enum(HABIT_COMPARES)
+          .nullable()
+          .describe(
+            "Build habits: atLeast (reach it, the default), moreThan (beat it), atMost / " +
+              "lessThan (stay under it). For time, less is earlier: atMost = by, lessThan = before",
+          ),
         unit: z.string().nullable().describe("counter only, e.g. 'pages'"),
         avoid: z.boolean().describe("true for a habit to cut back on or quit"),
         refs,
@@ -567,6 +593,7 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
             target: input.target,
             unit: input.unit?.trim() || null,
             direction: input.avoid ? "avoid" : "build",
+            compare: input.compare,
           });
           const nodeIds = toLinks(input.refs);
           c.drafts.push({
@@ -578,6 +605,7 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
             target: config.target,
             unit: config.unit,
             avoid: input.avoid,
+            compare: input.avoid ? null : (config.compare ?? null),
             nodeIds,
             reason: input.reason.trim(),
             status: "pending",

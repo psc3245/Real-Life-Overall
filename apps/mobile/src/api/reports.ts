@@ -8,6 +8,7 @@ import type {
 } from "@rlo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
+import type { HapticKind } from "@/lib/haptics";
 
 export const reportsKey = ["reports"] as const;
 
@@ -46,9 +47,13 @@ export interface ReportInput {
   defaultRange: Exclude<ReportRange, "custom">;
 }
 
-function useReportMutation<TInput, TOutput>(request: (input: TInput) => Promise<TOutput>) {
+function useReportMutation<TInput, TOutput>(
+  request: (input: TInput) => Promise<TOutput>,
+  haptic: HapticKind = "success",
+) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic },
     mutationFn: request,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: reportsKey }),
   });
@@ -67,12 +72,16 @@ export function useUpdateReport() {
 }
 
 export function useDeleteReport() {
-  return useReportMutation((id: string) => api<null>(`/reports/${id}`, { method: "DELETE" }));
+  return useReportMutation(
+    (id: string) => api<null>(`/reports/${id}`, { method: "DELETE" }),
+    "remove",
+  );
 }
 
 export function useRunReport(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "success" },
     mutationFn: (input: {
       range: ReportRange;
       from?: string;
@@ -89,6 +98,7 @@ export function useRunReport(id: string) {
 export function useDeleteReportRun(reportId: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "remove" },
     mutationFn: (runId: string) => api<null>(`/reports/runs/${runId}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [...reportsKey, reportId] }),
   });

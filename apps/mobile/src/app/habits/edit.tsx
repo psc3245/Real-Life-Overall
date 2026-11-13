@@ -3,11 +3,17 @@ import {
   ALL_DAYS,
   GROUP_RULE_LABELS,
   GROUP_RULES,
+  HABIT_COMPARE_LABELS,
+  HABIT_COMPARES,
   HABIT_DIRECTIONS,
   HABIT_TYPE_LABELS,
   HABIT_TYPES,
   MAX_HABIT_LINKS,
+  habitCompare,
   normalizeHabitConfig,
+  suggestedHabitConfig,
+  TARGETED_TYPES,
+  TIME_COMPARE_LABELS,
   type HabitConfig,
   type HabitDirection,
   type HabitDto,
@@ -30,6 +36,7 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useAccount } from "@/api/account";
 import { useCoachDraft, useResolveCoachSuggestion } from "@/api/coach";
 import { PremiumBadge } from "@/components/Premium";
+import { TimeField } from "@/components/TimeField";
 
 /** What "kept" means for an avoid habit, by how it's logged. */
 const AVOID_HELP: Partial<Record<HabitType, string>> = {
@@ -84,11 +91,7 @@ function EditHabitScreen() {
             index: d.index,
             name: d.name,
             type: d.habitType,
-            config: normalizeHabitConfig(d.habitType, {
-              target: d.target,
-              unit: d.unit,
-              direction: d.avoid ? "avoid" : "build",
-            }),
+            config: suggestedHabitConfig(d),
             days: d.days,
             links: d.nodeIds,
           }}
@@ -153,6 +156,7 @@ function HabitEditor({
   const saving = create.isPending || update.isPending || accept.isPending;
 
   const avoid = config.direction === "avoid";
+  const compare = habitCompare(type, config);
   const changeType = (next: HabitType) => {
     setType(next);
     setConfig(normalizeHabitConfig(next, { direction: config.direction }));
@@ -216,10 +220,26 @@ function HabitEditor({
     </FormRow>
   );
 
+  // Build goals: reach it, beat it or stay under it.
+  const compareRow = !avoid && (
+    <FormRow label="Win when">
+      <View style={styles.wrap}>
+        {HABIT_COMPARES.map((c) => (
+          <Chip
+            key={c}
+            label={(type === "time" ? TIME_COMPARE_LABELS : HABIT_COMPARE_LABELS)[c]}
+            selected={compare === c}
+            onPress={() => setConfig((prev) => ({ ...prev, compare: c }))}
+          />
+        ))}
+      </View>
+    </FormRow>
+  );
+
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} keyboardVerticalOffset={100}>
       <Screen>
-        {type !== "group" && (
+        {type !== "group" && type !== "time" && (
           <FormRow label="Goal">
             <View style={styles.wrap}>
               {HABIT_DIRECTIONS.map((d) => (
@@ -270,7 +290,8 @@ function HabitEditor({
           )}
         </FormRow>
 
-        {(type === "counter" || type === "duration" || type === "slider" || type === "rating") && (
+        {TARGETED_TYPES.includes(type) && compareRow}
+        {TARGETED_TYPES.includes(type) && (
           <View style={styles.inline}>
             {type === "counter" && (
               <>
@@ -295,7 +316,25 @@ function HabitEditor({
             )}
             {type === "rating" && num("max", "Stars (3–10)")}
             {avoid && (type === "slider" || type === "rating") && num("target", "Stay at or below")}
+            {!avoid && (type === "slider" || type === "rating") && num("target", "Goal (optional)")}
+            {type === "time" && (
+              <FormRow label="Target time">
+                <TimeField
+                  accessibilityLabel="Target time"
+                  placeholder="None"
+                  value={config.target}
+                  onChange={(target) => setConfig((c) => ({ ...c, target }))}
+                />
+              </FormRow>
+            )}
           </View>
+        )}
+        {type === "time" && (
+          <Muted style={{ fontSize: 13 }}>
+            {config.target === null
+              ? "No target: just track the time. Add one to win days, earlier or later."
+              : "Times just past midnight count as later than a late-night target."}
+          </Muted>
         )}
 
         {type === "group" && (

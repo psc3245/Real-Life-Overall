@@ -1,4 +1,9 @@
-import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  focusManager,
+  MutationCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { DarkTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -10,6 +15,7 @@ import { AppState } from "react-native";
 import { useAuthState } from "@/api/session";
 import { Button, Card, Muted, Screen, Body } from "@/components/ui";
 import { API_URL } from "@/lib/config";
+import { mutationHaptics } from "@/lib/haptics";
 import { pushedOptions } from "@/lib/stack";
 import { colors, SEASON_MODE_KEY, setTierPalette } from "@/lib/theme";
 import { useSeasonMode } from "@/lib/talk";
@@ -17,7 +23,10 @@ import * as SecureStore from "expo-secure-store";
 
 void SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1 } },
+  mutationCache: new MutationCache(mutationHaptics),
+});
 
 // Refetch stale queries when the app comes back to the foreground.
 AppState.addEventListener("change", (status) => focusManager.setFocused(status === "active"));

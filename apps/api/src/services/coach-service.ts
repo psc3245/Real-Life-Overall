@@ -28,7 +28,7 @@ import {
   MAX_PRIORITIES,
   MAX_REPORT_FOCUSES,
   MAX_REPORT_LINE,
-  normalizeHabitConfig,
+  suggestedHabitConfig,
   WEEKDAY_NAMES,
   WEEKDAY_SHORT,
   type CoachActionDto,
@@ -667,11 +667,7 @@ function proposedBody(
       return {
         name: s.name,
         type: s.habitType,
-        config: normalizeHabitConfig(s.habitType, {
-          target: s.target,
-          unit: s.unit,
-          direction: s.avoid ? "avoid" : "build",
-        }),
+        config: suggestedHabitConfig(s),
         days: s.days,
         links: s.nodeIds.filter(live),
       };
