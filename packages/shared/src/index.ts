@@ -26,6 +26,7 @@ export * from "./schemas/objectives";
 export * from "./units";
 export * from "./exercises";
 export * from "./schemas/workouts";
+export * from "./schemas/cardio";
 export * from "./schemas/body";
 export * from "./schemas/account";
 export * from "./schemas/admin";

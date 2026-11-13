@@ -118,3 +118,31 @@ describe("template changes", () => {
     expect(next[1]!.sets[0]).toMatchObject({ weightKg: 50, reps: 10, done: false });
   });
 });
+
+describe("weight + time, weight + distance and distance sets", () => {
+  it("records the heaviest weight and the longest time or distance", () => {
+    const carries = [set({ weightKg: 40, durationS: 60 }), set({ weightKg: 50, durationS: 30 })];
+    expect(recordsFromSets("weight_duration", carries)).toMatchObject({
+      heaviestKg: 50,
+      longestS: 60,
+      longestM: null,
+      best1RmKg: null,
+    });
+    expect(bestSet("weight_duration", carries)).toBe(carries[1]);
+    expect(formatSet("weight_duration", carries[1]!, "metric")).toBe("50 kg · 0:30");
+    // Older duration-only sets still read.
+    expect(formatSet("weight_duration", set({ durationS: 45 }), "metric")).toBe("0:45");
+
+    const sled = [set({ weightKg: 100, distanceM: 20 }), set({ weightKg: 100, distanceM: 30 })];
+    expect(recordsFromSets("weight_distance", sled)).toMatchObject({
+      heaviestKg: 100,
+      longestM: 30,
+    });
+    expect(bestSet("weight_distance", sled)).toBe(sled[1]);
+
+    const jumps = [set({ distanceM: 5.2 }), set({ distanceM: 5.6 })];
+    expect(recordsFromSets("distance", jumps).longestM).toBe(5.6);
+    expect(formatSet("distance", jumps[1]!, "metric")).toBe("5.6 m");
+    expect(formatSet("weight_distance", sled[1]!, "imperial")).toBe("220.5 lb · 98.4 ft");
+  });
+});

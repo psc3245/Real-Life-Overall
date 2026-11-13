@@ -10,6 +10,9 @@ export const EXERCISE_TRACKING = [
   "duration",
   "distance_duration",
   "makes_attempts",
+  "weight_duration",
+  "weight_distance",
+  "distance",
 ] as const;
 export type ExerciseTracking = (typeof EXERCISE_TRACKING)[number];
 
@@ -19,18 +22,35 @@ export const TRACKING_LABELS: Record<ExerciseTracking, string> = {
   duration: "Time",
   distance_duration: "Distance + time",
   makes_attempts: "Makes / attempts",
+  weight_duration: "Weight + time",
+  weight_distance: "Weight + distance",
+  distance: "Distance",
 };
 
-export type SetField = "weight" | "reps" | "duration" | "distance" | "attempts";
+export type SetField = "weight" | "reps" | "duration" | "distance" | "length" | "attempts";
 
-/** The columns a set shows, in order. `reps` doubles as makes for makes_attempts. */
+/**
+ * The columns a set shows, in order. `reps` doubles as makes for makes_attempts; `distance` (mi
+ * or km) and `length` (ft or m, for short distances) are both stored as `distanceM`.
+ */
 export const TRACKING_FIELDS: Record<ExerciseTracking, SetField[]> = {
   weight_reps: ["weight", "reps"],
   reps: ["reps"],
   duration: ["duration"],
   distance_duration: ["distance", "duration"],
   makes_attempts: ["reps", "attempts"],
+  weight_duration: ["weight", "duration"],
+  weight_distance: ["weight", "length"],
+  distance: ["length"],
 };
+
+/** Whether a tracking kind's sets record `distanceM` (as a distance or a length). */
+export const recordsDistance = (tracking: ExerciseTracking) =>
+  TRACKING_FIELDS[tracking].some((f) => f === "distance" || f === "length");
+
+/** Whether a tracking kind shows its distance as a length (ft or m). */
+export const usesLength = (tracking: ExerciseTracking) =>
+  TRACKING_FIELDS[tracking].includes("length");
 
 export const EXERCISE_CATEGORIES = [
   "chest",
@@ -131,6 +151,7 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("ab-wheel", "Ab Wheel Rollout", "core", "reps"),
   ex("russian-twist", "Russian Twist", "core", "reps"),
   ex("cable-crunch", "Cable Crunch", "core"),
+  ex("weighted-plank", "Weighted Plank", "core", "weight_duration"),
   // Full body
   ex("clean-and-jerk", "Clean and Jerk", "full_body"),
   ex("power-clean", "Power Clean", "full_body"),
@@ -138,7 +159,12 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("kettlebell-swing", "Kettlebell Swing", "full_body"),
   ex("thruster", "Thruster", "full_body"),
   ex("burpee", "Burpee", "full_body", "reps"),
-  ex("farmers-carry", "Farmer's Carry", "full_body", "duration"),
+  ex("farmers-carry", "Farmer's Carry", "full_body", "weight_duration"),
+  ex("farmers-walk-distance", "Farmer's Walk (Distance)", "full_body", "weight_distance"),
+  ex("sled-push", "Sled Push", "full_body", "weight_distance"),
+  ex("sled-pull", "Sled Pull", "full_body", "weight_distance"),
+  ex("dead-hang", "Dead Hang", "back", "duration"),
+  ex("weighted-dead-hang", "Weighted Dead Hang", "back", "weight_duration"),
   // Cardio
   ex("running", "Running", "cardio", "distance_duration"),
   ex("treadmill", "Treadmill", "cardio", "distance_duration"),
@@ -150,6 +176,8 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("stair-climber", "Stair Climber", "cardio", "duration"),
   ex("jump-rope", "Jump Rope", "cardio", "duration"),
   ex("sprints", "Sprints", "cardio", "distance_duration"),
+  ex("hiking", "Hiking", "cardio", "distance_duration"),
+  ex("indoor-cycling", "Indoor Cycling", "cardio", "distance_duration"),
   // Sport & skill
   ex("free-throws", "Free Throws", "sport", "makes_attempts"),
   ex("jump-shots", "Jump Shots", "sport", "makes_attempts"),
@@ -165,6 +193,9 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("practice", "Team Practice", "sport", "duration"),
   ex("shadowboxing", "Shadowboxing", "sport", "duration"),
   ex("heavy-bag", "Heavy Bag Rounds", "sport", "duration"),
+  ex("long-jump", "Long Jump", "sport", "distance"),
+  ex("shot-put", "Shot Put", "sport", "distance"),
+  ex("golf-drive", "Golf Drive", "sport", "distance"),
   // Mobility
   ex("stretching", "Stretching", "mobility", "duration"),
   ex("yoga", "Yoga", "mobility", "duration"),

@@ -81,7 +81,10 @@ export async function update(
   db: Executor,
   id: string,
   changes: Partial<
-    Pick<WorkoutRow, "name" | "notes" | "exercises" | "localDate" | "startedAt" | "endedAt">
+    Pick<
+      WorkoutRow,
+      "name" | "notes" | "exercises" | "cardio" | "localDate" | "startedAt" | "endedAt"
+    >
   >,
 ): Promise<WorkoutRow> {
   const rows = await db.update(workouts).set(changes).where(eq(workouts.id, id)).returning();

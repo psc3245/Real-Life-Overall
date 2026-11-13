@@ -21,6 +21,7 @@ import { StatTile } from "../../components/StatTile";
 import { longDate } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { formatElapsed, formatVolume } from "./format";
+import { CardioSessionView } from "./CardioPage";
 import { WorkoutEditor } from "./WorkoutEditor";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
 import { DebugId, DebugJson } from "../../components/debug/Debug";
@@ -32,7 +33,14 @@ export function WorkoutPage() {
   if (workout.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
   if (workout.isError) return <ErrorNote error={workout.error} />;
   if (!workout.data.endedAt) return <Navigate to="/workouts/active" replace />;
+  if (workout.data.kind === "cardio") return <CardioWorkout workout={workout.data} />;
   return <FinishedWorkout workout={workout.data} />;
+}
+
+function CardioWorkout({ workout }: { workout: WorkoutDto }) {
+  const location = useLocation();
+  const justFinished = (location.state as { justFinished?: boolean } | null)?.justFinished;
+  return <CardioSessionView workout={workout} justFinished={Boolean(justFinished)} />;
 }
 
 function FinishedWorkout({ workout: w }: { workout: WorkoutDto }) {

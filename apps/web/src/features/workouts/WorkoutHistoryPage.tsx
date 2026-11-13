@@ -9,6 +9,7 @@ import { Link } from "react-router";
 import { useExercises, useWorkoutHistory } from "../../api/workouts";
 import { Button } from "../../components/Button";
 import { dayLabel } from "../../lib/format";
+import { CardioCard } from "./CardioPage";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { formatElapsed, formatVolume } from "./format";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
@@ -76,6 +77,7 @@ export function WorkoutCard({
   byId: Map<string, ExerciseDto>;
   units: UnitSystem;
 }) {
+  if (w.kind === "cardio") return <CardioCard workout={w} byId={byId} units={units} />;
   return (
     <Link
       to={`/workouts/${w.id}`}

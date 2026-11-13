@@ -13,6 +13,7 @@ import {
 import { DateStepper, FormRow, NumberField } from "@/components/controls";
 import { StatGrid, StatTile } from "@/components/StatTile";
 import { Body, Button, Card, ErrorNote, Field, Loading, Muted, Screen } from "@/components/ui";
+import { CardioStats } from "@/components/workouts/Cardio";
 import { ExerciseSummary } from "@/components/workouts/WorkoutCard";
 import { WorkoutEditor } from "@/components/workouts/WorkoutEditor";
 import { longDate } from "@/lib/format";
@@ -33,12 +34,102 @@ function WorkoutScreen() {
     );
   }
   if (!workout.data.endedAt) return <Redirect href="/workouts/active" />;
+  if (workout.data.kind === "cardio") {
+    return (
+      <CardioWorkout
+        workout={workout.data}
+        justFinished={finished === "1"}
+        refresh={() => workout.refetch()}
+      />
+    );
+  }
   return (
     <FinishedWorkout
       workout={workout.data}
       justFinished={finished === "1"}
       refresh={() => workout.refetch()}
     />
+  );
+}
+
+/** A finished cardio session: its numbers and records; editing opens the cardio form. */
+function CardioWorkout({
+  workout: w,
+  justFinished,
+  refresh,
+}: {
+  workout: WorkoutDto;
+  justFinished: boolean;
+  refresh: () => Promise<unknown>;
+}) {
+  const units = useUnits();
+  const remove = useDeleteWorkout();
+  const menu = () =>
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ["Edit session", "Delete session", "Cancel"],
+        destructiveButtonIndex: 1,
+        cancelButtonIndex: 2,
+        userInterfaceStyle: "dark",
+      },
+      (i) => {
+        if (i === 0) router.push({ pathname: "/workouts/cardio", params: { id: w.id } });
+        if (i === 1) {
+          Alert.alert("Delete this session?", "It comes off that day's log.", [
+            { text: "Keep", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => remove.mutate(w.id, { onSuccess: () => router.back() }),
+            },
+          ]);
+        }
+      },
+    );
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Text onPress={menu} style={styles.headerAction} accessibilityRole="button">
+              Edit
+            </Text>
+          ),
+        }}
+      />
+      <Screen eyebrow={longDate(w.localDate)} title={w.name} onRefresh={refresh}>
+        {justFinished && (
+          <Card style={{ borderColor: colors.neonDim }}>
+            <Body style={{ color: colors.neon }}>
+              Session logged. It&apos;s on that day&apos;s log and counts toward its recap.
+            </Body>
+          </Card>
+        )}
+        <CardioStats workout={w} units={units} />
+        {w.summary.prs.length > 0 && (
+          <Card style={{ gap: space.xs, borderColor: tierColor(75) }}>
+            <Text style={[styles.prTitle, { color: tierColor(75) }]}>★ Personal records</Text>
+            {w.summary.prs.map((pr) => (
+              <Body key={pr.exerciseId}>{pr.label}</Body>
+            ))}
+          </Card>
+        )}
+        {w.notes ? <Muted>{w.notes}</Muted> : null}
+        {w.exercises[0] && (
+          <Link
+            href={{
+              pathname: "/workouts/exercises/[id]",
+              params: { id: w.exercises[0].exerciseId },
+            }}
+            style={{ color: colors.neon, fontSize: 15 }}
+          >
+            Activity history →
+          </Link>
+        )}
+        <ErrorNote error={remove.error} />
+      </Screen>
+    </>
   );
 }
 

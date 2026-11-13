@@ -4,6 +4,7 @@ import {
   EXERCISE_TRACKING,
   formatSet,
   fromDisplayDistance,
+  fromDisplayLength,
   fromDisplayWeight,
   HABIT_TYPE_LABELS,
   HABIT_TYPES,
@@ -176,6 +177,7 @@ const SET_FIELD_KEYS: Record<SetField, keyof WorkoutSetDto> = {
   reps: "reps",
   duration: "durationS",
   distance: "distanceM",
+  length: "distanceM",
   attempts: "attempts",
 };
 
@@ -222,7 +224,12 @@ const exercisesField = (units: UnitSystem) => {
           weight: z.number().nullable().describe(`In ${weight}; weight_reps only`),
           reps: z.number().nullable().describe("Reps, or makes for makes/attempts"),
           seconds: z.number().nullable().describe("duration and distance+time only"),
-          distance: z.number().nullable().describe(`In ${distance}; distance+time only`),
+          distance: z
+            .number()
+            .nullable()
+            .describe(
+              `In ${distance} for distance fields, ${units === "imperial" ? "feet" : "meters"} for length fields`,
+            ),
           attempts: z.number().nullable().describe("makes/attempts only"),
         }),
       ),
@@ -268,7 +275,12 @@ async function buildExercises(
       weightKg: s.weight !== null ? fromDisplayWeight(s.weight, c.units) : null,
       reps: s.reps !== null ? Math.round(s.reps) : null,
       durationS: s.seconds !== null ? Math.round(s.seconds) : null,
-      distanceM: s.distance !== null ? fromDisplayDistance(s.distance, c.units) : null,
+      distanceM:
+        s.distance === null
+          ? null
+          : fields.includes("length")
+            ? fromDisplayLength(s.distance, c.units)
+            : fromDisplayDistance(s.distance, c.units),
       attempts: s.attempts !== null ? Math.round(s.attempts) : null,
       done,
     }));

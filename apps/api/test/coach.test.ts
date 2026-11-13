@@ -276,13 +276,13 @@ describe("coach logging", () => {
   it("tells the model when an exercise isn't in the library, or adds it as asked", async () => {
     const unknown = {
       ...legDay,
-      exercises: [{ exercise: "Sled push", newExercise: null, sets: [set(null, 10)] }],
+      exercises: [{ exercise: "Tire flip", newExercise: null, sets: [set(null, 10)] }],
     };
     const added = {
       ...legDay,
       exercises: [
         {
-          exercise: "Sled push",
+          exercise: "Tire flip",
           newExercise: { category: "legs", tracking: "duration" },
           sets: [{ ...set(null, null), seconds: 40 }],
         },
@@ -293,7 +293,7 @@ describe("coach logging", () => {
       toolCallResult(["draft_workout", added]),
       done,
     ]);
-    await t.send("Did sled pushes");
+    await t.send("Did tire flips");
     const second = JSON.stringify(
       t.model.doGenerateCalls[t.model.doGenerateCalls.length - 2]!.prompt,
     );

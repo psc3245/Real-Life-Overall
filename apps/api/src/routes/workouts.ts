@@ -1,4 +1,5 @@
 import {
+  cardioBodySchema,
   createTemplateBodySchema,
   exerciseBodySchema,
   finishWorkoutBodySchema,
@@ -24,6 +25,17 @@ export const workoutRoutes = new Hono<AppEnv>()
     c.json(await workouts.listHistory(c.get("db"), c.get("userId"), c.req.query("before"))),
   )
   .get("/active", async (c) => c.json(await workouts.getActive(c.get("db"), c.get("userId"))))
+  .get("/cardio", async (c) => c.json(await workouts.cardioOverview(c.get("db"), c.get("userId"))))
+  .post("/cardio", async (c) => {
+    const body = await parseJson(c, cardioBodySchema);
+    return c.json(await workouts.logCardio(c.get("db"), c.get("userId"), body), 201);
+  })
+  .put("/cardio/:id", async (c) => {
+    const body = await parseJson(c, cardioBodySchema);
+    return c.json(
+      await workouts.updateCardio(c.get("db"), c.get("userId"), idParam(c, "id", "Workout"), body),
+    );
+  })
   .post("/", async (c) => {
     const body = (await parseOptionalJson(c, startWorkoutBodySchema)) ?? {};
     return c.json(await workouts.startWorkout(c.get("db"), c.get("userId"), body), 201);

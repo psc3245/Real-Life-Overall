@@ -11,8 +11,12 @@ import {
   toDisplayWeight,
   TRACKING_LABELS,
   distanceUnit,
+  lengthUnit,
+  usesLength,
+  toDisplayLength,
   weightUnit,
   type ExerciseRecordsDto,
+  type ExerciseTracking,
   type UnitSystem,
 } from "@rlo/shared";
 import { useState } from "react";
@@ -28,7 +32,12 @@ import { DebugId, DebugJson } from "../../components/debug/Debug";
 import { ChartLink } from "../charts/ChartLink";
 
 /** A record's value in the user's units. */
-function formatRecord(key: keyof ExerciseRecordsDto, value: number, units: UnitSystem) {
+function formatRecord(
+  key: keyof ExerciseRecordsDto,
+  value: number,
+  units: UnitSystem,
+  tracking: ExerciseTracking,
+) {
   switch (key) {
     case "heaviestKg":
     case "best1RmKg":
@@ -37,7 +46,9 @@ function formatRecord(key: keyof ExerciseRecordsDto, value: number, units: UnitS
     case "longestS":
       return formatDuration(value);
     case "longestM":
-      return `${toDisplayDistance(value, units)} ${distanceUnit(units)}`;
+      return usesLength(tracking)
+        ? `${toDisplayLength(value, units)} ${lengthUnit(units)}`
+        : `${toDisplayDistance(value, units)} ${distanceUnit(units)}`;
     case "bestPct":
       return `${Math.round(value)}%`;
     default:
@@ -63,8 +74,11 @@ export function ExercisePage() {
   const points = [...history]
     .reverse()
     .filter((h) => h.best !== null)
-    .map((h) => ({ date: h.localDate, value: recordChartValue(headline, h.best!, units) }));
-  const unit = recordChartUnit(headline, units);
+    .map((h) => ({
+      date: h.localDate,
+      value: recordChartValue(headline, h.best!, units, e.tracking),
+    }));
+  const unit = recordChartUnit(headline, units, e.tracking);
   const chartUnit = unit === "%" ? "%" : unit === "reps" ? "" : ` ${unit}`;
 
   return (
@@ -103,7 +117,7 @@ export function ExercisePage() {
             <StatTile
               key={k}
               label={RECORD_LABELS[k]}
-              value={formatRecord(k, records[k]!, units)}
+              value={formatRecord(k, records[k]!, units, e.tracking)}
             />
           ))}
         </dl>

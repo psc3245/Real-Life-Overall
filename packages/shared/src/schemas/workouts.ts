@@ -1,15 +1,21 @@
 import { z } from "zod";
+import type { CardioDetailsDto } from "./cardio";
 import { isValidDate } from "../dates";
 import {
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
+  recordsDistance,
+  TRACKING_FIELDS,
+  usesLength,
   type ExerciseCategory,
   type ExerciseTracking,
 } from "../exercises";
 import {
   distanceUnit,
   formatDuration,
+  lengthUnit,
   toDisplayDistance,
+  toDisplayLength,
   toDisplayWeight,
   weightUnit,
   type UnitSystem,
@@ -35,6 +41,10 @@ export const SET_KIND_TAGS: Record<Exclude<SetKind, "normal">, string> = {
   drop: "D",
   failure: "F",
 };
+
+/** Strength workouts are logged set by set; cardio sessions are one activity's distance and time. */
+export const WORKOUT_KINDS = ["strength", "cardio"] as const;
+export type WorkoutKind = (typeof WORKOUT_KINDS)[number];
 
 export const MAX_WORKOUT_EXERCISES = 40;
 export const MAX_SETS_PER_EXERCISE = 30;
@@ -85,6 +95,8 @@ export interface WorkoutSummaryDto {
 
 export interface WorkoutDto {
   id: string;
+  /** Missing from older API responses means "strength". */
+  kind: WorkoutKind;
   name: string;
   notes: string;
   /** The day it counts for (the user's local date it started). */
@@ -97,6 +109,8 @@ export interface WorkoutDto {
   summary: WorkoutSummaryDto;
   /** The sets from the last completed workout with each exercise (the "Previous" column). */
   previous: Record<string, WorkoutSetDto[]>;
+  /** Cardio sessions' extras; null for strength workouts. */
+  cardio: CardioDetailsDto | null;
 }
 
 export interface WorkoutTemplateDto {
@@ -143,6 +157,7 @@ export interface ExerciseDetailDto {
 /** A workout as the day log and recap see it. */
 export interface DayWorkoutDto {
   id: string;
+  kind: WorkoutKind;
   name: string;
   durationS: number;
   volumeKg: number;
@@ -186,8 +201,9 @@ export function recordsFromSets(
   const pct = done
     .filter((s) => (s.attempts ?? 0) >= 5 && s.reps !== null)
     .map((s) => (100 * s.reps!) / s.attempts!);
+  const fields = TRACKING_FIELDS[tracking];
   return {
-    heaviestKg: tracking === "weight_reps" ? max(done.map((s) => s.weightKg)) : null,
+    heaviestKg: fields.includes("weight") ? max(done.map((s) => s.weightKg)) : null,
     best1RmKg:
       tracking === "weight_reps"
         ? max(done.map((s) => estimatedOneRm(s.weightKg ?? 0, s.reps ?? 0)))
@@ -197,11 +213,8 @@ export function recordsFromSets(
       tracking === "weight_reps" || tracking === "reps" || tracking === "makes_attempts"
         ? max(done.map((s) => s.reps))
         : null,
-    longestS:
-      tracking === "duration" || tracking === "distance_duration"
-        ? max(done.map((s) => s.durationS))
-        : null,
-    longestM: tracking === "distance_duration" ? max(done.map((s) => s.distanceM)) : null,
+    longestS: fields.includes("duration") ? max(done.map((s) => s.durationS)) : null,
+    longestM: recordsDistance(tracking) ? max(done.map((s) => s.distanceM)) : null,
     bestPct: tracking === "makes_attempts" ? max(pct) : null,
   };
 }
@@ -223,6 +236,9 @@ export const HEADLINE_RECORD: Record<ExerciseTracking, keyof ExerciseRecordsDto>
   duration: "longestS",
   distance_duration: "longestM",
   makes_attempts: "bestPct",
+  weight_duration: "heaviestKg",
+  weight_distance: "heaviestKg",
+  distance: "longestM",
 };
 
 /** Records `next` beats in `prior` (a first-ever session sets no records). */
@@ -262,6 +278,8 @@ export function formatSet(
       ? `${toDisplayDistance(s.distanceM, system)} ${distanceUnit(system)}`
       : null;
   const t = s.durationS !== null ? formatDuration(s.durationS) : null;
+  const l =
+    s.distanceM !== null ? `${toDisplayLength(s.distanceM, system)} ${lengthUnit(system)}` : null;
   switch (tracking) {
     case "weight_reps":
       return [w ?? "—", s.reps ?? "—"].join(" × ");
@@ -273,6 +291,12 @@ export function formatSet(
       return [d, t].filter(Boolean).join(" · ") || "—";
     case "makes_attempts":
       return `${s.reps ?? "—"}/${s.attempts ?? "—"}`;
+    case "weight_duration":
+      return [w, t].filter(Boolean).join(" · ") || "—";
+    case "weight_distance":
+      return [w, l].filter(Boolean).join(" · ") || "—";
+    case "distance":
+      return l ?? "—";
   }
 }
 
@@ -292,6 +316,13 @@ export function bestSet(tracking: ExerciseTracking, sets: WorkoutSetDto[]): Work
         return s.distanceM ?? s.durationS ?? 0;
       case "makes_attempts":
         return s.attempts ? (s.reps ?? 0) / s.attempts : 0;
+      // Heaviest first, then the longest at that weight.
+      case "weight_duration":
+        return (s.weightKg ?? 0) * 1e6 + (s.durationS ?? 0);
+      case "weight_distance":
+        return (s.weightKg ?? 0) * 1e7 + (s.distanceM ?? 0);
+      case "distance":
+        return s.distanceM ?? 0;
     }
   };
   return done.reduce((best, s) => (score(s) > score(best) ? s : best));
@@ -508,26 +539,40 @@ export const exerciseBodySchema = z.object({
   tracking: z.enum(EXERCISE_TRACKING),
 });
 
-/** A record in display units, as a plain number for charts (time in minutes). */
+/**
+ * A record in display units, as a plain number for charts (time in minutes). Pass the tracking
+ * kind so short distances come out in feet or meters.
+ */
 export function recordChartValue(
   key: keyof ExerciseRecordsDto,
   value: number,
   system: UnitSystem,
+  tracking?: ExerciseTracking,
 ): number {
   if (key === "heaviestKg" || key === "best1RmKg" || key === "bestSetVolumeKg") {
     return toDisplayWeight(value, system);
   }
-  if (key === "longestM") return toDisplayDistance(value, system);
+  if (key === "longestM") {
+    return tracking && usesLength(tracking)
+      ? toDisplayLength(value, system)
+      : toDisplayDistance(value, system);
+  }
   if (key === "longestS") return Math.round(value / 6) / 10;
   return Math.round(value * 10) / 10;
 }
 
 /** The unit recordChartValue returns. */
-export function recordChartUnit(key: keyof ExerciseRecordsDto, system: UnitSystem): string {
+export function recordChartUnit(
+  key: keyof ExerciseRecordsDto,
+  system: UnitSystem,
+  tracking?: ExerciseTracking,
+): string {
   if (key === "heaviestKg" || key === "best1RmKg" || key === "bestSetVolumeKg") {
     return weightUnit(system);
   }
-  if (key === "longestM") return distanceUnit(system);
+  if (key === "longestM") {
+    return tracking && usesLength(tracking) ? lengthUnit(system) : distanceUnit(system);
+  }
   if (key === "longestS") return "min";
   if (key === "bestPct") return "%";
   return "reps";

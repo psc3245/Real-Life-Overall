@@ -163,7 +163,7 @@ export async function catalog(db: Database, userId: string): Promise<MetricDto[]
       id: `exercise:${id}`,
       group: "exercises",
       label: info.name,
-      unit: recordChartUnit(headline, units),
+      unit: recordChartUnit(headline, units, info.tracking),
       kind: "session",
       target: null,
       detail: `${RECORD_LABELS[headline]}, per session`,
@@ -365,7 +365,7 @@ export async function series(
             if (!bestSet(info.tracking, e.sets)) continue;
             const best = recordsFromSets(info.tracking, e.sets)[headline];
             if (best === null) continue;
-            const v = recordChartValue(headline, best, units);
+            const v = recordChartValue(headline, best, units, info.tracking);
             values.set(w.localDate, Math.max(values.get(w.localDate) ?? 0, v));
           }
         }

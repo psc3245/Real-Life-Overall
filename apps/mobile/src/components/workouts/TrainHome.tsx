@@ -9,14 +9,42 @@ import {
   useStartWorkout,
   useTemplates,
 } from "@/api/workouts";
+import { Segmented } from "@/components/controls";
 import { NavRow, SettingsGroup } from "@/components/settings";
 import { Sheet } from "@/components/Sheet";
 import { Body, Button, Card, ErrorNote, Label, Muted } from "@/components/ui";
 import { colors, fonts, space } from "@/lib/theme";
 import { since } from "@/lib/workouts";
+import { CardioHome } from "./Cardio";
+
+type Mode = "lifting" | "cardio";
+
+/** Train: lifting (start a workout or a template) or cardio, like the web's training tabs. */
+export function TrainHome() {
+  const [mode, setMode] = useState<Mode>("lifting");
+  return (
+    <View style={{ gap: space.lg }}>
+      <Segmented
+        label="Training"
+        options={[
+          { value: "lifting", label: "Lifting" },
+          { value: "cardio", label: "Cardio" },
+        ]}
+        value={mode}
+        onChange={setMode}
+      />
+      {mode === "lifting" ? <LiftingHome /> : <CardioHome />}
+      <SettingsGroup>
+        <NavRow icon="clock" label="History" href="/workouts/history" />
+        <NavRow icon="dumbbell" label="Exercises" href="/workouts/exercises" />
+        <NavRow icon="figure" label="Body" href="/body" last />
+      </SettingsGroup>
+    </View>
+  );
+}
 
 /** Start a workout: resume the one in progress, start empty, or start from a template. */
-export function TrainHome() {
+function LiftingHome() {
   const active = useActiveWorkout();
   const templates = useTemplates();
   const exercises = useExercises();
@@ -85,12 +113,6 @@ export function TrainHome() {
           </Pressable>
         ))}
       </View>
-
-      <SettingsGroup>
-        <NavRow icon="clock" label="History" href="/workouts/history" />
-        <NavRow icon="dumbbell" label="Exercises" href="/workouts/exercises" />
-        <NavRow icon="figure" label="Body" href="/body" last />
-      </SettingsGroup>
 
       <Sheet
         open={preview !== null}

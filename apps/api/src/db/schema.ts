@@ -1,5 +1,6 @@
 import {
   BODY_KINDS,
+  WORKOUT_KINDS,
   BUG_REPORT_STATUSES,
   EXERCISE_CATEGORIES,
   EXERCISE_TRACKING,
@@ -734,9 +735,13 @@ export const workoutTemplates = pgTable(
   (t) => [index().on(t.userId)],
 );
 
+export const workoutKind = pgEnum("workout_kind", WORKOUT_KINDS);
+
 /**
  * Logged workouts. `exercises` is WorkoutExerciseDto[] (kg, m, s); the whole document is saved
- * at once while the workout is in progress. `ended_at` is null until it's finished.
+ * at once while the workout is in progress. `ended_at` is null until it's finished. Cardio
+ * sessions are finished workouts with one exercise and one set, plus `cardio`
+ * (CardioDetailsDto).
  */
 export const workouts = pgTable(
   "workouts",
@@ -751,7 +756,9 @@ export const workouts = pgTable(
     startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     endedAt: timestamp({ withTimezone: true }),
     templateId: uuid().references(() => workoutTemplates.id, { onDelete: "set null" }),
+    kind: workoutKind().notNull().default("strength"),
     exercises: jsonb().notNull().default([]),
+    cardio: jsonb(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

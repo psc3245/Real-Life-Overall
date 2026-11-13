@@ -1,17 +1,28 @@
 import {
+  addDays,
   bestSet,
   brokenRecords,
+  cardioLine,
+  cardioSession,
   CATALOG_BY_ID,
+  emptySet,
+  isCardioTracking,
   EXERCISE_CATALOG,
   formatSet,
   HEADLINE_RECORD,
   localDateIn,
   mergeRecords,
   RECORD_LABELS,
+  recordsDistance,
   recordsFromSets,
   TRACKING_FIELDS,
   withTemplateValues,
   workoutVolume,
+  type CardioActivityDto,
+  type CardioDetailsDto,
+  type CardioOverviewDto,
+  type CardioTotalsDto,
+  type cardioBodySchema,
   type DayWorkoutDto,
   type ExerciseCategory,
   type ExerciseDetailDto,
@@ -95,7 +106,7 @@ function normalizeExercises(input: WorkoutExerciseDto[], lookup: Lookup): Workou
         weightKg: fields.includes("weight") ? s.weightKg : null,
         reps: fields.includes("reps") ? s.reps : null,
         durationS: fields.includes("duration") ? s.durationS : null,
-        distanceM: fields.includes("distance") ? s.distanceM : null,
+        distanceM: recordsDistance(info.tracking) ? s.distanceM : null,
         attempts: fields.includes("attempts") ? s.attempts : null,
         done: s.done,
       })),
@@ -162,6 +173,7 @@ function toDto(row: WorkoutRow, state: ReplayState, lookup: Lookup, now = new Da
   const end = row.endedAt ?? now;
   return {
     id: row.id,
+    kind: row.kind,
     name: row.name,
     notes: row.notes,
     localDate: row.localDate,
@@ -176,6 +188,7 @@ function toDto(row: WorkoutRow, state: ReplayState, lookup: Lookup, now = new Da
       prs,
     },
     previous,
+    cardio: (row.cardio as CardioDetailsDto | null) ?? null,
   };
 }
 
@@ -417,17 +430,168 @@ export async function workoutsForDay(
   const dtos = await buildDtos(db, userId, rows, lookup);
   return dtos.map((w) => ({
     id: w.id,
+    kind: w.kind,
     name: w.name,
     durationS: w.summary.durationS,
     volumeKg: w.summary.volumeKg,
-    lines: w.exercises.map((e) => {
-      const info = lookup.get(e.exerciseId);
-      const best = info ? bestSet(info.tracking, e.sets) : null;
-      const sets = `${e.sets.length} set${e.sets.length === 1 ? "" : "s"}`;
-      return `${nameOf(lookup, e.exerciseId)}: ${sets}${best && info ? `, best ${formatSet(info.tracking, best, system)}` : ""}`;
-    }),
+    lines:
+      w.kind === "cardio"
+        ? [cardioDayLine(w, lookup, system)]
+        : w.exercises.map((e) => {
+            const info = lookup.get(e.exerciseId);
+            const best = info ? bestSet(info.tracking, e.sets) : null;
+            const sets = `${e.sets.length} set${e.sets.length === 1 ? "" : "s"}`;
+            return `${nameOf(lookup, e.exerciseId)}: ${sets}${best && info ? `, best ${formatSet(info.tracking, best, system)}` : ""}`;
+          }),
     prs: w.summary.prs.map((p) => p.label),
   }));
+}
+
+function cardioDayLine(w: WorkoutDto, lookup: Lookup, system: UnitSystem) {
+  const s = cardioSession(w);
+  return `${nameOf(lookup, s.activityId)}: ${cardioLine(s.activityId, s.distanceM, s.durationS, w.cardio, system)}`;
+}
+
+// Cardio
+
+type CardioBody = z.infer<typeof cardioBodySchema>;
+
+/** The session as a workout document: the activity with one done set. */
+function cardioFields(input: CardioBody, lookup: Lookup) {
+  const info = lookup.get(input.activity);
+  if (!info) throw badRequest(`Unknown exercise: ${input.activity}`);
+  if (!isCardioTracking(info.tracking)) {
+    throw badRequest("Pick an activity that records time");
+  }
+  const distanceM = TRACKING_FIELDS[info.tracking].includes("distance") ? input.distanceM : null;
+  const exercises: WorkoutExerciseDto[] = [
+    {
+      exerciseId: info.id,
+      notes: "",
+      sets: [{ ...emptySet(), durationS: input.durationS, distanceM, done: true }],
+      restS: null,
+    },
+  ];
+  const cardio: CardioDetailsDto = {
+    avgHeartRate: input.avgHeartRate,
+    calories: input.calories,
+    elevationM: input.elevationM,
+    effort: input.effort,
+  };
+  return { name: input.name ?? info.name, notes: input.notes.trim(), exercises, cardio };
+}
+
+async function checkCardioDate(db: Database, userId: string, localDate: string) {
+  const user = await userOf(db, userId);
+  if (localDate > localDateIn(user.timezone)) throw badRequest("Workouts can't be in the future");
+  return user;
+}
+
+/** Logs a finished cardio session for `localDate`; `startedAt` is the moment it was logged. */
+export async function logCardio(
+  db: Database,
+  userId: string,
+  input: CardioBody,
+): Promise<WorkoutDto> {
+  await checkCardioDate(db, userId, input.localDate);
+  const fields = cardioFields(input, await loadLookup(db, userId));
+  const startedAt = new Date();
+  const row = await workoutRepo.insert(db, {
+    userId,
+    kind: "cardio",
+    ...fields,
+    localDate: input.localDate,
+    startedAt,
+    endedAt: new Date(startedAt.getTime() + input.durationS * 1000),
+    templateId: null,
+  });
+  await touchDays(db, userId, row.localDate);
+  return one(db, userId, row);
+}
+
+/** Replaces a cardio session's activity, numbers and day. */
+export async function updateCardio(
+  db: Database,
+  userId: string,
+  id: string,
+  input: CardioBody,
+): Promise<WorkoutDto> {
+  const row = await workoutRepo.findById(db, userId, id);
+  if (!row || row.kind !== "cardio") throw notFound("Cardio session not found");
+  await checkCardioDate(db, userId, input.localDate);
+  const updated = await workoutRepo.update(db, row.id, {
+    ...cardioFields(input, await loadLookup(db, userId)),
+    localDate: input.localDate,
+    endedAt: new Date(row.startedAt.getTime() + input.durationS * 1000),
+  });
+  await touchDays(db, userId, row.localDate, updated.localDate);
+  return one(db, userId, updated);
+}
+
+const RECENT_CARDIO = 20;
+
+/** Totals for the last 7 and 30 days, per-activity bests, and the latest sessions. */
+export async function cardioOverview(db: Database, userId: string): Promise<CardioOverviewDto> {
+  const [user, completed] = await Promise.all([
+    userOf(db, userId),
+    workoutRepo.findCompleted(db, userId),
+  ]);
+  const rows = completed.filter((r) => r.kind === "cardio");
+  const today = localDateIn(user.timezone);
+  const totals = (from: string): CardioTotalsDto => {
+    const out = { sessions: 0, distanceM: 0, durationS: 0 };
+    for (const r of rows) {
+      if (r.localDate < from || r.localDate > today) continue;
+      const s = sessionOf(r);
+      out.sessions += 1;
+      out.distanceM += s.distanceM ?? 0;
+      out.durationS += s.durationS;
+    }
+    return out;
+  };
+
+  const activities = new Map<string, CardioActivityDto>();
+  for (const r of rows) {
+    const s = sessionOf(r);
+    const a = activities.get(s.activityId) ?? {
+      activityId: s.activityId,
+      sessions: 0,
+      distanceM: 0,
+      durationS: 0,
+      longestM: null,
+      longestS: null,
+      bestPaceSPerKm: null,
+      lastDone: r.localDate,
+    };
+    a.sessions += 1;
+    a.distanceM += s.distanceM ?? 0;
+    a.durationS += s.durationS;
+    if (s.distanceM && (a.longestM === null || s.distanceM > a.longestM)) a.longestM = s.distanceM;
+    if (a.longestS === null || s.durationS > a.longestS) a.longestS = s.durationS;
+    if (s.distanceM) {
+      const pace = s.durationS / (s.distanceM / 1000);
+      if (a.bestPaceSPerKm === null || pace < a.bestPaceSPerKm) a.bestPaceSPerKm = pace;
+    }
+    if (r.localDate > a.lastDone) a.lastDone = r.localDate;
+    activities.set(s.activityId, a);
+  }
+
+  const recent = rows.slice(-RECENT_CARDIO).reverse();
+  return {
+    week: totals(addDays(today, -6)),
+    month: totals(addDays(today, -29)),
+    activities: [...activities.values()].sort((a, b) => b.lastDone.localeCompare(a.lastDone)),
+    recent: await buildDtos(db, userId, recent),
+  };
+}
+
+/** A finished cardio row's activity, distance and time, without building its DTO. */
+function sessionOf(row: WorkoutRow) {
+  const end = row.endedAt ?? row.startedAt;
+  return cardioSession({
+    exercises: exercisesOf(row),
+    summary: { durationS: Math.round((end.getTime() - row.startedAt.getTime()) / 1000) },
+  });
 }
 
 // Templates
