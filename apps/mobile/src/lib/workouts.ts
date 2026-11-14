@@ -1,14 +1,16 @@
 import {
   distanceUnit,
   formatDuration,
+  heightUnit,
   lengthUnit,
   toDisplayDistance,
+  toDisplayHeight,
   toDisplayLength,
   toDisplayWeight,
   usesLength,
   weightUnit,
-  type ExerciseRecordsDto,
-  type ExerciseTracking,
+  type ExerciseStat,
+  type RecordKey,
   type UnitSystem,
 } from "@rlo/shared";
 import { useMe } from "@/api/hooks";
@@ -43,10 +45,10 @@ export function useUnits(): UnitSystem {
 
 /** A record's value in the user's units. */
 export function formatRecord(
-  key: keyof ExerciseRecordsDto,
+  key: RecordKey,
   value: number,
   units: UnitSystem,
-  tracking: ExerciseTracking,
+  stats: readonly ExerciseStat[],
 ) {
   switch (key) {
     case "heaviestKg":
@@ -54,13 +56,20 @@ export function formatRecord(
     case "bestSetVolumeKg":
       return `${(Math.round(toDisplayWeight(value, units) * 10) / 10).toLocaleString()} ${weightUnit(units)}`;
     case "longestS":
-      return formatDuration(value);
+    case "fastestS":
+      return formatDuration(value, true);
     case "longestM":
-      return usesLength(tracking)
+      return usesLength(stats)
         ? `${toDisplayLength(value, units)} ${lengthUnit(units)}`
         : `${toDisplayDistance(value, units)} ${distanceUnit(units)}`;
     case "bestPct":
       return `${Math.round(value)}%`;
+    case "steepestPct":
+      return `${value}%`;
+    case "highestCm":
+      return `${toDisplayHeight(value, units)} ${heightUnit(units)}`;
+    case "highestLevel":
+      return `Level ${value}`;
     default:
       return String(value);
   }

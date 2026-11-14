@@ -421,7 +421,7 @@ function draftFacts(
     list.map((e) => {
       const info = byId.get(e.exerciseId);
       const last = e.sets.findLast((x) => x.weightKg ?? x.reps ?? x.durationS ?? x.distanceM);
-      const shown = last && info ? formatSet(info.tracking, last, units) : "";
+      const shown = last && info ? formatSet(info, last, units) : "";
       return `${info?.name ?? "Exercise"}: ${e.sets.length} set${e.sets.length === 1 ? "" : "s"}${shown ? ` · ${shown}` : ""}`;
     });
   const builds = (ids: string[]) => {

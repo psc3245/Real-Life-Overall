@@ -3,6 +3,7 @@ import {
   createTemplateBodySchema,
   exerciseBodySchema,
   finishWorkoutBodySchema,
+  updateExerciseBodySchema,
   startWorkoutBodySchema,
   updateTemplateBodySchema,
   updateWorkoutBodySchema,
@@ -97,7 +98,7 @@ export const exerciseRoutes = new Hono<AppEnv>()
     ),
   )
   .patch("/:id", async (c) => {
-    const body = await parseJson(c, exerciseBodySchema.partial());
+    const body = await parseJson(c, updateExerciseBodySchema);
     return c.json(
       await workouts.updateExercise(
         c.get("db"),

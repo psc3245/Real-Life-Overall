@@ -1,14 +1,19 @@
 import {
+  emptyBoxScore,
   finishTemplateOptions,
   formatDuration,
+  hasBoxScore,
   templateChange,
+  workoutVolume,
+  type BoxScoreDto,
   type TemplateAction,
   type TemplateChange,
+  type UnitSystem,
   type WorkoutDto,
   type WorkoutExerciseDto,
 } from "@rlo/shared";
 import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import {
   useActiveWorkout,
   useDeleteWorkout,
@@ -19,7 +24,11 @@ import {
 } from "../../api/workouts";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
+import { usePreferences } from "../../api/preferences";
+import { StatTile } from "../../components/StatTile";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { BoxScoreFields } from "./BoxScore";
+import { formatElapsed, formatVolume } from "./format";
 import { RestTimerBar, useRestTimer } from "./RestTimer";
 import { WorkoutEditor } from "./WorkoutEditor";
 import { useUnits } from "./WorkoutsNav";
@@ -216,6 +225,10 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
         <FinishDialog
           doneSets={doneSets}
           skipped={sets.length - doneSets}
+          startedAt={workout.startedAt}
+          volumeKg={workoutVolume(draft.exercises)}
+          prs={(save.data ?? workout).summary.prs.map((p) => p.label)}
+          units={units}
           workoutName={draft.name.trim() || workout.name}
           templateName={template?.name ?? null}
           change={change}
@@ -249,6 +262,10 @@ function Elapsed({ since }: { since: string }) {
 function FinishDialog({
   doneSets,
   skipped,
+  startedAt,
+  volumeKg,
+  prs,
+  units,
   workoutName,
   templateName,
   change,
@@ -259,29 +276,68 @@ function FinishDialog({
 }: {
   doneSets: number;
   skipped: number;
+  startedAt: string;
+  volumeKg: number;
+  prs: string[];
+  units: UnitSystem;
   workoutName: string;
   templateName: string | null;
   change: TemplateChange;
   pending: boolean;
   error: unknown;
   onCancel: () => void;
-  onFinish: (options: { template: TemplateAction; templateName?: string }) => void;
+  onFinish: (options: {
+    template: TemplateAction;
+    templateName?: string;
+    boxScore?: BoxScoreDto;
+  }) => void;
 }) {
   const options = doneSets > 0 ? finishTemplateOptions(templateName, change) : [];
   const [action, setAction] = useState<TemplateAction>("none");
   const [name, setName] = useState(workoutName);
+  const asked = usePreferences().boxScore;
+  const [box, setBox] = useState<BoxScoreDto>(emptyBoxScore);
+  const [elapsedS] = useState(() => (Date.now() - Date.parse(startedAt)) / 1000);
   return (
     <div className="space-y-4">
-      <h2 className="font-display text-2xl uppercase">Finish workout?</h2>
+      <h2 className="font-display text-2xl uppercase">
+        {doneSets === 0 ? "Finish workout?" : "Box score"}
+      </h2>
       {doneSets === 0 ? (
         <p className="text-sm text-court-300">
           Check off at least one set first. Tap ✓ on each set you did.
         </p>
       ) : (
-        <p className="text-sm text-court-300">
-          {doneSets} set{doneSets === 1 ? "" : "s"} done.
-          {skipped > 0 && ` ${skipped} unchecked set${skipped === 1 ? "" : "s"} will be left out.`}
-        </p>
+        <>
+          <dl className="grid grid-cols-3 gap-2">
+            <StatTile label="Time" value={formatElapsed(elapsedS)} />
+            <StatTile label="Sets" value={doneSets} />
+            <StatTile label="Volume" value={volumeKg > 0 ? formatVolume(volumeKg, units) : "—"} />
+          </dl>
+          {prs.length > 0 && (
+            <ul className="space-y-0.5 rounded-lg border border-tier-yellow/40 bg-tier-yellow/5 px-3 py-2 text-sm text-tier-yellow">
+              {prs.map((pr) => (
+                <li key={pr}>★ {pr}</li>
+              ))}
+            </ul>
+          )}
+          {skipped > 0 && (
+            <p className="text-sm text-court-500">
+              {skipped} unchecked set{skipped === 1 ? "" : "s"} will be left out.
+            </p>
+          )}
+          {asked.length > 0 && (
+            <section className="space-y-3 rounded-xl border border-court-700 bg-court-900/70 p-3">
+              <p className="flex items-baseline justify-between gap-3 text-xs text-court-500">
+                <span>All optional. From your watch or how it felt.</span>
+                <Link to="/settings#box-score" className="shrink-0 text-neon hover:underline">
+                  Change what's asked
+                </Link>
+              </p>
+              <BoxScoreFields value={box} fields={asked} onChange={setBox} />
+            </section>
+          )}
+        </>
       )}
       {options.length > 0 && (
         <fieldset className="space-y-2">
@@ -332,6 +388,7 @@ function FinishDialog({
             onFinish({
               template: action,
               ...(action === "new" && { templateName: name.trim() }),
+              ...(hasBoxScore(box) && { boxScore: box }),
             })
           }
         >

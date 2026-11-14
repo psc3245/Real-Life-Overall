@@ -1,4 +1,10 @@
-import { addDays, type ExerciseDto, type WorkoutDto } from "@rlo/shared";
+import {
+  addDays,
+  BOX_SCORE_FIELDS,
+  emptyBoxScore,
+  type ExerciseDto,
+  type WorkoutDto,
+} from "@rlo/shared";
 import { Link, Redirect, router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActionSheetIOS, Alert, StyleSheet, Text, View } from "react-native";
@@ -13,6 +19,7 @@ import {
 import { DateStepper, FormRow, NumberField } from "@/components/controls";
 import { StatGrid, StatTile } from "@/components/StatTile";
 import { Body, Button, Card, ErrorNote, Field, Loading, Muted, Screen } from "@/components/ui";
+import { BoxScoreFields, BoxScoreTiles } from "@/components/workouts/BoxScore";
 import { CardioStats } from "@/components/workouts/Cardio";
 import { ExerciseSummary } from "@/components/workouts/WorkoutCard";
 import { WorkoutEditor } from "@/components/workouts/WorkoutEditor";
@@ -208,6 +215,7 @@ function FinishedWorkout({
           />
           <StatTile label="Sets" value={w.summary.doneSets} />
         </StatGrid>
+        {!editing && <BoxScoreTiles box={w.boxScore} durationS={w.summary.durationS} />}
 
         {w.summary.prs.length > 0 && (
           <Card style={{ gap: space.xs, borderColor: tierColor(75) }}>
@@ -260,6 +268,7 @@ function EditWorkout({
     Math.max(1, Math.round(w.summary.durationS / 60)),
   );
   const [exercises, setExercises] = useState(w.exercises);
+  const [box, setBox] = useState(w.boxScore ?? emptyBoxScore());
 
   return (
     <View style={{ gap: space.md }}>
@@ -290,6 +299,10 @@ function EditWorkout({
           style={{ minHeight: 70 }}
         />
       </FormRow>
+      <Card style={{ gap: space.md }}>
+        <Muted style={{ fontSize: 12 }}>Box score</Muted>
+        <BoxScoreFields value={box} fields={BOX_SCORE_FIELDS} onChange={setBox} />
+      </Card>
       <WorkoutEditor
         exercises={exercises}
         library={library}
@@ -310,6 +323,7 @@ function EditWorkout({
               notes,
               localDate,
               durationS: Math.max(60, Math.round((minutes ?? 1) * 60)),
+              boxScore: box,
               // Every set of a finished workout counts as done.
               exercises: exercises
                 .map((x) => ({ ...x, sets: x.sets.map((s) => ({ ...s, done: true })) }))

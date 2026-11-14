@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidDate } from "../dates";
-import { TRACKING_FIELDS, type ExerciseTracking } from "../exercises";
+import type { ExerciseStat } from "../exercises";
+import { boxScoreLine, type BoxScoreDto } from "./box-score";
 import {
   distanceUnit,
   formatDuration,
@@ -16,26 +17,8 @@ import type { WorkoutDto, WorkoutExerciseDto } from "./workouts";
  * charts, the day log and recaps see them like any workout; the extras below ride alongside.
  */
 
-/** Optional extras a cardio session records beyond distance and time. */
-export interface CardioDetailsDto {
-  avgHeartRate: number | null;
-  calories: number | null;
-  /** Elevation gain, m. */
-  elevationM: number | null;
-  /** Perceived effort, 1 (easy) to 10 (all out). */
-  effort: number | null;
-}
-
-export const emptyCardioDetails = (): CardioDetailsDto => ({
-  avgHeartRate: null,
-  calories: null,
-  elevationM: null,
-  effort: null,
-});
-
 /** Cardio activities need time; distance is optional (elliptical, jump rope). */
-export const isCardioTracking = (tracking: ExerciseTracking) =>
-  TRACKING_FIELDS[tracking].includes("duration");
+export const isCardioLine = (stats: readonly ExerciseStat[]) => stats.includes("duration");
 
 /** Activities shown as speed ("15.2 mph") rather than pace ("8:04 /mi"). */
 export const SPEED_ACTIVITIES = new Set(["cycling", "indoor-cycling"]);
@@ -81,12 +64,12 @@ export function cardioSession(w: {
   };
 }
 
-/** "3.1 mi in 25:00 (8:04 /mi) · avg HR 150 · 320 cal · effort 7/10" */
+/** "3.1 mi in 25:00 (8:04 /mi) · avg HR 150 · max 172 · 320 cal · effort 7/10" */
 export function cardioLine(
   activityId: string,
   distanceM: number | null,
   durationS: number,
-  details: CardioDetailsDto | null,
+  details: BoxScoreDto | null,
   system: UnitSystem,
 ): string {
   const pace = formatPace(activityId, distanceM, durationS, system);
@@ -97,9 +80,7 @@ export function cardioLine(
     details?.elevationM
       ? `${Math.round(system === "imperial" ? details.elevationM * 3.28084 : details.elevationM)} ${system === "imperial" ? "ft" : "m"} climb`
       : null,
-    details?.avgHeartRate ? `avg HR ${details.avgHeartRate}` : null,
-    details?.calories ? `${details.calories} cal` : null,
-    details?.effort ? `effort ${details.effort}/10` : null,
+    boxScoreLine(details) || null,
   ].filter(Boolean);
   return [main, ...extras].join(" · ");
 }
@@ -138,7 +119,7 @@ const optional = (min: number, max: number) =>
   z.number().finite().min(min).max(max).nullable().default(null);
 
 export const cardioBodySchema = z.object({
-  /** A catalog slug or custom exercise id whose tracking records time. */
+  /** A catalog slug or custom exercise id whose stat line records time. */
   activity: z.string().min(1).max(64),
   /** Defaults to the activity's name. */
   name: z.string().trim().min(1).max(80).optional(),
@@ -147,6 +128,7 @@ export const cardioBodySchema = z.object({
   durationS: z.number().int().min(1).max(86_400),
   distanceM: optional(0, 1_000_000),
   avgHeartRate: z.number().int().min(30).max(250).nullable().default(null),
+  maxHeartRate: z.number().int().min(30).max(250).nullable().default(null),
   calories: z.number().int().min(0).max(20_000).nullable().default(null),
   elevationM: optional(0, 20_000),
   effort: z.number().int().min(1).max(10).nullable().default(null),

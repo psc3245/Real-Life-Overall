@@ -5,6 +5,7 @@ import {
   type BodyDto,
   type DayDto,
   type ExerciseDetailDto,
+  type MetricSeriesResponseDto,
   type ExerciseDto,
   type MeDto,
   type ObjectiveDto,
@@ -224,7 +225,7 @@ describe("workouts", () => {
         ...json({ name: "Floaters", category: "sport", tracking: "makes_attempts" }),
       }),
     );
-    expect(custom).toMatchObject({ custom: true, tracking: "makes_attempts" });
+    expect(custom).toMatchObject({ custom: true, stats: ["makes"], headline: "bestPct" });
     const dupe = await request("/exercises", {
       method: "POST",
       ...json({ name: "free throws", category: "sport", tracking: "makes_attempts" }),
@@ -249,22 +250,102 @@ describe("workouts", () => {
     expect(detail.history).toHaveLength(1);
     expect(detail.exercise.timesDone).toBe(1);
 
-    // Built-ins can't be edited; custom ones with history keep their tracking.
+    // Built-ins can't be edited; custom ones can change their stat line, history and all.
     expect(
       (await request("/exercises/plank", { method: "PATCH", ...json({ name: "x" }) })).status,
     ).toBe(400);
+    const reshaped = await body<ExerciseDto>(
+      await request(`/exercises/${custom.id}`, {
+        method: "PATCH",
+        ...json({ stats: ["makes", "rpe"] }),
+      }),
+    );
+    expect(reshaped).toMatchObject({ stats: ["makes", "rpe"], headline: "bestPct" });
+    // A headline that no longer fits falls back to the stat line's default.
+    expect(
+      await body<ExerciseDto>(
+        await request(`/exercises/${custom.id}`, { method: "PATCH", ...json({ stats: ["reps"] }) }),
+      ),
+    ).toMatchObject({ stats: ["reps"], headline: "mostReps" });
     expect(
       (
         await request(`/exercises/${custom.id}`, {
           method: "PATCH",
-          ...json({ tracking: "reps" }),
+          ...json({ stats: ["reps", "makes"] }),
         })
       ).status,
-    ).toBe(409);
+    ).toBe(400);
     expect((await request(`/exercises/${custom.id}`, { method: "DELETE" })).status).toBe(204);
     const library = await body<ExerciseDto[]>(await request("/exercises"));
     expect(library.some((e) => e.id === custom.id)).toBe(false);
     expect(library.some((e) => e.id === "free-throws")).toBe(true);
+  });
+
+  it("logs a stat-line exercise and the box score at the finish", async () => {
+    const { request, start, save, finish } = await setup();
+    const walk = await body<ExerciseDto>(
+      await request("/exercises", {
+        method: "POST",
+        ...json({
+          name: "Hill farmer's walk",
+          category: "full_body",
+          stats: ["weight", "length", "duration", "incline"],
+        }),
+      }),
+    );
+    expect(walk).toMatchObject({ headline: "heaviestKg", sport: null });
+    const w = await start();
+    await save(w.id, {
+      exercises: [
+        {
+          exerciseId: walk.id,
+          // Reps and RPE aren't on its stat line, so they're dropped.
+          sets: [
+            set({
+              weightKg: 40,
+              distanceM: 30,
+              durationS: 45,
+              inclinePct: 6,
+              reps: 3,
+              rpe: 8,
+              done: true,
+            }),
+          ],
+        },
+      ],
+    });
+    const done = await body<WorkoutDto>(
+      await finish(w.id, { boxScore: { avgHeartRate: 132, maxHeartRate: 168, effort: 7 } }),
+    );
+    expect(done.exercises[0]!.sets[0]).toMatchObject({
+      weightKg: 40,
+      distanceM: 30,
+      durationS: 45,
+      inclinePct: 6,
+      reps: null,
+      rpe: null,
+    });
+    expect(done.boxScore).toEqual({
+      avgHeartRate: 132,
+      maxHeartRate: 168,
+      calories: null,
+      elevationM: null,
+      effort: 7,
+    });
+    const detail = await body<ExerciseDetailDto>(await request(`/exercises/${walk.id}`));
+    expect(detail.records).toMatchObject({ heaviestKg: 40, longestM: 30, steepestPct: 6 });
+    const charts = await body<MetricSeriesResponseDto>(
+      await request("/metrics/series?ids=workouts:heartRate,workouts:effort"),
+    );
+    expect(charts.series.map((x) => x.points.at(-1)?.value)).toEqual([132, 7]);
+
+    // The box score can be fixed afterwards, or cleared.
+    const fixed = await body<WorkoutDto>(
+      await save(w.id, { boxScore: { avgHeartRate: null, calories: 410, effort: 7 } }),
+    );
+    expect(fixed.boxScore).toMatchObject({ avgHeartRate: null, calories: 410 });
+    const cleared = await body<WorkoutDto>(await save(w.id, { boxScore: {} }));
+    expect(cleared.boxScore).toBeNull();
   });
 
   it("keeps workouts private to their owner", async () => {
@@ -325,7 +406,7 @@ describe("cardio", () => {
       kind: "cardio",
       name: "Running",
       summary: { durationS: 1500 },
-      cardio: { avgHeartRate: 150, effort: 7, calories: null },
+      boxScore: { avgHeartRate: 150, effort: 7, calories: null },
       exercises: [
         { exerciseId: "running", sets: [{ distanceM: 5000, durationS: 1500, done: true }] },
       ],
@@ -352,7 +433,7 @@ describe("cardio", () => {
     expect(edited).toMatchObject({
       name: "Tempo run",
       summary: { durationS: 1800 },
-      cardio: { effort: null },
+      boxScore: null,
     });
     // Strength workouts can't be edited as cardio.
     const w = await body<WorkoutDto>(await t.request("/workouts", { method: "POST" }));

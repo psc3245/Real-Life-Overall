@@ -5,10 +5,9 @@ import {
   formatDuration,
   formatPace,
   fromDisplayDistance,
-  isCardioTracking,
+  isCardioLine,
   parseDuration,
   toDisplayDistance,
-  TRACKING_FIELDS,
   type CardioInput,
   type ExerciseDto,
   type WorkoutDto,
@@ -20,25 +19,18 @@ import { useExercises, useSaveCardio } from "../../api/workouts";
 import { Button } from "../../components/Button";
 import { compactFieldClass } from "../../components/form";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { EffortPicker } from "./BoxScore";
 import { useUnits } from "./WorkoutsNav";
 
 const FT_PER_M = 3.28084;
 const label = "block text-xs uppercase tracking-wider text-court-300";
 
-/** 1–3 easy, 4–6 steady, 7–8 hard, 9–10 all out. */
-export function effortLabel(effort: number) {
-  if (effort <= 3) return "Easy";
-  if (effort <= 6) return "Steady";
-  if (effort <= 8) return "Hard";
-  return "All out";
-}
+export { effortLabel } from "./BoxScore";
 
 /** Cardio activities: the library's cardio exercises (and custom ones) that record time. */
 export function useCardioActivities(): ExerciseDto[] {
   const exercises = useExercises();
-  return (exercises.data ?? []).filter(
-    (e) => e.category === "cardio" && isCardioTracking(e.tracking),
-  );
+  return (exercises.data ?? []).filter((e) => e.category === "cardio" && isCardioLine(e.stats));
 }
 
 const num = (text: string) => {
@@ -61,7 +53,7 @@ export function CardioForm({
   const activities = useCardioActivities();
   const save = useSaveCardio(session?.id);
   const initial = session ? cardioSession(session) : null;
-  const details = session?.cardio;
+  const details = session?.boxScore;
 
   const [activity, setActivity] = useState(initial?.activityId ?? "running");
   const [name, setName] = useState(session?.name ?? "");
@@ -78,12 +70,13 @@ export function CardioForm({
       : "",
   );
   const [heartRate, setHeartRate] = useState(details?.avgHeartRate?.toString() ?? "");
+  const [maxHeartRate, setMaxHeartRate] = useState(details?.maxHeartRate?.toString() ?? "");
   const [calories, setCalories] = useState(details?.calories?.toString() ?? "");
   const [effort, setEffort] = useState<number | null>(details?.effort ?? null);
   const [notes, setNotes] = useState(session?.notes ?? "");
 
   const info = activities.find((a) => a.id === activity);
-  const tracksDistance = info ? TRACKING_FIELDS[info.tracking].includes("distance") : true;
+  const tracksDistance = info ? info.stats.includes("distance") : true;
   const durationS = parseDuration(duration);
   const distanceM =
     tracksDistance && num(distance) ? fromDisplayDistance(num(distance)!, units) : null;
@@ -103,6 +96,7 @@ export function CardioForm({
       distanceM,
       elevationM: elev === null ? null : units === "imperial" ? elev / FT_PER_M : elev,
       avgHeartRate: num(heartRate) === null ? null : Math.round(num(heartRate)!),
+      maxHeartRate: num(maxHeartRate) === null ? null : Math.round(num(maxHeartRate)!),
       calories: num(calories) === null ? null : Math.round(num(calories)!),
       effort,
     };
@@ -191,7 +185,7 @@ export function CardioForm({
         )}
       </p>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <label className="space-y-1">
           <span className={label}>Avg HR</span>
           <input
@@ -199,6 +193,16 @@ export function CardioForm({
             inputMode="numeric"
             placeholder="bpm"
             onChange={(e) => setHeartRate(e.target.value)}
+            className={`${compactFieldClass} w-full tabular-nums`}
+          />
+        </label>
+        <label className="space-y-1">
+          <span className={label}>Max HR</span>
+          <input
+            value={maxHeartRate}
+            inputMode="numeric"
+            placeholder="bpm"
+            onChange={(e) => setMaxHeartRate(e.target.value)}
             className={`${compactFieldClass} w-full tabular-nums`}
           />
         </label>
@@ -224,25 +228,7 @@ export function CardioForm({
         </label>
       </div>
 
-      <fieldset className="space-y-2">
-        <legend className={label}>
-          Effort{effort !== null && `: ${effort}/10 · ${effortLabel(effort)}`}
-        </legend>
-        <div className="grid grid-cols-10 gap-1">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-label={`Effort ${n}`}
-              aria-pressed={effort === n}
-              onClick={() => setEffort(effort === n ? null : n)}
-              className={`rounded-md py-1.5 text-sm tabular-nums ${effort !== null && n <= effort ? "bg-neon text-court-950" : "bg-court-800 text-court-300 hover:bg-court-700"}`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <EffortPicker value={effort} onChange={setEffort} />
 
       <div className="grid gap-3 sm:grid-cols-[1fr_2fr]">
         <label className="space-y-1">

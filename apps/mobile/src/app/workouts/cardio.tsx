@@ -7,19 +7,19 @@ import {
   fromDisplayDistance,
   parseDuration,
   toDisplayDistance,
-  TRACKING_FIELDS,
   type CardioInput,
   type WorkoutDto,
 } from "@rlo/shared";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useDay } from "@/api/days";
 import { useSaveCardio, useWorkout } from "@/api/workouts";
 import { Chip, DateStepper, FormRow } from "@/components/controls";
 import { FeatureGate } from "@/components/FeatureGate";
 import { Button, Card, ErrorNote, Field, Loading, Muted, Screen } from "@/components/ui";
-import { effortLabel, FT_PER_M, useCardioActivities } from "@/components/workouts/Cardio";
+import { EffortPicker } from "@/components/workouts/BoxScore";
+import { FT_PER_M, useCardioActivities } from "@/components/workouts/Cardio";
 import { colors, space } from "@/lib/theme";
 import { useUnits } from "@/lib/workouts";
 
@@ -54,7 +54,7 @@ function CardioForm({ today, session }: { today: string; session?: WorkoutDto })
   const activities = useCardioActivities();
   const save = useSaveCardio(session?.id);
   const initial = session ? cardioSession(session) : null;
-  const details = session?.cardio;
+  const details = session?.boxScore;
 
   const [activity, setActivity] = useState(initial?.activityId ?? "running");
   const [name, setName] = useState(session?.name ?? "");
@@ -71,12 +71,13 @@ function CardioForm({ today, session }: { today: string; session?: WorkoutDto })
       : "",
   );
   const [heartRate, setHeartRate] = useState(details?.avgHeartRate?.toString() ?? "");
+  const [maxHeartRate, setMaxHeartRate] = useState(details?.maxHeartRate?.toString() ?? "");
   const [calories, setCalories] = useState(details?.calories?.toString() ?? "");
   const [effort, setEffort] = useState<number | null>(details?.effort ?? null);
   const [notes, setNotes] = useState(session?.notes ?? "");
 
   const info = activities.find((a) => a.id === activity);
-  const tracksDistance = info ? TRACKING_FIELDS[info.tracking].includes("distance") : true;
+  const tracksDistance = info ? info.stats.includes("distance") : true;
   const durationS = parseDuration(duration);
   const distanceM =
     tracksDistance && num(distance) ? fromDisplayDistance(num(distance)!, units) : null;
@@ -95,6 +96,7 @@ function CardioForm({ today, session }: { today: string; session?: WorkoutDto })
       distanceM,
       elevationM: elev === null ? null : units === "imperial" ? elev / FT_PER_M : elev,
       avgHeartRate: num(heartRate) === null ? null : Math.round(num(heartRate)!),
+      maxHeartRate: num(maxHeartRate) === null ? null : Math.round(num(maxHeartRate)!),
       calories: num(calories) === null ? null : Math.round(num(calories)!),
       effort,
     };
@@ -177,6 +179,19 @@ function CardioForm({ today, session }: { today: string; session?: WorkoutDto })
           </FormRow>
         </View>
         <View style={{ flex: 1 }}>
+          <FormRow label="Max HR">
+            <Field
+              accessibilityLabel="Max heart rate"
+              value={maxHeartRate}
+              placeholder="bpm"
+              keyboardType="number-pad"
+              onChangeText={setMaxHeartRate}
+            />
+          </FormRow>
+        </View>
+      </View>
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
           <FormRow label="Calories">
             <Field
               accessibilityLabel="Calories"
@@ -199,25 +214,7 @@ function CardioForm({ today, session }: { today: string; session?: WorkoutDto })
           </FormRow>
         </View>
       </View>
-      <FormRow label={effort === null ? "Effort" : `Effort: ${effort}/10 · ${effortLabel(effort)}`}>
-        <View style={styles.effort}>
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-            const on = effort !== null && n <= effort;
-            return (
-              <Pressable
-                key={n}
-                accessibilityRole="button"
-                accessibilityLabel={`Effort ${n}`}
-                accessibilityState={{ selected: effort === n }}
-                onPress={() => setEffort(effort === n ? null : n)}
-                style={[styles.effortCell, on && { backgroundColor: colors.neon }]}
-              >
-                <Text style={[styles.effortText, on && { color: colors.court950 }]}>{n}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </FormRow>
+      <EffortPicker value={effort} onChange={setEffort} />
       <FormRow label="Name">
         <Field
           value={name}
@@ -261,13 +258,4 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
   row: { flexDirection: "row", gap: space.sm },
   pace: { color: colors.court300, fontSize: 15, fontVariant: ["tabular-nums"] },
-  effort: { flexDirection: "row", gap: 4 },
-  effortCell: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: colors.court800,
-  },
-  effortText: { color: colors.court300, fontSize: 14, fontVariant: ["tabular-nums"] },
 });

@@ -72,7 +72,7 @@ function exerciseLines(exercises: WorkoutExerciseDto[], library: ExerciseDto[], 
   return exercises.map((e) => {
     const info = byId.get(e.exerciseId);
     const last = e.sets.findLast((s) => s.weightKg ?? s.reps ?? s.durationS ?? s.distanceM);
-    const shown = last && info ? formatSet(info.tracking, last, units) : "";
+    const shown = last && info ? formatSet(info, last, units) : "";
     return `${info?.name ?? "Exercise"}: ${e.sets.length} set${e.sets.length === 1 ? "" : "s"}${shown ? ` · ${shown}` : ""}`;
   });
 }

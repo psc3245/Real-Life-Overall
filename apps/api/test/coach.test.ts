@@ -206,6 +206,10 @@ describe("coach logging", () => {
     seconds: null,
     distance: null,
     attempts: null,
+    incline: null,
+    height: null,
+    level: null,
+    rpe: null,
   });
   const legDay = {
     date: null,
@@ -283,7 +287,7 @@ describe("coach logging", () => {
       exercises: [
         {
           exercise: "Tire flip",
-          newExercise: { category: "legs", tracking: "duration" },
+          newExercise: { category: "legs", stats: ["duration"] },
           sets: [{ ...set(null, null), seconds: 40 }],
         },
       ],

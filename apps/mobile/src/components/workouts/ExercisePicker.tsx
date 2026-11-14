@@ -1,21 +1,19 @@
 import {
   CATEGORY_LABELS,
   EXERCISE_CATEGORIES,
-  EXERCISE_TRACKING,
   SPORT_LABELS,
-  TRACKING_LABELS,
+  statLineLabel,
   type ExerciseCategory,
   type ExerciseDto,
-  type ExerciseTracking,
 } from "@rlo/shared";
 import { SymbolView } from "expo-symbols";
 import { useState } from "react";
 import { Pressable, ScrollView, SectionList, StyleSheet, Text, View } from "react-native";
-import { useCreateExercise } from "@/api/workouts";
-import { Chip, FormRow } from "@/components/controls";
+import { Chip } from "@/components/controls";
 import { Sheet } from "@/components/Sheet";
-import { Button, ErrorNote, Field, Muted } from "@/components/ui";
+import { Button, Field, Muted } from "@/components/ui";
 import { colors, space } from "@/lib/theme";
+import { ExerciseForm } from "./ExerciseForm";
 
 /** Filters the library by text and category; shared by the picker and the Exercises screen. */
 export function filterExercises(
@@ -58,7 +56,7 @@ export function CategoryChips({
 }
 
 export const exerciseDetail = (e: ExerciseDto) =>
-  `${e.sport ? SPORT_LABELS[e.sport] : CATEGORY_LABELS[e.category]} · ${TRACKING_LABELS[e.tracking]}${e.custom ? " · custom" : ""}`;
+  `${e.sport ? SPORT_LABELS[e.sport] : CATEGORY_LABELS[e.category]} · ${statLineLabel(e.stats)}${e.custom ? " · custom" : ""}`;
 
 /** Picks one or more exercises to add, or creates a custom one. */
 export function ExercisePicker({
@@ -122,10 +120,10 @@ export function ExercisePicker({
       }
     >
       {creating ? (
-        <View style={{ gap: space.md }}>
-          <NewExerciseForm
+        <View style={{ flex: 1, gap: space.md }}>
+          <ExerciseForm
             initialName={query}
-            onCreated={(e) => {
+            onSaved={(e) => {
               setCreating(false);
               setPicked((prev) => [...prev, e.id]);
               setQuery("");
@@ -188,65 +186,6 @@ export function ExercisePicker({
   );
 }
 
-export function NewExerciseForm({
-  initialName = "",
-  onCreated,
-}: {
-  initialName?: string;
-  onCreated: (e: ExerciseDto) => void;
-}) {
-  const create = useCreateExercise();
-  const [name, setName] = useState(initialName);
-  const [category, setCategory] = useState<ExerciseCategory>("other");
-  const [tracking, setTracking] = useState<ExerciseTracking>("weight_reps");
-
-  return (
-    <View style={{ gap: space.md }}>
-      <FormRow label="Name">
-        <Field
-          value={name}
-          autoFocus
-          maxLength={60}
-          placeholder="e.g. Floaters, Sled Push"
-          onChangeText={setName}
-        />
-      </FormRow>
-      <FormRow label="Category">
-        <View style={styles.wrap}>
-          {EXERCISE_CATEGORIES.map((c) => (
-            <Chip
-              key={c}
-              label={CATEGORY_LABELS[c]}
-              selected={category === c}
-              onPress={() => setCategory(c)}
-            />
-          ))}
-        </View>
-      </FormRow>
-      <FormRow label="What a set records">
-        <View style={styles.wrap}>
-          {EXERCISE_TRACKING.map((t) => (
-            <Chip
-              key={t}
-              label={TRACKING_LABELS[t]}
-              selected={tracking === t}
-              onPress={() => setTracking(t)}
-            />
-          ))}
-        </View>
-      </FormRow>
-      <ErrorNote error={create.error} />
-      <Button
-        title={create.isPending ? "Creating…" : "Create exercise"}
-        disabled={!name.trim() || create.isPending}
-        onPress={() =>
-          create.mutate({ name: name.trim(), category, tracking }, { onSuccess: onCreated })
-        }
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   sectionHead: {
     color: colors.court500,
@@ -266,5 +205,4 @@ const styles = StyleSheet.create({
   },
   rowOn: { backgroundColor: "rgba(60,242,200,0.1)" },
   rowName: { color: colors.court100, fontSize: 16 },
-  wrap: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
 });

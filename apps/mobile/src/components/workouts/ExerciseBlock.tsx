@@ -1,6 +1,4 @@
 import {
-  distanceUnit,
-  lengthUnit,
   formatDuration,
   emptySet,
   formatSet,
@@ -8,10 +6,11 @@ import {
   SET_KIND_LABELS,
   SET_KIND_TAGS,
   SET_KINDS,
-  TRACKING_FIELDS,
-  weightUnit,
+  SET_FIELD_KEYS as FIELD_KEY,
+  setFieldHeader as fieldHeader,
+  statFields,
   type ExerciseDto,
-  type SetField,
+  type ExerciseStat,
   type UnitSystem,
   type WorkoutExerciseDto,
   type WorkoutSetDto,
@@ -34,31 +33,7 @@ import { SwipeRow } from "./SwipeRow";
  */
 export type EditorMode = "live" | "log" | "plan";
 
-const FIELD_KEY: Record<SetField, keyof WorkoutSetDto> = {
-  weight: "weightKg",
-  reps: "reps",
-  duration: "durationS",
-  distance: "distanceM",
-  length: "distanceM",
-  attempts: "attempts",
-};
-
-function fieldHeader(field: SetField, units: UnitSystem, makes: boolean) {
-  switch (field) {
-    case "weight":
-      return weightUnit(units);
-    case "reps":
-      return makes ? "Makes" : "Reps";
-    case "duration":
-      return "Time";
-    case "distance":
-      return distanceUnit(units);
-    case "length":
-      return lengthUnit(units);
-    case "attempts":
-      return "Att.";
-  }
-}
+const LIFT: ExerciseStat[] = ["weight", "reps"];
 
 const kindColor = (kind: WorkoutSetDto["kind"]) =>
   kind === "warmup"
@@ -107,9 +82,9 @@ export function ExerciseBlock({
   const menu = usePopAnchor();
   const [menuPage, setMenuPage] = useState<"main" | "rest">("main");
   const restS = exercise.restS ?? null;
-  const tracking = info?.tracking ?? "weight_reps";
-  const fields = TRACKING_FIELDS[tracking];
-  const makes = tracking === "makes_attempts";
+  const line = info ?? { stats: LIFT };
+  const fields = statFields(line.stats);
+  const makes = line.stats.includes("makes");
   const name = info?.name ?? "Unknown exercise";
 
   const setAt = (i: number, changes: Partial<WorkoutSetDto>) =>
@@ -136,7 +111,7 @@ export function ExerciseBlock({
     const out: Partial<WorkoutSetDto> = {};
     for (const f of fields) {
       const key = FIELD_KEY[f];
-      if (!onlyEmpty || exercise.sets[i]![key] === null) Object.assign(out, { [key]: prev[key] });
+      if (!onlyEmpty || exercise.sets[i]![key] == null) Object.assign(out, { [key]: prev[key] });
     }
     return out;
   };
@@ -241,7 +216,12 @@ export function ExerciseBlock({
 
       <View style={styles.row}>
         <Text style={[styles.header, styles.setCol]}>Set</Text>
-        {showPrevious && <Text style={[styles.header, styles.prevCol]}>Previous</Text>}
+        {showPrevious && (
+          <Text style={[styles.header, styles.prevCol]} numberOfLines={1}>
+            {/* Four-stat lines leave the column too narrow for the full word. */}
+            {fields.length > 3 ? "Prev." : "Previous"}
+          </Text>
+        )}
         {fields.map((f) => (
           <Text key={f} style={[styles.header, styles.fieldCol]}>
             {fieldHeader(f, units, makes)}
@@ -274,7 +254,7 @@ export function ExerciseBlock({
                 style={styles.prevCol}
               >
                 <Text style={styles.prevText} numberOfLines={1}>
-                  {prev ? formatSet(tracking, prev, units) : "—"}
+                  {prev ? formatSet(line, prev, units) : "—"}
                 </Text>
               </Pressable>
             )}
@@ -282,11 +262,17 @@ export function ExerciseBlock({
               <View key={f} style={styles.fieldCol}>
                 <SetCell
                   field={f}
-                  value={s[FIELD_KEY[f]] as number | null}
+                  value={(s[FIELD_KEY[f]] as number | null | undefined) ?? null}
                   units={units}
                   label={`Set ${i + 1} ${fieldHeader(f, units, makes)}`}
                   placeholder={
-                    prev ? displayValue(f, prev[FIELD_KEY[f]] as number | null, units) : undefined
+                    prev
+                      ? displayValue(
+                          f,
+                          (prev[FIELD_KEY[f]] as number | null | undefined) ?? null,
+                          units,
+                        )
+                      : undefined
                   }
                   onChange={(v) => setAt(i, { [FIELD_KEY[f]]: v })}
                 />

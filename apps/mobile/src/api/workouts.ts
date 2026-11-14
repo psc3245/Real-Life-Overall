@@ -7,7 +7,10 @@ import type {
   ExerciseCategory,
   ExerciseDetailDto,
   ExerciseDto,
-  ExerciseTracking,
+  BoxScoreDto,
+  ExerciseStat,
+  RecordKey,
+  Sport,
   TemplateAction,
   WorkoutDto,
   WorkoutExerciseDto,
@@ -87,6 +90,7 @@ export interface WorkoutChanges {
   exercises?: WorkoutExerciseDto[];
   localDate?: string;
   durationS?: number;
+  boxScore?: BoxScoreDto;
 }
 
 /** Saves a workout. The caller owns the editing state; this only keeps the cache in step. */
@@ -109,7 +113,11 @@ export function useFinishWorkout(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     meta: { haptic: "success" },
-    mutationFn: (options: { template: TemplateAction; templateName?: string }) =>
+    mutationFn: (options: {
+      template: TemplateAction;
+      templateName?: string;
+      boxScore?: BoxScoreDto;
+    }) =>
       api<WorkoutDto>(`/workouts/${id}/finish`, {
         method: "POST",
         body: JSON.stringify(options),
@@ -238,13 +246,36 @@ export function useExercise(id: string) {
   });
 }
 
+export interface ExerciseInput {
+  name: string;
+  category: ExerciseCategory;
+  stats: ExerciseStat[];
+  headline: RecordKey;
+  sport: Sport | null;
+}
+
 export function useCreateExercise() {
   const queryClient = useQueryClient();
   return useMutation({
     meta: { haptic: "impact" },
-    mutationFn: (input: { name: string; category: ExerciseCategory; tracking: ExerciseTracking }) =>
+    mutationFn: (input: ExerciseInput) =>
       api<ExerciseDto>("/exercises", { method: "POST", body: JSON.stringify(input) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: exercisesKey }),
+  });
+}
+
+/** Renames a custom exercise or changes its stat line. */
+export function useUpdateExercise(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    meta: { haptic: "success" },
+    mutationFn: (input: Partial<ExerciseInput>) =>
+      api<ExerciseDto>(`/exercises/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    // Records, charts and every set table follow the stat line.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: exercisesKey });
+      void queryClient.invalidateQueries({ queryKey: workoutsKey });
+    },
   });
 }
 

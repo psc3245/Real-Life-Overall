@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS, TRACKING_LABELS, type ExerciseCategory } from "@rlo/shared";
+import { CATEGORY_LABELS, statLineLabel, type ExerciseCategory } from "@rlo/shared";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useExercises } from "../../api/workouts";
@@ -6,7 +6,8 @@ import { Button } from "../../components/Button";
 import { compactFieldClass } from "../../components/form";
 import { Modal } from "../../components/Modal";
 import { ErrorNote } from "../onboarding/ErrorNote";
-import { CategoryChips, filterExercises, NewExerciseForm } from "./ExercisePicker";
+import { ExerciseForm } from "./ExerciseForm";
+import { CategoryChips, filterExercises } from "./ExercisePicker";
 import { since } from "./format";
 import { WorkoutsNav } from "./WorkoutsNav";
 import { DebugJson } from "../../components/debug/Debug";
@@ -53,7 +54,7 @@ export function ExercisesPage() {
               <span className="min-w-0">
                 <span className="block truncate font-medium">{e.name}</span>
                 <span className="block text-xs text-court-500">
-                  {CATEGORY_LABELS[e.category]} · {TRACKING_LABELS[e.tracking]}
+                  {CATEGORY_LABELS[e.category]} · {statLineLabel(e.stats)}
                   {e.custom && " · custom"}
                 </span>
               </span>
@@ -75,7 +76,11 @@ export function ExercisesPage() {
       <DebugJson label="exercises" data={exercises.data} />
       <Modal open={creating} onClose={() => setCreating(false)} label="New exercise">
         <h2 className="mb-4 font-display text-xl uppercase tracking-wider">New exercise</h2>
-        <NewExerciseForm initialName={query} onCreated={() => setCreating(false)} />
+        <ExerciseForm
+          initialName={query}
+          onSaved={() => setCreating(false)}
+          onCancel={() => setCreating(false)}
+        />
       </Modal>
     </div>
   );

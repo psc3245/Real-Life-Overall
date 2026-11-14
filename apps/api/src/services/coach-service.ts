@@ -55,13 +55,7 @@ import * as eventRepo from "../repos/rating-event-repo";
 import * as habitRepo from "../repos/habit-repo";
 import * as recapRepo from "../repos/recap-repo";
 import * as userRepo from "../repos/user-repo";
-import {
-  coachTools,
-  refsForDay,
-  renderDayLog,
-  renderExercises,
-  TRACKING_NOTE,
-} from "./coach-tools";
+import { coachTools, refsForDay, renderDayLog, renderExercises, STATS_NOTE } from "./coach-tools";
 import { getDay, saveEntry, saveObjective } from "./day-service";
 import { renderScoutingReport } from "./evolution-service";
 import { archiveHabit, createHabit, loadLeafContext, type LeafContext } from "./habit-service";
@@ -291,7 +285,7 @@ async function buildContext(db: Database, userId: string, date?: string) {
     off.length ? `Switched off by the user: ${off.join(", ")}. Don't suggest those.` : "",
     renderDayLog(day, dayRefs, features),
     lookup &&
-      `Exercise library (id: name [tracking]; sets record ${TRACKING_NOTE}):\n${renderExercises(lookup)}`,
+      `Exercise library (id: name [stats each set records]; stats: ${STATS_NOTE}):\n${renderExercises(lookup)}`,
   ]
     .filter(Boolean)
     .join("\n\n");

@@ -1,18 +1,15 @@
 import {
   CATEGORY_LABELS,
   EXERCISE_CATEGORIES,
-  EXERCISE_TRACKING,
   SPORT_LABELS,
-  TRACKING_LABELS,
+  statLineLabel,
   type ExerciseCategory,
   type ExerciseDto,
-  type ExerciseTracking,
 } from "@rlo/shared";
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useCreateExercise } from "../../api/workouts";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { compactFieldClass } from "../../components/form";
-import { ErrorNote } from "../onboarding/ErrorNote";
+import { ExerciseForm } from "./ExerciseForm";
 
 /** Filters the library by text and category; shared by the picker and the Exercises page. */
 export function filterExercises(
@@ -106,7 +103,7 @@ export function ExercisePicker({
           <span className="block truncate">{e.name}</span>
           <span className="block text-xs text-court-500">
             {e.sport ? SPORT_LABELS[e.sport] : CATEGORY_LABELS[e.category]} ·{" "}
-            {TRACKING_LABELS[e.tracking]}
+            {statLineLabel(e.stats)}
             {e.custom && " · custom"}
           </span>
         </span>
@@ -124,9 +121,9 @@ export function ExercisePicker({
         </Button>
       </div>
       {creating ? (
-        <NewExerciseForm
+        <ExerciseForm
           initialName={query}
-          onCreated={(e) => {
+          onSaved={(e) => {
             setCreating(false);
             setPicked((prev) => [...prev, e.id]);
             setQuery("");
@@ -180,78 +177,5 @@ export function ExercisePicker({
         </Button>
       </div>
     </div>
-  );
-}
-
-export function NewExerciseForm({
-  initialName = "",
-  onCreated,
-}: {
-  initialName?: string;
-  onCreated: (e: ExerciseDto) => void;
-}) {
-  const create = useCreateExercise();
-  const [name, setName] = useState(initialName);
-  const [category, setCategory] = useState<ExerciseCategory>("other");
-  const [tracking, setTracking] = useState<ExerciseTracking>("weight_reps");
-  const label = "block text-xs uppercase tracking-wider text-court-300";
-
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    create.mutate({ name: name.trim(), category, tracking }, { onSuccess: onCreated });
-  };
-
-  return (
-    <form onSubmit={onSubmit} aria-label="New exercise" className="space-y-4">
-      <label className="block space-y-1">
-        <span className={label}>Name</span>
-        <input
-          value={name}
-          required
-          autoFocus
-          maxLength={60}
-          placeholder="e.g. Floaters, Sled Push"
-          onChange={(e) => setName(e.target.value)}
-          className={`${compactFieldClass} w-full`}
-        />
-      </label>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block space-y-1">
-          <span className={label}>Category</span>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as ExerciseCategory)}
-            className={`${compactFieldClass} w-full`}
-          >
-            {EXERCISE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORY_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block space-y-1">
-          <span className={label}>What a set records</span>
-          <select
-            value={tracking}
-            onChange={(e) => setTracking(e.target.value as ExerciseTracking)}
-            className={`${compactFieldClass} w-full`}
-          >
-            {EXERCISE_TRACKING.map((t) => (
-              <option key={t} value={t}>
-                {TRACKING_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <ErrorNote error={create.error} />
-      <div className="flex justify-end">
-        <Button type="submit" variant="primary" disabled={!name.trim() || create.isPending}>
-          {create.isPending ? "Creating…" : "Create exercise"}
-        </Button>
-      </div>
-    </form>
   );
 }

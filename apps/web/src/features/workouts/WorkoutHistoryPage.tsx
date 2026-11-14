@@ -113,14 +113,14 @@ export function WorkoutCard({
         <tbody>
           {w.exercises.map((e, i) => {
             const info = byId.get(e.exerciseId);
-            const best = info ? bestSet(info.tracking, e.sets) : null;
+            const best = info ? bestSet(info, e.sets) : null;
             return (
               <tr key={i}>
                 <td className="truncate py-0.5 pr-3">
                   {e.sets.length} × {info?.name ?? "Unknown exercise"}
                 </td>
                 <td className="py-0.5 text-right tabular-nums text-court-300">
-                  {best && info ? formatSet(info.tracking, best, units) : "—"}
+                  {best && info ? formatSet(info, best, units) : "—"}
                 </td>
               </tr>
             );

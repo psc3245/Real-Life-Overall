@@ -1,4 +1,6 @@
 import {
+  BOX_SCORE_FIELDS,
+  emptyBoxScore,
   formatSet,
   SET_KIND_TAGS,
   type ExerciseDto,
@@ -21,6 +23,7 @@ import { StatTile } from "../../components/StatTile";
 import { longDate } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { formatElapsed, formatVolume } from "./format";
+import { BoxScoreFields, BoxScoreTiles } from "./BoxScore";
 import { CardioSessionView } from "./CardioPage";
 import { WorkoutEditor } from "./WorkoutEditor";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
@@ -77,6 +80,7 @@ function FinishedWorkout({ workout: w }: { workout: WorkoutDto }) {
         />
         <StatTile label="Sets" value={w.summary.doneSets} />
       </dl>
+      {!editing && <BoxScoreTiles box={w.boxScore} durationS={w.summary.durationS} />}
 
       {w.summary.prs.length > 0 && (
         <section className="space-y-2 rounded-xl border border-tier-yellow/40 bg-tier-yellow/5 p-4">
@@ -144,7 +148,7 @@ function ExerciseSummary({
               <span className="w-6 text-center font-semibold text-court-500">
                 {s.kind === "normal" ? working : SET_KIND_TAGS[s.kind]}
               </span>
-              <span>{info ? formatSet(info.tracking, s, units) : "—"}</span>
+              <span>{info ? formatSet(info, s, units) : "—"}</span>
             </li>
           );
         })}
@@ -211,6 +215,7 @@ function EditWorkout({
   const [localDate, setLocalDate] = useState(w.localDate);
   const [minutes, setMinutes] = useState(Math.max(1, Math.round(w.summary.durationS / 60)));
   const [exercises, setExercises] = useState(w.exercises);
+  const [box, setBox] = useState(w.boxScore ?? emptyBoxScore());
   const label = "block text-xs uppercase tracking-wider text-court-300";
 
   return (
@@ -225,6 +230,7 @@ function EditWorkout({
             notes,
             localDate,
             durationS: Math.max(60, minutes * 60),
+            boxScore: box,
             // Every set of a finished workout counts as done.
             exercises: exercises
               .map((x) => ({ ...x, sets: x.sets.map((s) => ({ ...s, done: true })) }))
@@ -275,6 +281,10 @@ function EditWorkout({
           className={`${compactFieldClass} w-full`}
         />
       </label>
+      <fieldset className="space-y-2">
+        <legend className={label}>Box score</legend>
+        <BoxScoreFields value={box} fields={BOX_SCORE_FIELDS} onChange={setBox} />
+      </fieldset>
       <WorkoutEditor
         exercises={exercises}
         library={library}

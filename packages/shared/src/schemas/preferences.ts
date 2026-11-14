@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SPORTS_TALK_LEVELS } from "../talk";
+import { BOX_SCORE_FIELDS } from "./box-score";
 
 /**
  * Per-player personalization and configuration (DESIGN.md §7.9), stored as one jsonb document on
@@ -177,6 +178,12 @@ export const preferencesSchema = z.object({
   sportsTalk: z.enum(SPORTS_TALK_LEVELS).catch("normal"),
   /** The walkthrough (a tour of the main features) was finished or skipped; it shows once. */
   walkthroughDone: z.boolean().catch(false),
+  /** What the box score asks for after a workout, in order; empty skips it (DESIGN.md §7.5). */
+  boxScore: z
+    .array(z.enum(BOX_SCORE_FIELDS))
+    .catch([...BOX_SCORE_FIELDS])
+    .default([...BOX_SCORE_FIELDS])
+    .transform((f) => [...new Set(f)]),
   features: featuresSchema,
   today: todaySchema,
 });
@@ -216,6 +223,7 @@ export const preferencesPatchSchema = z
     startPage: z.enum(START_PAGES),
     sportsTalk: z.enum(SPORTS_TALK_LEVELS),
     walkthroughDone: z.boolean(),
+    boxScore: z.array(z.enum(BOX_SCORE_FIELDS)).max(BOX_SCORE_FIELDS.length),
     features: z
       .object(
         Object.fromEntries(FEATURES.map((f) => [f, z.boolean()])) as Record<Feature, z.ZodBoolean>,

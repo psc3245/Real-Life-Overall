@@ -1,56 +1,140 @@
+import { defaultHeadline, type RecordKey } from "./records";
+
 /**
  * The built-in exercise library. Custom exercises live in the database with uuid ids; these use
  * stable slugs, so workouts can reference either.
  */
 
-/** What a set records. Columns per kind come from TRACKING_FIELDS. */
-export const EXERCISE_TRACKING = [
-  "weight_reps",
+/**
+ * An exercise's **stat line**: the 1-4 stats each of its sets records, in column order, plus the
+ * record that scores it (DESIGN.md §7.5). A weighted farmer's walk up a hill is weight, distance,
+ * time and incline.
+ */
+export const EXERCISE_STATS = [
+  "weight",
   "reps",
+  "makes",
   "duration",
-  "distance_duration",
-  "makes_attempts",
-  "weight_duration",
-  "weight_distance",
   "distance",
+  "length",
+  "incline",
+  "height",
+  "level",
+  "rpe",
 ] as const;
-export type ExerciseTracking = (typeof EXERCISE_TRACKING)[number];
+export type ExerciseStat = (typeof EXERCISE_STATS)[number];
 
-export const TRACKING_LABELS: Record<ExerciseTracking, string> = {
-  weight_reps: "Weight × reps",
-  reps: "Reps (bodyweight)",
+export const MAX_STATS = 4;
+
+export const STAT_LABELS: Record<ExerciseStat, string> = {
+  weight: "Weight",
+  reps: "Reps",
+  makes: "Makes / attempts",
   duration: "Time",
-  distance_duration: "Distance + time",
-  makes_attempts: "Makes / attempts",
-  weight_duration: "Weight + time",
-  weight_distance: "Weight + distance",
   distance: "Distance",
+  length: "Distance (short)",
+  incline: "Incline",
+  height: "Height",
+  level: "Level",
+  rpe: "RPE",
 };
 
-export type SetField = "weight" | "reps" | "duration" | "distance" | "length" | "attempts";
+export const STAT_DETAILS: Record<ExerciseStat, string> = {
+  weight: "lb or kg lifted or carried",
+  reps: "A count",
+  makes: "Made out of attempted (8/10)",
+  duration: "How long, or how fast",
+  distance: "Miles or km (runs, rides)",
+  length: "Feet or meters (sleds, carries, jumps)",
+  incline: "Treadmill or hill grade, %",
+  height: "Box or jump height, in or cm",
+  level: "Machine level or resistance",
+  rpe: "How hard it felt, 1-10",
+};
+
+/** "Weight · Distance (short) · Time · Incline", or "Weight × reps". */
+export function statLineLabel(stats: readonly ExerciseStat[]): string {
+  if (stats.length === 2 && stats[0] === "weight" && stats[1] === "reps") return "Weight × reps";
+  return stats.map((s) => STAT_LABELS[s]).join(" · ");
+}
+
+/** Stats that share a set field, so an exercise can't record both. */
+const CLASHES: [ExerciseStat, ExerciseStat][] = [
+  ["reps", "makes"],
+  ["distance", "length"],
+];
+
+/** The stat already on the line that `stat` can't be combined with, if any. */
+export function statClash(stats: readonly ExerciseStat[], stat: ExerciseStat): ExerciseStat | null {
+  for (const [a, b] of CLASHES) {
+    if (stat === a && stats.includes(b)) return b;
+    if (stat === b && stats.includes(a)) return a;
+  }
+  return null;
+}
+
+/** Whether a list of stats is a valid stat line: 1-4 distinct stats with no clashes. */
+export function isValidStatLine(stats: readonly ExerciseStat[]): boolean {
+  return (
+    stats.length >= 1 &&
+    stats.length <= MAX_STATS &&
+    new Set(stats).size === stats.length &&
+    stats.every((s, i) => statClash(stats.slice(0, i), s) === null)
+  );
+}
+
+/** A set's columns. `reps` doubles as makes; `distance` and `length` are both `distanceM`. */
+export type SetField =
+  | "weight"
+  | "reps"
+  | "duration"
+  | "distance"
+  | "length"
+  | "attempts"
+  | "incline"
+  | "height"
+  | "level"
+  | "rpe";
+
+/** The columns a stat line shows, in order (makes / attempts takes two). */
+export function statFields(stats: readonly ExerciseStat[]): SetField[] {
+  return stats.flatMap((s): SetField[] => (s === "makes" ? ["reps", "attempts"] : [s]));
+}
+
+/** Whether a stat line's sets record `distanceM` (as a distance or a length). */
+export const recordsDistance = (stats: readonly ExerciseStat[]) =>
+  stats.includes("distance") || stats.includes("length");
+
+/** Whether a stat line shows its distance as a length (ft or m). */
+export const usesLength = (stats: readonly ExerciseStat[]) => stats.includes("length");
 
 /**
- * The columns a set shows, in order. `reps` doubles as makes for makes_attempts; `distance` (mi
- * or km) and `length` (ft or m, for short distances) are both stored as `distanceM`.
+ * Ready-made stat lines: the new-exercise modal's "Start from" chips, the library's shorthand and
+ * what older apps send as `tracking`.
  */
-export const TRACKING_FIELDS: Record<ExerciseTracking, SetField[]> = {
+export const STAT_PRESETS = {
   weight_reps: ["weight", "reps"],
   reps: ["reps"],
   duration: ["duration"],
   distance_duration: ["distance", "duration"],
-  makes_attempts: ["reps", "attempts"],
+  makes_attempts: ["makes"],
   weight_duration: ["weight", "duration"],
   weight_distance: ["weight", "length"],
   distance: ["length"],
+} as const satisfies Record<string, readonly ExerciseStat[]>;
+export type StatPreset = keyof typeof STAT_PRESETS;
+export const STAT_PRESET_KEYS = Object.keys(STAT_PRESETS) as StatPreset[];
+
+export const PRESET_LABELS: Record<StatPreset, string> = {
+  weight_reps: "Lift",
+  reps: "Bodyweight",
+  duration: "Timed",
+  distance_duration: "Cardio",
+  makes_attempts: "Shooting",
+  weight_duration: "Weighted hold",
+  weight_distance: "Carry or sled",
+  distance: "Jump or throw",
 };
-
-/** Whether a tracking kind's sets record `distanceM` (as a distance or a length). */
-export const recordsDistance = (tracking: ExerciseTracking) =>
-  TRACKING_FIELDS[tracking].some((f) => f === "distance" || f === "length");
-
-/** Whether a tracking kind shows its distance as a length (ft or m). */
-export const usesLength = (tracking: ExerciseTracking) =>
-  TRACKING_FIELDS[tracking].includes("length");
 
 export const EXERCISE_CATEGORIES = [
   "chest",
@@ -115,7 +199,8 @@ export interface CatalogExercise {
   id: string;
   name: string;
   category: ExerciseCategory;
-  tracking: ExerciseTracking;
+  stats: ExerciseStat[];
+  headline: RecordKey;
   /** Sport & skill drills only; null for drills that fit any sport. */
   sport: Sport | null;
 }
@@ -124,9 +209,13 @@ const ex = (
   id: string,
   name: string,
   category: ExerciseCategory,
-  tracking: ExerciseTracking = "weight_reps",
+  line: StatPreset | ExerciseStat[] = "weight_reps",
   sport: Sport | null = null,
-): CatalogExercise => ({ id, name, category, tracking, sport });
+  headline?: RecordKey,
+): CatalogExercise => {
+  const stats = typeof line === "string" ? [...STAT_PRESETS[line]] : line;
+  return { id, name, category, stats, headline: headline ?? defaultHeadline(stats), sport };
+};
 
 export const EXERCISE_CATALOG: CatalogExercise[] = [
   // Chest
@@ -200,24 +289,24 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex("weighted-dead-hang", "Weighted Dead Hang", "back", "weight_duration"),
   // Cardio
   ex("running", "Running", "cardio", "distance_duration"),
-  ex("treadmill", "Treadmill", "cardio", "distance_duration"),
+  ex("treadmill", "Treadmill", "cardio", ["distance", "duration", "incline"]),
   ex("cycling", "Cycling", "cardio", "distance_duration"),
   ex("rowing-machine", "Rowing (Machine)", "cardio", "distance_duration"),
   ex("swimming", "Swimming", "cardio", "distance_duration"),
   ex("walking", "Walking", "cardio", "distance_duration"),
-  ex("elliptical", "Elliptical", "cardio", "duration"),
-  ex("stair-climber", "Stair Climber", "cardio", "duration"),
+  ex("elliptical", "Elliptical", "cardio", ["duration", "level"]),
+  ex("stair-climber", "Stair Climber", "cardio", ["duration", "level"]),
   ex("jump-rope", "Jump Rope", "cardio", "duration"),
   ex("sprints", "Sprints", "cardio", "distance_duration"),
   ex("hiking", "Hiking", "cardio", "distance_duration"),
-  ex("indoor-cycling", "Indoor Cycling", "cardio", "distance_duration"),
+  ex("indoor-cycling", "Indoor Cycling", "cardio", ["distance", "duration", "level"]),
   // Sport & skill: athleticism (speed, agility, power)
   ex("agility-ladder", "Agility Ladder", "sport", "duration", "athletic"),
   ex("cone-drills", "Cone Drills", "sport", "duration", "athletic"),
-  ex("shuttle-run", "Shuttle Run", "sport", "duration", "athletic"),
-  ex("forty-yard-dash", "40-Yard Dash", "sport", "duration", "athletic"),
+  ex("shuttle-run", "Shuttle Run", "sport", "duration", "athletic", "fastestS"),
+  ex("forty-yard-dash", "40-Yard Dash", "sport", "duration", "athletic", "fastestS"),
   ex("reaction-drills", "Reaction Drills", "sport", "duration", "athletic"),
-  ex("box-jump", "Box Jump", "sport", "reps", "athletic"),
+  ex("box-jump", "Box Jump", "sport", ["reps", "height"], "athletic"),
   ex("depth-jump", "Depth Jump", "sport", "reps", "athletic"),
   ex("lateral-bounds", "Lateral Bounds", "sport", "reps", "athletic"),
   ex("skater-jumps", "Skater Jumps", "sport", "reps", "athletic"),
