@@ -201,7 +201,7 @@ export function CardioCard({
         {w.name !== byId.get(s.activityId)?.name && ` · ${byId.get(s.activityId)?.name ?? ""}`}
       </p>
       <p className="text-sm tabular-nums text-court-300">
-        {cardioLine(s.activityId, s.distanceM, s.durationS, w.cardio, units)}
+        {cardioLine(s.activityId, s.distanceM, s.durationS, w.boxScore, units)}
       </p>
       {w.summary.prs.length > 0 && (
         <p className="text-sm text-tier-yellow">
@@ -229,7 +229,7 @@ export function CardioSessionView({
   const s = cardioSession(w);
   const activity = exercises.data?.find((e) => e.id === s.activityId);
   const pace = formatPace(s.activityId, s.distanceM, s.durationS, units);
-  const c = w.cardio;
+  const c = w.boxScore;
 
   return (
     <div className="space-y-6 pt-4">
@@ -265,9 +265,13 @@ export function CardioSessionView({
             />
             <StatTile label="Pace" value={pace ?? "—"} />
           </dl>
-          {c && (c.avgHeartRate || c.calories || c.elevationM || c.effort) && (
+          {c && (c.avgHeartRate || c.maxHeartRate || c.calories || c.elevationM || c.effort) && (
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile label="Avg HR" value={c.avgHeartRate ?? "—"} />
+              <StatTile
+                label="Avg HR"
+                value={c.avgHeartRate ?? "—"}
+                detail={c.maxHeartRate ? `Max ${c.maxHeartRate}` : undefined}
+              />
               <StatTile label="Calories" value={c.calories ?? "—"} />
               <StatTile
                 label={`Climb (${units === "imperial" ? "ft" : "m"})`}

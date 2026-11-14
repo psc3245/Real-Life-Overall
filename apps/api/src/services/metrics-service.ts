@@ -2,7 +2,7 @@ import {
   addDays,
   bestSet,
   HABIT_TYPE_LABELS,
-  HEADLINE_RECORD,
+  LOWER_WINS,
   isAvoid,
   clockOffset,
   TARGETED_TYPES,
@@ -16,6 +16,8 @@ import {
   weightUnit,
   workoutVolume,
   CM_PER_INCH,
+  trainingLoad,
+  type BoxScoreDto,
   type HabitDto,
   type MetricDto,
   type MetricPointDto,
@@ -43,7 +45,21 @@ const WORKOUT_METRICS = {
   "workouts:volume": { label: "Training volume", unit: "" },
   "workouts:duration": { label: "Training time", unit: "min" },
   "workouts:sets": { label: "Sets done", unit: "sets" },
+  "workouts:calories": { label: "Calories burned", unit: "cal" },
+  "workouts:load": { label: "Training load", unit: "load" },
+  "workouts:heartRate": { label: "Avg heart rate", unit: "bpm" },
+  "workouts:effort": { label: "Workout effort", unit: "/10" },
 } as const;
+
+/** Box score fields behind the workouts:* metrics. */
+const BOX_SCORE_KEYS = {
+  calories: "calories",
+  heartRate: "avgHeartRate",
+  effort: "effort",
+} as const satisfies Record<string, keyof BoxScoreDto>;
+
+/** Box score metrics that average over the day's workouts that have them, rather than add up. */
+const AVERAGED = new Set(["heartRate", "effort"]);
 
 async function userOf(db: Database, userId: string) {
   const user = await userRepo.findById(db, userId);
@@ -166,21 +182,26 @@ export async function catalog(db: Database, userId: string): Promise<MetricDto[]
       group: "workouts",
       label: m.label,
       unit: id === "workouts:volume" ? weightUnit(units) : m.unit,
-      kind: "amount",
+      kind: AVERAGED.has(id.slice("workouts:".length)) ? "session" : "amount",
       target: null,
-      detail: "Finished workouts, per day",
+      detail:
+        id === "workouts:load"
+          ? "Effort × minutes from the box score, per day"
+          : AVERAGED.has(id.slice("workouts:".length))
+            ? "From the box score, averaged per day"
+            : "Finished workouts, per day",
     });
   }
   const done = new Set(completed.flatMap((w) => exercisesOf(w).map((e) => e.exerciseId)));
   for (const id of done) {
     const info = lookup.get(id);
     if (!info) continue;
-    const headline = HEADLINE_RECORD[info.tracking];
+    const headline = info.headline;
     out.push({
       id: `exercise:${id}`,
       group: "exercises",
       label: info.name,
-      unit: recordChartUnit(headline, units, info.tracking),
+      unit: recordChartUnit(headline, units, info.stats),
       kind: "session",
       target: null,
       detail: `${RECORD_LABELS[headline]}, per session`,
@@ -361,6 +382,26 @@ export async function series(
         }
         points = sparse(running, from, to);
       }
+    } else if (kind === "workouts" && completed && (key in BOX_SCORE_KEYS || key === "load")) {
+      const sums = new Map<string, { total: number; n: number }>();
+      for (const w of completed) {
+        const box = w.boxScore as BoxScoreDto | null;
+        const durationS = (w.endedAt!.getTime() - w.startedAt.getTime()) / 1000;
+        const v =
+          key === "load"
+            ? trainingLoad(box?.effort, durationS)
+            : (box?.[BOX_SCORE_KEYS[key as keyof typeof BOX_SCORE_KEYS]] ?? null);
+        if (v === null || v === undefined) continue;
+        const d = sums.get(w.localDate) ?? { total: 0, n: 0 };
+        sums.set(w.localDate, { total: d.total + v, n: d.n + 1 });
+      }
+      const values = new Map(
+        [...sums].map(([d, { total, n }]) => [
+          d,
+          AVERAGED.has(key) ? Math.round((total / n) * 10) / 10 : total,
+        ]),
+      );
+      points = AVERAGED.has(key) ? sparse(values, from, to) : dense(values, from, to);
     } else if (kind === "workouts" && completed) {
       const values = new Map<string, number>();
       for (const w of completed) {
@@ -379,15 +420,17 @@ export async function series(
     } else if (kind === "exercise" && completed && lookup) {
       const info = lookup.get(key);
       if (info) {
-        const headline = HEADLINE_RECORD[info.tracking];
+        const headline = info.headline;
+        const pick = LOWER_WINS.has(headline) ? Math.min : Math.max;
         const values = new Map<string, number>();
         for (const w of completed) {
           for (const e of exercisesOf(w).filter((x) => x.exerciseId === key)) {
-            if (!bestSet(info.tracking, e.sets)) continue;
-            const best = recordsFromSets(info.tracking, e.sets)[headline];
+            if (!bestSet(info, e.sets)) continue;
+            const best = recordsFromSets(info, e.sets)[headline];
             if (best === null) continue;
-            const v = recordChartValue(headline, best, units, info.tracking);
-            values.set(w.localDate, Math.max(values.get(w.localDate) ?? 0, v));
+            const v = recordChartValue(headline, best, units, info.stats);
+            const prior = values.get(w.localDate);
+            values.set(w.localDate, prior === undefined ? v : pick(prior, v));
           }
         }
         points = sparse(values, from, to);

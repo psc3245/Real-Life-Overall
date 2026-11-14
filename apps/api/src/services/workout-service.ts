@@ -1,25 +1,28 @@
 import {
   addDays,
   bestSet,
+  boxScoreLine,
   brokenRecords,
   cardioLine,
   cardioSession,
   CATALOG_BY_ID,
+  defaultHeadline,
   emptySet,
-  isCardioTracking,
+  isCardioLine,
   EXERCISE_CATALOG,
   formatSet,
-  HEADLINE_RECORD,
+  hasBoxScore,
   localDateIn,
   mergeRecords,
   RECORD_LABELS,
   recordsDistance,
   recordsFromSets,
-  TRACKING_FIELDS,
+  statFields,
+  trackedRecords,
   withTemplateValues,
   workoutVolume,
+  type BoxScoreDto,
   type CardioActivityDto,
-  type CardioDetailsDto,
   type CardioOverviewDto,
   type CardioTotalsDto,
   type cardioBodySchema,
@@ -29,7 +32,8 @@ import {
   type ExerciseDetailDto,
   type ExerciseDto,
   type ExerciseRecordsDto,
-  type ExerciseTracking,
+  type ExerciseStat,
+  type RecordKey,
   type LiveWorkoutKind,
   type Sport,
   type SportOverviewDto,
@@ -43,6 +47,7 @@ import {
   type createTemplateBodySchema,
   type exerciseBodySchema,
   type finishWorkoutBodySchema,
+  type updateExerciseBodySchema,
   type templateBodySchema,
   type updateWorkoutBodySchema,
 } from "@rlo/shared";
@@ -60,7 +65,8 @@ interface ExerciseInfo {
   id: string;
   name: string;
   category: ExerciseCategory;
-  tracking: ExerciseTracking;
+  stats: ExerciseStat[];
+  headline: RecordKey;
   sport: Sport | null;
   custom: boolean;
   archived: boolean;
@@ -83,8 +89,9 @@ function lookupFrom(custom: ExerciseRow[]): Lookup {
       id: e.id,
       name: e.name,
       category: e.category,
-      tracking: e.tracking,
-      sport: null,
+      stats: e.stats as ExerciseStat[],
+      headline: e.headline as RecordKey,
+      sport: e.sport as Sport | null,
       custom: true,
       archived: e.archivedAt !== null,
     });
@@ -99,12 +106,12 @@ export async function loadLookup(db: Database, userId: string): Promise<Lookup> 
 const exercisesOf = (row: { exercises: unknown }) => row.exercises as WorkoutExerciseDto[];
 const nameOf = (lookup: Lookup, id: string) => lookup.get(id)?.name ?? "Unknown exercise";
 
-/** Keeps only the fields an exercise's tracking kind records, and checks every id resolves. */
+/** Keeps only the fields an exercise's stat line records, and checks every id resolves. */
 function normalizeExercises(input: WorkoutExerciseDto[], lookup: Lookup): WorkoutExerciseDto[] {
   return input.map((e) => {
     const info = lookup.get(e.exerciseId);
     if (!info) throw badRequest(`Unknown exercise: ${e.exerciseId}`);
-    const fields = TRACKING_FIELDS[info.tracking];
+    const fields = statFields(info.stats);
     return {
       exerciseId: e.exerciseId,
       notes: e.notes.trim(),
@@ -113,13 +120,29 @@ function normalizeExercises(input: WorkoutExerciseDto[], lookup: Lookup): Workou
         weightKg: fields.includes("weight") ? s.weightKg : null,
         reps: fields.includes("reps") ? s.reps : null,
         durationS: fields.includes("duration") ? s.durationS : null,
-        distanceM: recordsDistance(info.tracking) ? s.distanceM : null,
+        distanceM: recordsDistance(info.stats) ? s.distanceM : null,
         attempts: fields.includes("attempts") ? s.attempts : null,
+        inclinePct: fields.includes("incline") ? (s.inclinePct ?? null) : null,
+        heightCm: fields.includes("height") ? (s.heightCm ?? null) : null,
+        level: fields.includes("level") ? (s.level ?? null) : null,
+        rpe: fields.includes("rpe") ? (s.rpe ?? null) : null,
         done: s.done,
       })),
       restS: e.restS ?? null,
     };
   });
+}
+
+/** A box score as stored: null when every field is empty. */
+function boxScoreOf(b: BoxScoreDto): BoxScoreDto | null {
+  const out: BoxScoreDto = {
+    avgHeartRate: b.avgHeartRate ?? null,
+    maxHeartRate: b.maxHeartRate ?? null,
+    calories: b.calories ?? null,
+    elevationM: b.elevationM ?? null,
+    effort: b.effort ?? null,
+  };
+  return Object.values(out).some((v) => v !== null) ? out : null;
 }
 
 /** Template sets are plans: nothing is done yet. */
@@ -142,7 +165,7 @@ function replay(
     for (const e of exercisesOf(row)) {
       const info = lookup.get(e.exerciseId);
       if (!info) continue;
-      const records = recordsFromSets(info.tracking, e.sets);
+      const records = recordsFromSets(info, e.sets);
       state.records.set(
         e.exerciseId,
         mergeRecords(state.records.get(e.exerciseId) ?? null, records),
@@ -168,7 +191,7 @@ function toDto(row: WorkoutRow, state: ReplayState, lookup: Lookup, now = new Da
     if (!info) continue;
     const broken = brokenRecords(
       state.records.get(e.exerciseId) ?? null,
-      recordsFromSets(info.tracking, e.sets),
+      recordsFromSets(info, e.sets),
     );
     if (broken.length) {
       prs.push({
@@ -195,7 +218,7 @@ function toDto(row: WorkoutRow, state: ReplayState, lookup: Lookup, now = new Da
       prs,
     },
     previous,
-    cardio: (row.cardio as CardioDetailsDto | null) ?? null,
+    boxScore: (row.boxScore as BoxScoreDto | null) ?? null,
   };
 }
 
@@ -316,6 +339,7 @@ export async function updateWorkout(
     ...(input.durationS !== undefined && {
       endedAt: new Date(row.startedAt.getTime() + input.durationS * 1000),
     }),
+    ...(input.boxScore !== undefined && { boxScore: boxScoreOf(input.boxScore) }),
   });
   if (finished) await touchDays(db, userId, row.localDate, updated.localDate);
   return (await buildDtos(db, userId, [updated], lookup))[0]!;
@@ -343,7 +367,11 @@ export async function finishWorkout(
   const action = options.template ?? (options.updateTemplate ? "overwrite" : "none");
 
   const finished = await db.transaction(async (tx) => {
-    const updated = await workoutRepo.update(tx, row.id, { exercises: done, endedAt: new Date() });
+    const updated = await workoutRepo.update(tx, row.id, {
+      exercises: done,
+      endedAt: new Date(),
+      ...(options.boxScore && { boxScore: boxScoreOf(options.boxScore) }),
+    });
     if (action === "new") {
       await workoutRepo.insertTemplate(tx, {
         userId,
@@ -451,19 +479,22 @@ export async function workoutsForDay(
     lines:
       w.kind === "cardio"
         ? [cardioDayLine(w, lookup, system)]
-        : w.exercises.map((e) => {
-            const info = lookup.get(e.exerciseId);
-            const best = info ? bestSet(info.tracking, e.sets) : null;
-            const sets = `${e.sets.length} set${e.sets.length === 1 ? "" : "s"}`;
-            return `${nameOf(lookup, e.exerciseId)}: ${sets}${best && info ? `, best ${formatSet(info.tracking, best, system)}` : ""}`;
-          }),
+        : [
+            ...w.exercises.map((e) => {
+              const info = lookup.get(e.exerciseId);
+              const best = info ? bestSet(info, e.sets) : null;
+              const sets = `${e.sets.length} set${e.sets.length === 1 ? "" : "s"}`;
+              return `${nameOf(lookup, e.exerciseId)}: ${sets}${best && info ? `, best ${formatSet(info, best, system)}` : ""}`;
+            }),
+            ...(hasBoxScore(w.boxScore) ? [`Box score: ${boxScoreLine(w.boxScore)}`] : []),
+          ],
     prs: w.summary.prs.map((p) => p.label),
   }));
 }
 
 function cardioDayLine(w: WorkoutDto, lookup: Lookup, system: UnitSystem) {
   const s = cardioSession(w);
-  return `${nameOf(lookup, s.activityId)}: ${cardioLine(s.activityId, s.distanceM, s.durationS, w.cardio, system)}`;
+  return `${nameOf(lookup, s.activityId)}: ${cardioLine(s.activityId, s.distanceM, s.durationS, w.boxScore, system)}`;
 }
 
 // Cardio
@@ -474,10 +505,10 @@ type CardioBody = z.infer<typeof cardioBodySchema>;
 function cardioFields(input: CardioBody, lookup: Lookup) {
   const info = lookup.get(input.activity);
   if (!info) throw badRequest(`Unknown exercise: ${input.activity}`);
-  if (!isCardioTracking(info.tracking)) {
+  if (!isCardioLine(info.stats)) {
     throw badRequest("Pick an activity that records time");
   }
-  const distanceM = TRACKING_FIELDS[info.tracking].includes("distance") ? input.distanceM : null;
+  const distanceM = info.stats.includes("distance") ? input.distanceM : null;
   const exercises: WorkoutExerciseDto[] = [
     {
       exerciseId: info.id,
@@ -486,13 +517,14 @@ function cardioFields(input: CardioBody, lookup: Lookup) {
       restS: null,
     },
   ];
-  const cardio: CardioDetailsDto = {
+  const boxScore = boxScoreOf({
     avgHeartRate: input.avgHeartRate,
+    maxHeartRate: input.maxHeartRate,
     calories: input.calories,
     elevationM: input.elevationM,
     effort: input.effort,
-  };
-  return { name: input.name ?? info.name, notes: input.notes.trim(), exercises, cardio };
+  });
+  return { name: input.name ?? info.name, notes: input.notes.trim(), exercises, boxScore };
 }
 
 async function checkCardioDate(db: Database, userId: string, localDate: string) {
@@ -642,14 +674,14 @@ export async function sportOverview(db: Database, userId: string): Promise<Sport
         exerciseId: e.exerciseId,
         sessions: 0,
         lastDone: w.localDate,
-        headline: HEADLINE_RECORD[info.tracking],
+        headline: info.headline,
         best: null,
-        recent: info.tracking === "makes_attempts" ? { makes: 0, attempts: 0 } : null,
+        recent: info.stats.includes("makes") ? { makes: 0, attempts: 0 } : null,
         records: null,
       };
       skill.sessions += 1;
       if (w.localDate > skill.lastDone) skill.lastDone = w.localDate;
-      skill.records = mergeRecords(skill.records, recordsFromSets(info.tracking, e.sets));
+      skill.records = mergeRecords(skill.records, recordsFromSets(info, e.sets));
       if (skill.recent && w.localDate >= monthStart) {
         for (const s of e.sets.filter((x) => x.done)) {
           skill.recent.makes += s.reps ?? 0;
@@ -763,7 +795,8 @@ const toExerciseDto = (
   id: info.id,
   name: info.name,
   category: info.category,
-  tracking: info.tracking,
+  stats: info.stats,
+  headline: info.headline,
   sport: info.sport,
   custom: info.custom,
   timesDone: u?.timesDone ?? 0,
@@ -794,7 +827,7 @@ export async function getExercise(
   ]);
   const info = lookup.get(id);
   if (!info) throw notFound("Exercise not found");
-  const headline = HEADLINE_RECORD[info.tracking];
+  const headline = info.headline;
   const sessions = completed.flatMap((w) =>
     exercisesOf(w)
       .filter((e) => e.exerciseId === id)
@@ -803,16 +836,16 @@ export async function getExercise(
         workoutName: w.name,
         localDate: w.localDate,
         sets: e.sets,
-        best: recordsFromSets(info.tracking, e.sets)[headline],
+        best: recordsFromSets(info, e.sets)[headline],
       })),
   );
   const records = sessions.reduce<ExerciseRecordsDto | null>(
-    (acc, s) => mergeRecords(acc, recordsFromSets(info.tracking, s.sets)),
+    (acc, s) => mergeRecords(acc, recordsFromSets(info, s.sets)),
     null,
   );
   return {
     exercise: toExerciseDto(info, usage(completed).get(id)),
-    records: records ?? recordsFromSets(info.tracking, []),
+    records: records ?? recordsFromSets(info, []),
     history: sessions.reverse(),
   };
 }
@@ -831,7 +864,15 @@ export async function createExercise(
   input: z.infer<typeof exerciseBodySchema>,
 ): Promise<ExerciseDto> {
   checkCustomName(input.name, await workoutRepo.findExercises(db, userId));
-  const row = await workoutRepo.insertExercise(db, { userId, ...input });
+  const stats = input.stats!;
+  const row = await workoutRepo.insertExercise(db, {
+    userId,
+    name: input.name,
+    category: input.category,
+    stats,
+    headline: input.headline ?? defaultHeadline(stats),
+    sport: input.category === "sport" ? input.sport : null,
+  });
   return toExerciseDto(lookupFrom([row]).get(row.id)!, undefined);
 }
 
@@ -843,20 +884,33 @@ async function ownCustom(db: Database, userId: string, id: string) {
   return { row, rows };
 }
 
-/** Renames or recategorizes a custom exercise. The tracking kind is fixed once it's used. */
+/**
+ * Edits a custom exercise, its stat line included: logged sets keep their numbers, a removed
+ * stat's column just stops showing. A headline that no longer fits falls back to the default.
+ */
 export async function updateExercise(
   db: Database,
   userId: string,
   id: string,
-  input: Partial<z.infer<typeof exerciseBodySchema>>,
+  input: z.infer<typeof updateExerciseBodySchema>,
 ): Promise<ExerciseDto> {
   const { row, rows } = await ownCustom(db, userId, id);
   if (input.name) checkCustomName(input.name, rows, row.id);
-  if (input.tracking && input.tracking !== row.tracking) {
-    const used = usage(await workoutRepo.findCompleted(db, userId)).has(row.id);
-    if (used) throw conflict("This exercise has history, so its tracking can't change");
+  const stats = input.stats ?? (row.stats as ExerciseStat[]);
+  let headline = input.headline ?? (row.headline as RecordKey);
+  if (!trackedRecords(stats, headline).includes(headline)) {
+    if (input.headline) throw badRequest("That record doesn't fit these stats");
+    headline = defaultHeadline(stats);
   }
-  const updated = await workoutRepo.updateExercise(db, row.id, input);
+  const category = input.category ?? row.category;
+  const sport = category === "sport" ? (input.sport !== undefined ? input.sport : row.sport) : null;
+  const updated = await workoutRepo.updateExercise(db, row.id, {
+    ...(input.name !== undefined && { name: input.name }),
+    category,
+    stats,
+    headline,
+    sport,
+  });
   return toExerciseDto(lookupFrom([updated]).get(updated.id)!, undefined);
 }
 

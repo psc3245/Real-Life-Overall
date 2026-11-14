@@ -1,13 +1,13 @@
 import {
   CATEGORY_LABELS,
   formatSet,
-  HEADLINE_RECORD,
+  RECORD_KEYS,
   RECORD_LABELS,
   recordChartUnit,
   recordChartValue,
   SET_KIND_TAGS,
-  TRACKING_LABELS,
-  type ExerciseRecordsDto,
+  SPORT_LABELS,
+  statLineLabel,
 } from "@rlo/shared";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -16,7 +16,9 @@ import { Button } from "../../components/Button";
 import { TrendChart } from "../../components/charts/TrendChart";
 import { StatTile } from "../../components/StatTile";
 import { dayLabel } from "../../lib/format";
+import { Modal } from "../../components/Modal";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { ExerciseForm } from "./ExerciseForm";
 import { formatRecord } from "./format";
 import { useUnits, WorkoutsNav } from "./WorkoutsNav";
 import { DebugId, DebugJson } from "../../components/debug/Debug";
@@ -29,22 +31,24 @@ export function ExercisePage() {
   const archive = useArchiveExercise();
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
   if (detail.isPending) return <p className="pt-10 text-court-500">Loading…</p>;
   if (detail.isError) return <ErrorNote error={detail.error} />;
 
   const { exercise: e, records, history } = detail.data;
-  const headline = HEADLINE_RECORD[e.tracking];
-  const recordKeys = (Object.keys(records) as (keyof ExerciseRecordsDto)[]).filter(
-    (k) => records[k] !== null,
+  const headline = e.headline;
+  // The headline record first, then the rest in their usual order.
+  const recordKeys = [headline, ...RECORD_KEYS.filter((k) => k !== headline)].filter(
+    (k) => records[k] != null,
   );
   const points = [...history]
     .reverse()
     .filter((h) => h.best !== null)
     .map((h) => ({
       date: h.localDate,
-      value: recordChartValue(headline, h.best!, units, e.tracking),
+      value: recordChartValue(headline, h.best!, units, e.stats),
     }));
-  const unit = recordChartUnit(headline, units, e.tracking);
+  const unit = recordChartUnit(headline, units, e.stats);
   const chartUnit = unit === "%" ? "%" : unit === "reps" ? "" : ` ${unit}`;
 
   return (
@@ -60,7 +64,8 @@ export function ExercisePage() {
             <DebugId id={e.id} />
           </h1>
           <p className="text-sm text-court-500">
-            {CATEGORY_LABELS[e.category]} · {TRACKING_LABELS[e.tracking]}
+            {e.sport ? SPORT_LABELS[e.sport] : CATEGORY_LABELS[e.category]} ·{" "}
+            {statLineLabel(e.stats)} · scored by {RECORD_LABELS[headline].toLowerCase()}
             {e.custom && " · custom"} · done {e.timesDone}×
             {/* The chart catalog only lists exercises from finished workouts. */}
             {e.timesDone > 0 && (
@@ -83,7 +88,7 @@ export function ExercisePage() {
             <StatTile
               key={k}
               label={RECORD_LABELS[k]}
-              value={formatRecord(k, records[k]!, units, e.tracking)}
+              value={formatRecord(k, records[k]!, units, e.stats)}
             />
           ))}
         </dl>
@@ -129,7 +134,7 @@ export function ExercisePage() {
                         <span className="w-6 text-center text-court-500">
                           {s.kind === "normal" ? working : SET_KIND_TAGS[s.kind]}
                         </span>
-                        {formatSet(e.tracking, s, units)}
+                        {formatSet(e, s, units)}
                       </li>
                     );
                   })}
@@ -142,7 +147,8 @@ export function ExercisePage() {
 
       <DebugJson label="exercise detail" data={detail.data} />
       {e.custom && (
-        <div className="border-t border-court-800 pt-4">
+        <div className="flex flex-wrap items-start gap-2 border-t border-court-800 pt-4">
+          {!confirming && <Button onClick={() => setEditing(true)}>Edit exercise</Button>}
           {confirming ? (
             <span className="flex flex-wrap items-center gap-2 text-sm text-court-300">
               Remove from your library? Past workouts keep it.
@@ -165,6 +171,19 @@ export function ExercisePage() {
             </Button>
           )}
           <ErrorNote error={archive.error} />
+          <Modal open={editing} onClose={() => setEditing(false)} label="Edit exercise">
+            <h2 className="mb-4 font-display text-xl uppercase tracking-wider">Edit exercise</h2>
+            {e.timesDone > 0 && (
+              <p className="mb-3 text-xs text-court-500">
+                Logged sets keep their numbers; a stat you remove just stops showing.
+              </p>
+            )}
+            <ExerciseForm
+              exercise={e}
+              onSaved={() => setEditing(false)}
+              onCancel={() => setEditing(false)}
+            />
+          </Modal>
         </div>
       )}
     </div>

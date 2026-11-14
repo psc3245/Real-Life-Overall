@@ -164,7 +164,9 @@ export async function insertExercise(
 export async function updateExercise(
   db: Executor,
   id: string,
-  changes: Partial<Pick<ExerciseRow, "name" | "category" | "tracking" | "archivedAt">>,
+  changes: Partial<
+    Pick<ExerciseRow, "name" | "category" | "stats" | "headline" | "sport" | "archivedAt">
+  >,
 ): Promise<ExerciseRow> {
   const rows = await db.update(exercises).set(changes).where(eq(exercises.id, id)).returning();
   return rows[0]!;

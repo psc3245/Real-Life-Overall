@@ -50,14 +50,14 @@ export function WorkoutCard({
         </View>
         {w.exercises.map((e, i) => {
           const info = byId.get(e.exerciseId);
-          const best = info ? bestSet(info.tracking, e.sets) : null;
+          const best = info ? bestSet(info, e.sets) : null;
           return (
             <View key={i} style={styles.line}>
               <Text style={styles.lineName} numberOfLines={1}>
                 {e.sets.length} × {info?.name ?? "Unknown exercise"}
               </Text>
               <Muted style={{ fontSize: 13 }}>
-                {best && info ? formatSet(info.tracking, best, units) : "—"}
+                {best && info ? formatSet(info, best, units) : "—"}
               </Muted>
             </View>
           );
@@ -98,7 +98,7 @@ export function ExerciseSummary({
             <Text style={styles.setNo}>
               {s.kind === "normal" ? working : SET_KIND_TAGS[s.kind]}
             </Text>
-            <Text style={styles.set}>{info ? formatSet(info.tracking, s, units) : "—"}</Text>
+            <Text style={styles.set}>{info ? formatSet(info, s, units) : "—"}</Text>
           </View>
         );
       })}

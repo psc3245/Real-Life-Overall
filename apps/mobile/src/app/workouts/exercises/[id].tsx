@@ -1,19 +1,21 @@
 import {
   formatSet,
-  HEADLINE_RECORD,
+  RECORD_KEYS,
   RECORD_LABELS,
   recordChartUnit,
   recordChartValue,
   SET_KIND_TAGS,
-  type ExerciseRecordsDto,
 } from "@rlo/shared";
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useArchiveExercise, useExercise } from "@/api/workouts";
 import { ChartButton } from "@/components/ChartButton";
 import { TrendChart } from "@/components/charts/MetricChart";
 import { StatGrid, StatTile } from "@/components/StatTile";
 import { Button, Card, ErrorNote, Label, Loading, Muted, Screen, Section } from "@/components/ui";
+import { Sheet } from "@/components/Sheet";
+import { ExerciseForm } from "@/components/workouts/ExerciseForm";
 import { exerciseDetail } from "@/components/workouts/ExercisePicker";
 import { dayLabel } from "@/lib/format";
 import { colors, space } from "@/lib/theme";
@@ -27,6 +29,7 @@ function ExerciseScreen() {
   const detail = useExercise(id);
   const units = useUnits();
   const archive = useArchiveExercise();
+  const [editing, setEditing] = useState(false);
   if (detail.isPending) return <Loading />;
   if (detail.isError) {
     return (
@@ -37,18 +40,19 @@ function ExerciseScreen() {
   }
 
   const { exercise: e, records, history } = detail.data;
-  const headline = HEADLINE_RECORD[e.tracking];
-  const recordKeys = (Object.keys(records) as (keyof ExerciseRecordsDto)[]).filter(
-    (k) => records[k] !== null,
+  const headline = e.headline;
+  // The headline record first, then the rest in their usual order.
+  const recordKeys = [headline, ...RECORD_KEYS.filter((k) => k !== headline)].filter(
+    (k) => records[k] != null,
   );
   const points = [...history]
     .reverse()
     .filter((h) => h.best !== null)
     .map((h) => ({
       date: h.localDate,
-      value: recordChartValue(headline, h.best!, units, e.tracking),
+      value: recordChartValue(headline, h.best!, units, e.stats),
     }));
-  const unit = recordChartUnit(headline, units, e.tracking);
+  const unit = recordChartUnit(headline, units, e.stats);
 
   const remove = () =>
     Alert.alert("Remove from your library?", "Past workouts keep it.", [
@@ -62,7 +66,7 @@ function ExerciseScreen() {
 
   return (
     <Screen
-      eyebrow={`${exerciseDetail(e)} · done ${e.timesDone}×`}
+      eyebrow={`${exerciseDetail(e)} · scored by ${RECORD_LABELS[headline].toLowerCase()} · done ${e.timesDone}×`}
       title={e.name}
       onRefresh={() => detail.refetch()}
     >
@@ -76,7 +80,7 @@ function ExerciseScreen() {
             <StatTile
               key={k}
               label={RECORD_LABELS[k]}
-              value={formatRecord(k, records[k]!, units, e.tracking)}
+              value={formatRecord(k, records[k]!, units, e.stats)}
             />
           ))}
         </StatGrid>
@@ -122,7 +126,7 @@ function ExerciseScreen() {
                         <Text style={styles.setNo}>
                           {s.kind === "normal" ? working : SET_KIND_TAGS[s.kind]}
                         </Text>
-                        <Muted>{formatSet(e.tracking, s, units)}</Muted>
+                        <Muted>{formatSet(e, s, units)}</Muted>
                       </View>
                     );
                   })}
@@ -135,8 +139,17 @@ function ExerciseScreen() {
 
       {e.custom && (
         <>
+          <Button title="Edit exercise" variant="ghost" onPress={() => setEditing(true)} />
           <Button title="Remove exercise" variant="danger" onPress={remove} />
           <ErrorNote error={archive.error} />
+          <Sheet open={editing} title="Edit exercise" onClose={() => setEditing(false)}>
+            {e.timesDone > 0 && (
+              <Muted style={{ fontSize: 12 }}>
+                Logged sets keep their numbers; a stat you remove just stops showing.
+              </Muted>
+            )}
+            <ExerciseForm exercise={e} onSaved={() => setEditing(false)} />
+          </Sheet>
         </>
       )}
     </Screen>

@@ -45,6 +45,18 @@ export function fromDisplayLength(value: number, system: UnitSystem): number {
   return system === "imperial" ? value * M_PER_FOOT : value;
 }
 
+/** Jump and box heights are shown in inches or centimeters. */
+export const heightUnit = (system: UnitSystem) => (system === "imperial" ? "in" : "cm");
+
+/** cm → inches or cm, to 0.5. */
+export function toDisplayHeight(cm: number, system: UnitSystem): number {
+  return Math.round((system === "imperial" ? cm / CM_PER_INCH : cm) * 2) / 2;
+}
+
+export function fromDisplayHeight(value: number, system: UnitSystem): number {
+  return system === "imperial" ? value * CM_PER_INCH : value;
+}
+
 /** "5′11″" or "180 cm" */
 export function formatHeight(cm: number, system: UnitSystem): string {
   if (system === "metric") return `${Math.round(cm)} cm`;
@@ -58,8 +70,14 @@ export function bmi(kg: number, cm: number): number {
   return round(kg / (m * m), 1);
 }
 
-/** Seconds as "m:ss", or "h:mm:ss" from an hour. */
-export function formatDuration(seconds: number): string {
+/**
+ * Seconds as "m:ss", or "h:mm:ss" from an hour. With `tenths`, a time under a minute keeps its
+ * tenths ("0:04.8"), for sprints; clocks leave it off.
+ */
+export function formatDuration(seconds: number, tenths = false): string {
+  if (tenths && seconds > 0 && seconds < 60 && !Number.isInteger(Math.round(seconds * 10) / 10)) {
+    return `0:${(Math.round(seconds * 10) / 10).toFixed(1).padStart(4, "0")}`;
+  }
   const s = Math.max(0, Math.round(seconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -67,12 +85,16 @@ export function formatDuration(seconds: number): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
-/** Parses "m:ss", "h:mm:ss" or a plain number of minutes into seconds; null if invalid. */
+/**
+ * Parses "m:ss", "h:mm:ss" or a plain number of minutes into seconds; null if invalid. The
+ * seconds may carry tenths ("0:04.8") for sprints.
+ */
 export function parseDuration(text: string): number | null {
   const t = text.trim();
   if (!t) return null;
   if (/^\d+(\.\d+)?$/.test(t)) return Math.round(Number(t) * 60);
   const parts = t.split(":");
-  if (parts.length > 3 || parts.some((p) => !/^\d+$/.test(p))) return null;
-  return parts.reduce((total, p) => total * 60 + Number(p), 0);
+  if (parts.length > 3 || parts.slice(0, -1).some((p) => !/^\d+$/.test(p))) return null;
+  if (!/^\d+(\.\d)?$/.test(parts[parts.length - 1]!)) return null;
+  return Math.round(parts.reduce((total, p) => total * 60 + Number(p), 0) * 10) / 10;
 }

@@ -4,7 +4,7 @@ import {
   distanceUnit,
   formatDuration,
   formatPace,
-  isCardioTracking,
+  isCardioLine,
   toDisplayDistance,
   type CardioTotalsDto,
   type ExerciseDto,
@@ -19,23 +19,16 @@ import { Button, Card, ErrorNote, Label, Muted } from "@/components/ui";
 import { dayLabel } from "@/lib/format";
 import { colors, fonts, space, tierColor } from "@/lib/theme";
 import { formatElapsed, useUnits } from "@/lib/workouts";
+import { effortLabel } from "./BoxScore";
 
 export const FT_PER_M = 3.28084;
 
-/** 1–3 easy, 4–6 steady, 7–8 hard, 9–10 all out. */
-export function effortLabel(effort: number) {
-  if (effort <= 3) return "Easy";
-  if (effort <= 6) return "Steady";
-  if (effort <= 8) return "Hard";
-  return "All out";
-}
+export { effortLabel };
 
 /** Cardio activities: the library's cardio exercises (and custom ones) that record time. */
 export function useCardioActivities(): ExerciseDto[] {
   const exercises = useExercises();
-  return (exercises.data ?? []).filter(
-    (e) => e.category === "cardio" && isCardioTracking(e.tracking),
-  );
+  return (exercises.data ?? []).filter((e) => e.category === "cardio" && isCardioLine(e.stats));
 }
 
 const distanceText = (m: number, units: UnitSystem) =>
@@ -180,7 +173,7 @@ export function CardioCard({
           {dayLabel(w.localDate)}
           {activity && activity !== w.name ? ` · ${activity}` : ""}
         </Muted>
-        <Muted>{cardioLine(s.activityId, s.distanceM, s.durationS, w.cardio, units)}</Muted>
+        <Muted>{cardioLine(s.activityId, s.distanceM, s.durationS, w.boxScore, units)}</Muted>
         {w.summary.prs.length > 0 && (
           <Muted style={{ color: tierColor(75) }}>
             ★ {w.summary.prs.length} PR{w.summary.prs.length === 1 ? "" : "s"}
@@ -194,7 +187,7 @@ export function CardioCard({
 /** A finished cardio session's numbers (the session screen). */
 export function CardioStats({ workout: w, units }: { workout: WorkoutDto; units: UnitSystem }) {
   const s = cardioSession(w);
-  const c = w.cardio;
+  const c = w.boxScore;
   const pace = formatPace(s.activityId, s.distanceM, s.durationS, units);
   return (
     <StatGrid>
@@ -205,6 +198,7 @@ export function CardioStats({ workout: w, units }: { workout: WorkoutDto; units:
       />
       <StatTile label="Pace" value={pace ?? "—"} />
       {c?.avgHeartRate ? <StatTile label="Avg HR" value={c.avgHeartRate} /> : null}
+      {c?.maxHeartRate ? <StatTile label="Max HR" value={c.maxHeartRate} /> : null}
       {c?.calories ? <StatTile label="Calories" value={c.calories} /> : null}
       {c?.elevationM ? (
         <StatTile

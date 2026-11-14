@@ -7,6 +7,7 @@ import { useUpdateProfile } from "../../api/social";
 import { Button } from "../../components/Button";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { TrackingSettings } from "../body/TrackingSettings";
+import { BoxScoreSettings } from "../workouts/BoxScore";
 import { CopyLink } from "../social/CopyLink";
 import { VISIBILITY_INFO } from "../social/visibility";
 import { fieldClass } from "../../components/form";
@@ -31,6 +32,7 @@ export function SettingsPage() {
     ...(auth.mode === "better-auth" ? [{ id: "security", label: "Sign-in & security" }] : []),
     { id: "sharing", label: "Sharing" },
     { id: "units", label: "Units & body" },
+    { id: "box-score", label: "Box score" },
     { id: "personalize", label: "Personalize" },
   ];
 
@@ -45,6 +47,7 @@ export function SettingsPage() {
           {auth.mode === "better-auth" && <SignInSettings id="security" />}
           <SharingSection me={me.data} />
           <TrackingSettings me={me.data} id="units" />
+          <BoxScoreSettings id="box-score" />
           <PersonalizeLinks />
           <DebugJson label="me" data={me.data} />
         </div>

@@ -4,13 +4,13 @@ import { SymbolView } from "expo-symbols";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useExercises } from "@/api/workouts";
+import { ExerciseForm } from "@/components/workouts/ExerciseForm";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, ErrorNote, Field, Loading, Muted, Screen } from "@/components/ui";
 import {
   CategoryChips,
   exerciseDetail,
   filterExercises,
-  NewExerciseForm,
 } from "@/components/workouts/ExercisePicker";
 import { colors, space } from "@/lib/theme";
 import { since } from "@/lib/workouts";
@@ -71,7 +71,7 @@ function ExercisesScreen() {
         )}
       </Card>
       <Sheet open={creating} title="New exercise" onClose={() => setCreating(false)}>
-        <NewExerciseForm initialName={query} onCreated={() => setCreating(false)} />
+        <ExerciseForm initialName={query} onSaved={() => setCreating(false)} />
       </Sheet>
     </Screen>
   );

@@ -1,4 +1,5 @@
-import type { ExerciseRecordsDto, WorkoutDto } from "./workouts";
+import type { ExerciseRecordsDto } from "../records";
+import type { WorkoutDto } from "./workouts";
 
 /**
  * Sports (DESIGN.md §7.5): practices are live workouts with `kind = sport`, built from the
@@ -15,7 +16,7 @@ export interface SportSkillDto {
   exerciseId: string;
   sessions: number;
   lastDone: string;
-  /** The drill's headline record (HEADLINE_RECORD) and its all-time best. */
+  /** The drill's headline record (the exercise's `headline`) and its all-time best. */
   headline: keyof ExerciseRecordsDto;
   best: number | null;
   /** Makes / attempts drills: totals over the last 30 days. */

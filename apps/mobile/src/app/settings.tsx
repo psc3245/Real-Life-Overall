@@ -14,6 +14,7 @@ import { useMe, type Me } from "@/api/hooks";
 import { useAuthState, useSignOut } from "@/api/session";
 import { useUpdateProfile } from "@/api/social";
 import { TrackingSettings } from "@/components/body/TrackingSettings";
+import { BoxScoreSettings } from "@/components/workouts/BoxScore";
 import { AccountCard } from "@/components/Premium";
 import { FormRow } from "@/components/controls";
 import { SettingRow, SettingsGroup } from "@/components/settings";
@@ -64,6 +65,7 @@ export default function SettingsScreen() {
       {auth.mode === "better-auth" && <SignInSettings />}
       <SharingSection me={me.data} />
       <TrackingSettings me={me.data} />
+      <BoxScoreSettings />
       {auth.mode === "dev" && <DevUser />}
       <View style={{ gap: space.sm }}>
         <Label>About</Label>

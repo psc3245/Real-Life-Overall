@@ -216,7 +216,7 @@ function SkillCard({
             {RECORD_LABELS[s.headline]}
           </dt>
           <dd className="tabular-nums">
-            {s.best !== null && info ? formatRecord(s.headline, s.best, units, info.tracking) : "—"}
+            {s.best !== null && info ? formatRecord(s.headline, s.best, units, info.stats) : "—"}
           </dd>
         </div>
         {s.recent && (

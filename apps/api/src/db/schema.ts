@@ -3,7 +3,6 @@ import {
   WORKOUT_KINDS,
   BUG_REPORT_STATUSES,
   EXERCISE_CATEGORIES,
-  EXERCISE_TRACKING,
   OBJECTIVE_KINDS,
   OBJECTIVE_SOURCES,
   ONBOARDING_METHODS,
@@ -717,7 +716,17 @@ export const friendships = pgTable(
 );
 
 export const exerciseCategory = pgEnum("exercise_category", EXERCISE_CATEGORIES);
-export const exerciseTracking = pgEnum("exercise_tracking", EXERCISE_TRACKING);
+/** The pre-stat-line tracking kinds (now STAT_PRESETS); the column stays for older code. */
+export const exerciseTracking = pgEnum("exercise_tracking", [
+  "weight_reps",
+  "reps",
+  "duration",
+  "distance_duration",
+  "makes_attempts",
+  "weight_duration",
+  "weight_distance",
+  "distance",
+]);
 
 /** A user's own exercises; the built-in library lives in @rlo/shared (EXERCISE_CATALOG). */
 export const exercises = pgTable(
@@ -729,7 +738,14 @@ export const exercises = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text().notNull(),
     category: exerciseCategory().notNull(),
-    tracking: exerciseTracking().notNull(),
+    /** Before stat lines; kept nullable so older code on the same database still reads. */
+    tracking: exerciseTracking(),
+    /** The stat line (ExerciseStat[]), in column order. */
+    stats: text().array().notNull(),
+    /** The record it's scored by (RecordKey). */
+    headline: text().notNull(),
+    /** Sport & skill drills' sport (Sport); null otherwise. */
+    sport: text(),
     archivedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
   },
@@ -761,8 +777,9 @@ export const workoutTemplates = pgTable(
 /**
  * Logged workouts. `exercises` is WorkoutExerciseDto[] (kg, m, s); the whole document is saved
  * at once while the workout is in progress. `ended_at` is null until it's finished. Cardio
- * sessions are finished workouts with one exercise and one set, plus `cardio`
- * (CardioDetailsDto).
+ * sessions are finished workouts with one exercise and one set. `box_score` (BoxScoreDto) is the
+ * heart rate, calories and effort asked for at the finish; `cardio` is its pre-box-score copy,
+ * kept for older code on the same database.
  */
 export const workouts = pgTable(
   "workouts",
@@ -780,6 +797,7 @@ export const workouts = pgTable(
     kind: workoutKind().notNull().default("strength"),
     exercises: jsonb().notNull().default([]),
     cardio: jsonb(),
+    boxScore: jsonb(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

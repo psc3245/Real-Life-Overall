@@ -98,9 +98,7 @@ function SkillCard({
           <View style={{ flex: 1 }}>
             <Text style={styles.statLabel}>{RECORD_LABELS[s.headline]}</Text>
             <Text style={styles.statValue}>
-              {s.best !== null && info
-                ? formatRecord(s.headline, s.best, units, info.tracking)
-                : "—"}
+              {s.best !== null && info ? formatRecord(s.headline, s.best, units, info.stats) : "—"}
             </Text>
           </View>
           {s.recent && (

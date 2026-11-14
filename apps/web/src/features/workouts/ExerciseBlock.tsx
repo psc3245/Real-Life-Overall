@@ -1,16 +1,15 @@
 import {
-  distanceUnit,
-  lengthUnit,
   emptySet,
   formatSet,
   MAX_SETS_PER_EXERCISE,
+  SET_FIELD_KEYS as FIELD_KEY,
   SET_KIND_LABELS,
   SET_KIND_TAGS,
   SET_KINDS,
-  TRACKING_FIELDS,
-  weightUnit,
+  setFieldHeader as fieldHeader,
+  statFields,
   type ExerciseDto,
-  type SetField,
+  type ExerciseStat,
   type UnitSystem,
   type WorkoutExerciseDto,
   type WorkoutSetDto,
@@ -25,31 +24,7 @@ import { displayValue, SetCell } from "./SetInputs";
  */
 export type EditorMode = "live" | "log" | "plan";
 
-const FIELD_KEY: Record<SetField, keyof WorkoutSetDto> = {
-  weight: "weightKg",
-  reps: "reps",
-  duration: "durationS",
-  distance: "distanceM",
-  length: "distanceM",
-  attempts: "attempts",
-};
-
-function fieldHeader(field: SetField, units: UnitSystem, makes: boolean) {
-  switch (field) {
-    case "weight":
-      return weightUnit(units);
-    case "reps":
-      return makes ? "Makes" : "Reps";
-    case "duration":
-      return "Time";
-    case "distance":
-      return distanceUnit(units);
-    case "length":
-      return lengthUnit(units);
-    case "attempts":
-      return "Att.";
-  }
-}
+const LIFT: ExerciseStat[] = ["weight", "reps"];
 
 const KIND_STYLE: Record<WorkoutSetDto["kind"], string> = {
   normal: "text-court-100",
@@ -85,9 +60,9 @@ export function ExerciseBlock({
   onSetDone?: () => void;
 }) {
   const [showNotes, setShowNotes] = useState(exercise.notes !== "");
-  const tracking = info?.tracking ?? "weight_reps";
-  const fields = TRACKING_FIELDS[tracking];
-  const makes = tracking === "makes_attempts";
+  const line = info ?? { stats: LIFT };
+  const fields = statFields(line.stats);
+  const makes = line.stats.includes("makes");
   const name = info?.name ?? "Unknown exercise";
 
   const setAt = (i: number, changes: Partial<WorkoutSetDto>) =>
@@ -115,7 +90,7 @@ export function ExerciseBlock({
     const out: Partial<WorkoutSetDto> = {};
     for (const f of fields) {
       const key = FIELD_KEY[f];
-      if (!onlyEmpty || exercise.sets[i]![key] === null) Object.assign(out, { [key]: prev[key] });
+      if (!onlyEmpty || exercise.sets[i]![key] == null) Object.assign(out, { [key]: prev[key] });
     }
     return out;
   };
@@ -129,8 +104,9 @@ export function ExerciseBlock({
   const showPrevious = mode !== "plan";
   const columns = [
     "2.25rem",
-    showPrevious && "minmax(4.5rem,1fr)",
-    ...fields.map(() => "minmax(3.5rem,7rem)"),
+    showPrevious && (fields.length > 3 ? "minmax(3rem,1fr)" : "minmax(4.5rem,1fr)"),
+    // Four-stat lines squeeze their cells to stay on a phone screen.
+    ...fields.map(() => (fields.length > 3 ? "minmax(2.75rem,7rem)" : "minmax(3.5rem,7rem)")),
     mode === "live" && "2.5rem",
     "1.75rem",
   ]
@@ -252,18 +228,24 @@ export function ExerciseBlock({
                   onClick={() => setAt(i, fromPrevious(i, false))}
                   className="truncate text-left text-court-500 enabled:hover:text-court-100"
                 >
-                  {prev ? formatSet(tracking, prev, units) : "—"}
+                  {prev ? formatSet(line, prev, units) : "—"}
                 </button>
               )}
               {fields.map((f) => (
                 <span key={f} role="cell">
                   <SetCell
                     field={f}
-                    value={s[FIELD_KEY[f]] as number | null}
+                    value={(s[FIELD_KEY[f]] as number | null | undefined) ?? null}
                     units={units}
                     label={`Set ${i + 1} ${fieldHeader(f, units, makes)}`}
                     placeholder={
-                      prev ? displayValue(f, prev[FIELD_KEY[f]] as number | null, units) : undefined
+                      prev
+                        ? displayValue(
+                            f,
+                            (prev[FIELD_KEY[f]] as number | null | undefined) ?? null,
+                            units,
+                          )
+                        : undefined
                     }
                     onChange={(v) => setAt(i, { [FIELD_KEY[f]]: v })}
                   />

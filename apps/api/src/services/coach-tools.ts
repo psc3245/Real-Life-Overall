@@ -1,9 +1,10 @@
 import {
   addDays,
   EXERCISE_CATEGORIES,
-  EXERCISE_TRACKING,
+  EXERCISE_STATS,
   formatSet,
   fromDisplayDistance,
+  fromDisplayHeight,
   fromDisplayLength,
   fromDisplayWeight,
   HABIT_TYPE_LABELS,
@@ -19,19 +20,20 @@ import {
   MAX_OBJECTIVE_DAYS,
   MAX_OBJECTIVE_TARGET,
   MAX_SETS_PER_EXERCISE,
+  MAX_STATS,
   MAX_WORKOUT_EXERCISES,
-  TRACKING_FIELDS,
-  TRACKING_LABELS,
+  isValidStatLine,
   normalizeHabitConfig,
+  SET_FIELD_KEYS,
+  STAT_DETAILS,
+  statFields,
   type CoachActionDto,
   type CoachSuggestionDto,
   type DayDto,
   type DayHabitDto,
-  type ExerciseTracking,
   type HabitConfig,
   type HabitDto,
   type HabitType,
-  type SetField,
   type UnitSystem,
   type WorkoutExerciseDto,
   type WorkoutSetDto,
@@ -152,7 +154,7 @@ export function renderDayLog(day: DayDto, refs: CoachRefs, features: Record<stri
 export function renderExercises(lookup: Lookup) {
   return [...lookup.values()]
     .filter((e) => !e.archived)
-    .map((e) => `${e.id}: ${e.name} [${e.tracking}]`)
+    .map((e) => `${e.id}: ${e.name} [${e.stats.join(", ")}]`)
     .join("\n");
 }
 
@@ -183,15 +185,6 @@ export function resolveExercise(lookup: Lookup, query: string) {
   if (all.length === 1) return { match: all[0]!.e, close: [] };
   return { match: null, close: scored.slice(0, 5).map((x) => x.e.name) };
 }
-
-const SET_FIELD_KEYS: Record<SetField, keyof WorkoutSetDto> = {
-  weight: "weightKg",
-  reps: "reps",
-  duration: "durationS",
-  distance: "distanceM",
-  length: "distanceM",
-  attempts: "attempts",
-};
 
 const message = (error: unknown) =>
   error instanceof HTTPException || error instanceof Error ? error.message : String(error);
@@ -228,14 +221,21 @@ const exercisesField = (units: UnitSystem) => {
     z.object({
       exercise: z.string().describe("An id from the exercise library, or its name"),
       newExercise: z
-        .object({ category: z.enum(EXERCISE_CATEGORIES), tracking: z.enum(EXERCISE_TRACKING) })
+        .object({
+          category: z.enum(EXERCISE_CATEGORIES),
+          stats: z
+            .array(z.enum(EXERCISE_STATS))
+            .min(1)
+            .max(MAX_STATS)
+            .describe("What each set records, in order, e.g. [weight, length, duration, incline]"),
+        })
         .nullable()
         .describe("Only when nothing in the library fits: adds it as the user's own exercise"),
       sets: z.array(
         z.object({
-          weight: z.number().nullable().describe(`In ${weight}; weight_reps only`),
+          weight: z.number().nullable().describe(`In ${weight}; exercises with weight only`),
           reps: z.number().nullable().describe("Reps, or makes for makes/attempts"),
-          seconds: z.number().nullable().describe("duration and distance+time only"),
+          seconds: z.number().nullable().describe("Exercises with duration only"),
           distance: z
             .number()
             .nullable()
@@ -243,6 +243,13 @@ const exercisesField = (units: UnitSystem) => {
               `In ${distance} for distance fields, ${units === "imperial" ? "feet" : "meters"} for length fields`,
             ),
           attempts: z.number().nullable().describe("makes/attempts only"),
+          incline: z.number().nullable().describe("Grade in %; incline only"),
+          height: z
+            .number()
+            .nullable()
+            .describe(`In ${units === "imperial" ? "inches" : "cm"}; height only`),
+          level: z.number().nullable().describe("Machine level; level only"),
+          rpe: z.number().nullable().describe("1-10; rpe only"),
         }),
       ),
     }),
@@ -266,9 +273,15 @@ async function buildExercises(
     const resolved = resolveExercise(lookup, e.exercise);
     let match = resolved.match;
     if (!match && e.newExercise) {
+      const stats = e.newExercise.stats.filter((st, i, all) => all.indexOf(st) === i);
+      if (!isValidStatLine(stats)) {
+        return { error: "newExercise.stats can't hold both reps and makes, or two distances." };
+      }
       const created = await createExercise(c.db, c.userId, {
         name: e.exercise.trim().slice(0, 60),
-        ...e.newExercise,
+        category: e.newExercise.category,
+        stats,
+        sport: null,
       });
       lookup = await loadLookup(c.db, c.userId);
       match = lookup.get(created.id) ?? null;
@@ -281,7 +294,7 @@ async function buildExercises(
           " Use one of those, or pass newExercise to add it.",
       };
     }
-    const fields = TRACKING_FIELDS[match.tracking];
+    const fields = statFields(match.stats);
     const sets = e.sets.slice(0, MAX_SETS_PER_EXERCISE).map((s): WorkoutSetDto => ({
       kind: "normal",
       weightKg: s.weight !== null ? fromDisplayWeight(s.weight, c.units) : null,
@@ -294,6 +307,10 @@ async function buildExercises(
             ? fromDisplayLength(s.distance, c.units)
             : fromDisplayDistance(s.distance, c.units),
       attempts: s.attempts !== null ? Math.round(s.attempts) : null,
+      inclinePct: s.incline ?? null,
+      heightCm: s.height != null ? fromDisplayHeight(s.height, c.units) : null,
+      level: s.level ?? null,
+      rpe: s.rpe ?? null,
       done,
     }));
     exercises.push({
@@ -314,7 +331,7 @@ function describeExercises(exercises: WorkoutExerciseDto[], lookup: Lookup, unit
     .map((x) => {
       const info = lookup.get(x.exerciseId);
       const last = x.sets.at(-1);
-      const shown = last && info ? formatSet(info.tracking, last, units) : "";
+      const shown = last && info ? formatSet(info, last, units) : "";
       return `${info?.name ?? "Exercise"}: ${x.sets.length}${shown && shown !== "—" ? ` × ${shown}` : " sets"}`;
     })
     .join(" · ");
@@ -682,8 +699,7 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
   return tools;
 }
 
-/** For the prompt: what each tracking kind's sets record. */
-export const TRACKING_NOTE = EXERCISE_TRACKING.map(
-  (t: ExerciseTracking) =>
-    `${t} (${TRACKING_LABELS[t].toLowerCase()}): ${TRACKING_FIELDS[t].join(", ")}`,
-).join("; ");
+/** For the prompt: what each stat records. */
+export const STATS_NOTE = EXERCISE_STATS.map((t) => `${t} (${STAT_DETAILS[t].toLowerCase()})`).join(
+  "; ",
+);

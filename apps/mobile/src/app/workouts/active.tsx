@@ -1,7 +1,11 @@
 import {
+  emptyBoxScore,
   finishTemplateOptions,
   formatDuration,
+  hasBoxScore,
   templateChange,
+  workoutVolume,
+  type BoxScoreDto,
   type TemplateAction,
   type TemplateChange,
   type WorkoutDto,
@@ -9,7 +13,10 @@ import {
 } from "@rlo/shared";
 import { Redirect, router, Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { usePreferences } from "@/api/preferences";
+import { StatGrid, StatTile } from "@/components/StatTile";
+import { BoxScoreFields } from "@/components/workouts/BoxScore";
 import {
   useActiveWorkout,
   useDeleteWorkout,
@@ -23,7 +30,7 @@ import { Body, Button, Card, ErrorNote, Field, Loading, Muted, Screen } from "@/
 import { RestTimerBar, useRestTimer } from "@/components/workouts/RestTimer";
 import { WorkoutEditor } from "@/components/workouts/WorkoutEditor";
 import { colors, fonts, space } from "@/lib/theme";
-import { useUnits } from "@/lib/workouts";
+import { formatElapsed, formatVolume, useUnits } from "@/lib/workouts";
 import { FeatureGate } from "@/components/FeatureGate";
 
 const AUTOSAVE_MS = 700;
@@ -210,10 +217,17 @@ function LiveWorkout({ workout }: { workout: WorkoutDto }) {
       </Screen>
       <RestTimerBar timer={timer} />
 
-      <Sheet open={finishing} title="Finish workout" onClose={() => setFinishing(false)}>
+      <Sheet
+        open={finishing}
+        title={doneSets ? "Box score" : "Finish workout"}
+        onClose={() => setFinishing(false)}
+      >
         <FinishDialog
           doneSets={doneSets}
           skipped={sets.length - doneSets}
+          startedAt={workout.startedAt}
+          volumeKg={workoutVolume(draft.exercises)}
+          prs={(save.data ?? workout).summary.prs.map((p) => p.label)}
           workoutName={draft.name.trim() || workout.name}
           templateName={template?.name ?? null}
           change={change}
@@ -252,6 +266,9 @@ function Elapsed({ since }: { since: string }) {
 function FinishDialog({
   doneSets,
   skipped,
+  startedAt,
+  volumeKg,
+  prs,
   workoutName,
   templateName,
   change,
@@ -261,25 +278,61 @@ function FinishDialog({
 }: {
   doneSets: number;
   skipped: number;
+  startedAt: string;
+  volumeKg: number;
+  prs: string[];
   workoutName: string;
   templateName: string | null;
   change: TemplateChange;
   pending: boolean;
   error: unknown;
-  onFinish: (options: { template: TemplateAction; templateName?: string }) => void;
+  onFinish: (options: {
+    template: TemplateAction;
+    templateName?: string;
+    boxScore?: BoxScoreDto;
+  }) => void;
 }) {
+  const units = useUnits();
   const options = doneSets > 0 ? finishTemplateOptions(templateName, change) : [];
   const [action, setAction] = useState<TemplateAction>("none");
   const [name, setName] = useState(workoutName);
+  const asked = usePreferences().boxScore;
+  const [box, setBox] = useState<BoxScoreDto>(emptyBoxScore);
+  const [elapsedS] = useState(() => (Date.now() - Date.parse(startedAt)) / 1000);
   return (
-    <View style={{ gap: space.lg }}>
+    <ScrollView
+      contentContainerStyle={{ gap: space.lg, paddingBottom: space.xl }}
+      keyboardShouldPersistTaps="handled"
+    >
       {doneSets === 0 ? (
         <Body>Check off at least one set first. Tap ✓ on each set you did.</Body>
       ) : (
-        <Body>
-          {doneSets} set{doneSets === 1 ? "" : "s"} done.
-          {skipped > 0 && ` ${skipped} unchecked set${skipped === 1 ? "" : "s"} will be left out.`}
-        </Body>
+        <>
+          <StatGrid>
+            <StatTile label="Time" value={formatElapsed(elapsedS)} />
+            <StatTile label="Sets" value={doneSets} />
+            {volumeKg > 0 && <StatTile label="Volume" value={formatVolume(volumeKg, units)} />}
+          </StatGrid>
+          {prs.map((pr) => (
+            <Muted key={pr} style={{ color: colors.neon }}>
+              ★ {pr}
+            </Muted>
+          ))}
+          {skipped > 0 && (
+            <Muted>
+              {skipped} unchecked set{skipped === 1 ? "" : "s"} will be left out.
+            </Muted>
+          )}
+          {asked.length > 0 && (
+            <Card style={{ gap: space.md }}>
+              {/* A link would open Settings under this sheet, so it just says where. */}
+              <Muted style={{ fontSize: 12 }}>
+                All optional: from your watch or how it felt. Change what's asked in Settings.
+              </Muted>
+              <BoxScoreFields value={box} fields={asked} onChange={setBox} />
+            </Card>
+          )}
+        </>
       )}
       {options.length > 0 && (
         <View
@@ -328,10 +381,11 @@ function FinishDialog({
           onFinish({
             template: action,
             ...(action === "new" && { templateName: name.trim() }),
+            ...(hasBoxScore(box) && { boxScore: box }),
           })
         }
       />
-    </View>
+    </ScrollView>
   );
 }
 
