@@ -216,7 +216,12 @@ export function ExerciseBlock({
 
       <View style={styles.row}>
         <Text style={[styles.header, styles.setCol]}>Set</Text>
-        {showPrevious && <Text style={[styles.header, styles.prevCol]}>Previous</Text>}
+        {showPrevious && (
+          <Text style={[styles.header, styles.prevCol]} numberOfLines={1}>
+            {/* Four-stat lines leave the column too narrow for the full word. */}
+            {fields.length > 3 ? "Prev." : "Previous"}
+          </Text>
+        )}
         {fields.map((f) => (
           <Text key={f} style={[styles.header, styles.fieldCol]}>
             {fieldHeader(f, units, makes)}

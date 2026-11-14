@@ -303,6 +303,7 @@ function FinishDialog({
     <ScrollView
       contentContainerStyle={{ gap: space.lg, paddingBottom: space.xl }}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       {doneSets === 0 ? (
         <Body>Check off at least one set first. Tap ✓ on each set you did.</Body>

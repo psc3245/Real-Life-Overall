@@ -57,6 +57,13 @@ export function EffortPicker({
   );
 }
 
+/** Three fields share a phone-width row, so their labels stay short enough for one line. */
+const SHORT_LABELS: Record<Exclude<BoxScoreField, "effort">, string> = {
+  avgHeartRate: "Avg HR",
+  maxHeartRate: "Max HR",
+  calories: "Calories",
+};
+
 const PLACEHOLDERS: Record<Exclude<BoxScoreField, "effort">, string> = {
   avgHeartRate: "bpm",
   maxHeartRate: "bpm",
@@ -86,7 +93,7 @@ export function BoxScoreFields({
         <View style={styles.row}>
           {numbers.map((f) => (
             <View key={f} style={{ flex: 1 }}>
-              <FormRow label={BOX_SCORE_LABELS[f]}>
+              <FormRow label={SHORT_LABELS[f]}>
                 <Field
                   accessibilityLabel={BOX_SCORE_LABELS[f]}
                   value={value[f]?.toString() ?? ""}

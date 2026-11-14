@@ -133,6 +133,7 @@ export function ExerciseForm({
     <ScrollView
       contentContainerStyle={{ gap: space.lg, paddingBottom: space.xl }}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       <FormRow label="Name">
         <Field
