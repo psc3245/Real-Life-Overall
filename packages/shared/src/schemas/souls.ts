@@ -10,7 +10,7 @@ export interface SoulStatDto {
   depth: number;
   /** Leaves: start plus levels bought. Parents: weighted mean. Null with nothing below. */
   level: number | null;
-  /** Leaves only: souls for the next level, null at 99. */
+  /** Leaves only: souls for its next level (the same for every stat), null at 99. */
   cost: number | null;
   /** Leaves only: levels bought this season. */
   gained: number;
@@ -49,8 +49,10 @@ export interface SoulsDto {
   spent: number;
   lost: number;
   deaths: number;
-  /** Overall's level. */
-  soulLevel: number | null;
+  /** The player's level: where the run started plus one per level bought (DESIGN.md §4.7). */
+  soulLevel: number;
+  /** Souls for the next level, whichever stat it goes to. */
+  nextCost: number;
   stats: SoulStatDto[];
   /** Every day of the run, newest first. */
   days: SoulDayDto[];

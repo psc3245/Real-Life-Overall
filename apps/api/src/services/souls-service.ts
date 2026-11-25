@@ -13,6 +13,8 @@ import {
   levelCost,
   levelFromRating,
   localDateIn,
+  soulLevelAsOf,
+  startingSoulLevel,
   objectiveLength,
   SOULS_PER_HABIT,
   SOULS_PER_POINT,
@@ -105,7 +107,26 @@ export async function soulLevels(
       .filter((r) => r.kind === "start")
       .map((r) => r.afterDate)
       .sort()[0] ?? today;
-  return { rows, levels, gained, startedOn };
+  const soulLevel = soulLevelAsOf(
+    startingSoulLevel(rows, await carriedSoulLevel(db, userId, season)),
+    rows,
+    today,
+  );
+  return { rows, levels, gained, startedOn, soulLevel };
+}
+
+/**
+ * The Soul Level New Game+ starts from: last season's final one, when it was a Souls season too
+ * (DESIGN.md §4.7). Null otherwise.
+ */
+export async function carriedSoulLevel(
+  db: Database,
+  userId: string,
+  season: SeasonDto,
+): Promise<number | null> {
+  const { previous } = await earlierSeasons(db, userId, season);
+  if (previous?.mode !== "souls") return null;
+  return (previous.finalSnapshot as Partial<SeasonCardDto> | null)?.level ?? null;
 }
 
 /** Each node's change in level over the last 7 days (leaves started since count from 0 change). */
@@ -125,6 +146,10 @@ export function levelTrends(
     const prior = before.get(id);
     if (prior !== undefined) out.set(id, Math.round((value - prior) * 100) / 100);
   }
+  // Overall is the Soul Level: one per level bought this week.
+  const root = nodes.find((n) => n.parentId === null);
+  if (root)
+    out.set(root.id, soulLevelAsOf(0, rows, today) - soulLevelAsOf(0, rows, addDays(today, -7)));
   return out;
 }
 
@@ -297,11 +322,9 @@ export async function finalSouls(
     today,
     season.endsOn < today ? season.endsOn : today,
   );
-  const rolled = computeNodeValues(nodes, levels.levels);
-  const root = nodes.find((n) => n.parentId === null);
   return {
-    levels: rolled,
-    soulLevel: root ? (rolled.get(root.id) ?? null) : null,
+    levels: computeNodeValues(nodes, levels.levels),
+    soulLevel: levels.soulLevel,
     held: Math.max(0, state.held),
   };
 }
@@ -340,7 +363,7 @@ export async function getSouls(db: Database, userId: string): Promise<SoulsDto> 
   const leaves = new Set(leafIds(nodes));
   const rolledLevels = computeNodeValues(nodes, levels.levels);
   const rolledRatings = computeNodeValues(nodes, ratings);
-  const root = nodes.find((n) => n.parentId === null);
+  const nextCost = levelCost(levels.soulLevel);
   return {
     season,
     today,
@@ -353,7 +376,8 @@ export async function getSouls(db: Database, userId: string): Promise<SoulsDto> 
     spent: state.spent,
     lost: state.lost,
     deaths: state.deaths,
-    soulLevel: root ? (rolledLevels.get(root.id) ?? null) : null,
+    soulLevel: levels.soulLevel,
+    nextCost,
     stats: nodes.map((n) => {
       const level = rolledLevels.get(n.id) ?? null;
       const leaf = leaves.has(n.id);
@@ -363,7 +387,7 @@ export async function getSouls(db: Database, userId: string): Promise<SoulsDto> 
         name: n.name,
         depth: n.depth,
         level: level === null ? null : leaf ? level : Math.round(level * 10) / 10,
-        cost: leaf && level !== null ? levelCost(level) : null,
+        cost: leaf && level !== null && level < STAT_LEVEL_MAX ? nextCost : null,
         gained: levels.gained.get(n.id) ?? 0,
         rating: rolledRatings.get(n.id) ?? null,
       };
@@ -382,12 +406,15 @@ export async function levelUp(
   if (!leafIds(nodes).includes(body.nodeId)) {
     throw badRequest("Only attributes without sub-attributes can be leveled");
   }
-  let level = levels.levels.get(body.nodeId)!;
+  // Each level costs by the Soul Level it's bought at, whichever stat it goes to (§4.7).
+  const level = levels.levels.get(body.nodeId)!;
+  if (level + body.levels > STAT_LEVEL_MAX) {
+    throw conflict(`That stat can't go past level ${STAT_LEVEL_MAX}`);
+  }
   let total = 0;
   const rows = [];
   for (let i = 0; i < body.levels; i++) {
-    const cost = levelCost(level);
-    if (cost === null) throw conflict(`That stat is already at level ${STAT_LEVEL_MAX}`);
+    const cost = levelCost(levels.soulLevel + i);
     total += cost;
     rows.push({
       userId,
@@ -398,7 +425,6 @@ export async function levelUp(
       cost,
       afterDate: today,
     });
-    level++;
   }
   if (total > state.held) throw conflict("Not enough souls for that");
   await soulRepo.insertLevelUps(db, rows);

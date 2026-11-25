@@ -12,7 +12,7 @@ export const STAT_LEVEL_MAX = 99;
 /** Starting levels sit below the first soft cap, so the climb to 99 is the run. */
 const START_LEVEL_PER_RATING_POINT = 0.4;
 
-/** Past each soft cap a level costs this much more (DESIGN.md §4.7). */
+/** Past each soft cap (a Soul Level) a level costs this much more (DESIGN.md §4.7). */
 export const SOFT_CAPS: readonly { level: number; multiplier: number }[] = [
   { level: 40, multiplier: 1.5 },
   { level: 60, multiplier: 3 },
@@ -35,12 +35,37 @@ export function levelFromRating(rating: number | null): number {
   return Math.min(STAT_LEVEL_MAX, Math.max(STAT_LEVEL_MIN, level));
 }
 
-/** Souls to raise a stat from `level` to `level + 1`; null at the max. */
-export function levelCost(level: number): number | null {
-  if (level >= STAT_LEVEL_MAX) return null;
-  let cost = 10 * Math.max(1, level) ** 1.4;
-  for (const cap of SOFT_CAPS) if (level >= cap.level) cost *= cap.multiplier;
+/**
+ * Souls for the next level at Soul Level `soulLevel`, whichever stat it goes to: the cost rises
+ * with the player's level, never with the stat's (DESIGN.md §4.7).
+ */
+export function levelCost(soulLevel: number): number {
+  let cost = 10 * Math.max(1, soulLevel) ** 1.4;
+  for (const cap of SOFT_CAPS) if (soulLevel >= cap.level) cost *= cap.multiplier;
   return Math.max(100, Math.round(cost / 10) * 10);
+}
+
+type SoulRow = { nodeId: string; kind: "start" | "level_up"; levels: number; afterDate: string };
+
+/**
+ * The Soul Level a run starts at: New Game+ carries last season's (`carried`); otherwise the mean
+ * of the stats' starting levels on the run's first day. Fixed once the run starts, so stats added
+ * later and weight shifts never move it.
+ */
+export function startingSoulLevel(rows: Iterable<SoulRow>, carried?: number | null): number {
+  if (carried != null) return Math.max(STAT_LEVEL_MIN, Math.round(carried));
+  const starts = [...rows].filter((r) => r.kind === "start");
+  const first = starts.map((r) => r.afterDate).sort()[0];
+  const levels = starts.filter((r) => r.afterDate === first).map((r) => r.levels);
+  if (!levels.length) return STAT_LEVEL_MIN;
+  return Math.max(STAT_LEVEL_MIN, Math.round(levels.reduce((a, b) => a + b, 0) / levels.length));
+}
+
+/** The Soul Level at the end of `date`: the start plus one per level bought by then. */
+export function soulLevelAsOf(start: number, rows: Iterable<SoulRow>, date: string): number {
+  let level = start;
+  for (const r of rows) if (r.kind === "level_up" && r.afterDate <= date) level += r.levels;
+  return level;
 }
 
 /** The boss soul for a goal that ran from `startsOn` for `days` days. */

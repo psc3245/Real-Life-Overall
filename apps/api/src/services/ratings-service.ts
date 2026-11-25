@@ -6,6 +6,7 @@ import {
   localDateIn,
   type ChangeFeedItemDto,
   type Confidence,
+  type RatingNodeDto,
   type RatingsDto,
   type SeasonMode,
 } from "@rlo/shared";
@@ -57,17 +58,9 @@ export async function getRatings(db: Database, userId: string): Promise<RatingsD
   const leaves = new Set(leafIds(nodes));
   const ratings = computeNodeValues(nodes, leafValuesFromEvents(events));
   const growth = computeNodeValues(nodes, leafGrowthFromEvents(events));
-  // Souls seasons score stat levels, bought with souls (DESIGN.md §4.7).
-  const values =
-    season.mode === "growth"
-      ? growth
-      : season.mode === "souls"
-        ? computeNodeValues(
-            nodes,
-            (await soulLevels(db, userId, season, nodes, leafValuesFromEvents(events), today))
-              .levels,
-          )
-        : ratings;
+  // Souls seasons score stat levels, bought with souls, and Overall is the Soul Level, its own
+  // number rather than the stats rolled up (DESIGN.md §4.7).
+  const values = season.mode === "growth" ? growth : souls ? soulValues(nodes, souls) : ratings;
   const rules = new Map(
     (await decayRuleRepo.findActiveByNodes(db, [...leaves])).map((r) => [r.nodeId, r]),
   );
@@ -159,4 +152,15 @@ export async function getChanges(
     date: recapDate ?? decayDate,
     createdAt: r.createdAt.toISOString(),
   }));
+}
+
+/** Souls levels by node, with Overall replaced by the Soul Level. */
+function soulValues(
+  nodes: RatingNodeDto[],
+  souls: Awaited<ReturnType<typeof soulLevels>>,
+): Map<string, number> {
+  const values = computeNodeValues(nodes, souls.levels);
+  const root = nodes.find((n) => n.parentId === null);
+  if (root) values.set(root.id, souls.soulLevel);
+  return values;
 }
