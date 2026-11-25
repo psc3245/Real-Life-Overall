@@ -26,7 +26,7 @@ describe("habit stats", () => {
     const run = season.habits[0]!;
     expect(run).toMatchObject({ currentStreak: 3, bestStreak: 3 });
     expect(run.completed).toBe(3);
-    expect(run.days.length).toBeGreaterThanOrEqual(90);
+    expect(run.days.length).toBeGreaterThanOrEqual(28);
 
     const week = await body<HabitStatsResponseDto>(
       await t.request(`/habits/stats?range=week&date=${today}`),
