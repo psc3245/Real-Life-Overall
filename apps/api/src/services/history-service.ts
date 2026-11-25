@@ -3,6 +3,8 @@ import {
   computeNodeValues,
   growthDelta,
   leafLevelsAsOf,
+  soulLevelAsOf,
+  startingSoulLevel,
   leafScoresFromEvents,
   localDateIn,
   MAX_HISTORY_DAYS,
@@ -16,11 +18,13 @@ import * as decayRepo from "../repos/decay-repo";
 import * as habitRepo from "../repos/habit-repo";
 import * as eventRepo from "../repos/rating-event-repo";
 import * as recapRepo from "../repos/recap-repo";
+import * as seasonRepo from "../repos/season-repo";
 import * as soulRepo from "../repos/soul-repo";
 import * as userRepo from "../repos/user-repo";
 import { applyDecay } from "./decay-service";
 import { asOf, datedEvents } from "./event-dates";
 import { loadLeafContext } from "./habit-service";
+import { carriedSoulLevel } from "./souls-service";
 
 /** Shared setup: the season context, today, and the first day with ratings. */
 async function rangeFor(db: Database, userId: string, days: number) {
@@ -66,7 +70,18 @@ export async function historyBetween(
   let daily: Map<string, number>[];
   if (mode === "souls") {
     const rows = await soulRepo.findBySeason(db, seasonId);
-    daily = dates.map((d) => computeNodeValues(nodes, leafLevelsAsOf(rows, d)));
+    // Overall is the Soul Level, its own number (DESIGN.md §4.7).
+    const season = await seasonRepo.findById(db, seasonId);
+    const start = startingSoulLevel(
+      rows,
+      season ? await carriedSoulLevel(db, season.userId, season) : null,
+    );
+    const root = nodes.find((n) => n.parentId === null);
+    daily = dates.map((d) => {
+      const values = computeNodeValues(nodes, leafLevelsAsOf(rows, d));
+      if (root && values.has(root.id)) values.set(root.id, soulLevelAsOf(start, rows, d));
+      return values;
+    });
   } else {
     const events = datedEvents(await eventRepo.findActiveWithDates(db, seasonId));
     daily = dates.map((d) => computeNodeValues(nodes, leafScoresFromEvents(mode, asOf(events, d))));

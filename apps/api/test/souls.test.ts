@@ -51,8 +51,11 @@ describe("souls mode", () => {
     const start = await t.souls();
     const stat = (s: SoulsDto, name: string) => s.stats.find((n) => n.name === name)!;
     expect([32, 28, 20]).toEqual(["Career", "Cardio", "Strength"].map((n) => stat(start, n).level));
-    expect(start).toMatchObject({ held: 0, startedOn: t.today, deaths: 0 });
-    expect(stat(start, "Strength").cost).toBe(660);
+    // The Soul Level starts at the stats' mean (26.7 → 27) and prices every stat's next level.
+    expect(start).toMatchObject({ held: 0, startedOn: t.today, deaths: 0, soulLevel: 27 });
+    expect(start).toMatchObject({ nextCost: 1010 });
+    expect(stat(start, "Strength").cost).toBe(1010);
+    expect(stat(start, "Career").cost).toBe(1010);
 
     const run = await t.habit({ name: "Run", type: "checkbox" });
     await t.request(`/days/${t.today}/habits/${run.id}`, { method: "PUT", ...json({ num: 1 }) });
@@ -60,16 +63,25 @@ describe("souls mode", () => {
     const earned = await t.souls();
     expect(earned.held).toBe(925); // 9 points × 100 + one habit
     expect(earned.days[0]!.earned).toMatchObject({ recap: 900, habits: 25 });
+    // The day's recap shows what it earned, not the rating move.
+    const recapped = (await body<DayDto>(await t.request(`/days/${t.today}`))).recap!;
+    expect(recapped.souls).toMatchObject({ earned: { recap: 900, habits: 25 }, deaths: [] });
 
-    expect((await t.levelUp(t.nodeId("Strength"), 2)).status).toBe(409);
+    expect((await t.levelUp(t.nodeId("Strength"))).status).toBe(409); // 1,010 > 925
     expect((await t.levelUp(t.nodeId("Fitness"))).status).toBe(400);
-    const leveled = await body<SoulsDto>(await t.levelUp(t.nodeId("Strength")));
-    expect(leveled.held).toBe(265);
-    expect(stat(leveled, "Strength")).toMatchObject({ level: 21, gained: 1 });
 
+    // A bigger day: 27 points. Two levels cost 1,010 at SL 27, then 1,060 at SL 28.
+    await t.db.update(ratingEvents).set({ delta: 9 }).where(eq(ratingEvents.source, "daily_recap"));
+    const leveled = await body<SoulsDto>(await t.levelUp(t.nodeId("Strength"), 2));
+    expect(leveled).toMatchObject({ held: 2725 - 2070, soulLevel: 29 });
+    expect(stat(leveled, "Strength")).toMatchObject({ level: 22, gained: 2 });
+    expect(stat(leveled, "Career").cost).toBe(leveled.nextCost);
+
+    // Overall is the Soul Level, not the stats rolled up.
     const ratings = await body<RatingsDto>(await t.request("/ratings"));
-    expect(ratings.nodes.find((n) => n.name === "Strength")).toMatchObject({ value: 21 });
-    expect(ratings.nodes.find((n) => n.name === "Strength")!.rating).toBeCloseTo(53, 5);
+    expect(ratings.nodes.find((n) => n.name === "Strength")).toMatchObject({ value: 22 });
+    expect(ratings.nodes.find((n) => n.parentId === null)).toMatchObject({ value: 29, trend: 2 });
+    expect(ratings.nodes.find((n) => n.name === "Strength")!.rating).toBeCloseTo(59, 5);
   });
 
   it("drops held souls as a bloodstain on a slip", async () => {
@@ -115,14 +127,20 @@ describe("souls mode", () => {
     const [call] = await t.db.select().from(llmCalls).where(eq(llmCalls.purpose, "recap.daily"));
     expect(call!.promptVersion).toMatch(/\+souls$/);
 
-    // 300 souls can't buy level 20 → 21 (660); give the run a boss-sized day instead.
-    await t.db.update(ratingEvents).set({ delta: 9 }).where(eq(ratingEvents.source, "daily_recap"));
+    // 300 souls can't buy a level at SL 27 (1,010); give the run a boss-sized day instead.
+    await t.db
+      .update(ratingEvents)
+      .set({ delta: 12 })
+      .where(eq(ratingEvents.source, "daily_recap"));
     await t.levelUp(t.nodeId("Strength"));
     const history = await body<HistoryDto>(await t.request("/ratings/history?days=7"));
     const strength = history.series.find((s) => s.nodeId === t.nodeId("Strength"))!;
     expect(strength.values.at(-1)).toBe(21);
     const ratings = await body<RatingsDto>(await t.request("/ratings"));
     expect(ratings.nodes.find((n) => n.name === "Strength")!.trend).toBe(1);
+    const rootId = ratings.nodes.find((n) => n.parentId === null)!.id;
+    const root = history.series.find((s) => s.nodeId === rootId)!;
+    expect(root.values.at(-1)).toBe(28); // the Soul Level, charted
 
     const board = await body<LeaderboardDto>(
       await t.request("/leaderboards?scope=friends&board=overall"),
@@ -146,7 +164,8 @@ describe("souls mode", () => {
       ...json({ journal: "Big day." }),
     });
     await t.request(`/days/${t.today}/recap`, { method: "POST" });
-    await t.levelUp(t.nodeId("Strength")); // 900 - 660 = 240 left
+    await t.db.update(ratingEvents).set({ delta: 4 }).where(eq(ratingEvents.source, "daily_recap"));
+    await t.levelUp(t.nodeId("Strength")); // 1,200 - 1,010 = 190 left, SL 28
 
     // Move the whole run to the last day of last quarter, so the next request rolls over.
     const prev = seasonForDate(addDays(seasonForDate(t.today).startsOn, -1));
@@ -160,12 +179,12 @@ describe("souls mode", () => {
       .set({ createdAt: new Date(`${addDays(prev.endsOn, -1)}T12:00:00Z`) });
 
     const ngp = await t.souls();
-    expect(ngp).toMatchObject({ carried: 240, held: 240, cycle: 1 });
+    expect(ngp).toMatchObject({ carried: 190, held: 190, cycle: 1, soulLevel: 28 });
     expect(ngp.season.label).not.toBe(prev.label);
     expect(ngp.stats.find((s) => s.name === "Strength")).toMatchObject({ level: 21, gained: 0 });
     const [card] = await body<SeasonCardDto[]>(await t.request("/seasons"));
     expect(card).toMatchObject({ mode: "souls", label: prev.label });
-    expect(card!.level).toBeCloseTo(ngp.soulLevel!, 2);
+    expect(card!.level).toBe(28);
     expect(card!.nodes.find((n) => n.name === "Strength")!.level).toBe(21);
   });
 });

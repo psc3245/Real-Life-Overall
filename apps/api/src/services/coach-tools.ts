@@ -13,6 +13,7 @@ import {
   isValidDate,
   isAvoid,
   describeHabitGoal,
+  formatHabitEntry,
   formatTimeOfDay,
   isEntryDone,
   MAX_COACH_ACTIONS,
@@ -42,6 +43,7 @@ import { tool, type ToolSet } from "ai";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Database } from "../db/client";
+import * as workoutRepo from "../repos/workout-repo";
 import { getDay, saveEntry, saveObjective } from "./day-service";
 import { createExercise, loadLookup, type Lookup } from "./workout-service";
 
@@ -102,13 +104,32 @@ function entryHint(h: HabitDto) {
   }
 }
 
+// Read as the player would ("6:25 AM", "6/8 glasses"), so the coach knows the answer and never
+// asks for it (DESIGN.md §5.9).
 const entryText = (h: DayHabitDto) => {
   if (!h.entry) return "not logged";
-  if (h.entry.text?.trim()) return `"${h.entry.text.trim().slice(0, 60)}"`;
-  return isEntryDone(h.habit.type, h.habit.config, h.entry)
-    ? `done (${h.entry.num})`
-    : `logged ${h.entry.num}`;
+  if (h.entry.text?.trim() && h.habit.type !== "checknote") {
+    return `"${h.entry.text.trim().slice(0, 60)}"`;
+  }
+  const shown = formatHabitEntry(h.habit.type, h.habit.config, h.entry);
+  return isEntryDone(h.habit.type, h.habit.config, h.entry) ? `done: ${shown}` : `logged: ${shown}`;
 };
+
+/** The same entry again: logging it would change nothing. */
+const sameEntry = (
+  a: { num: number | null; text: string | null } | null,
+  b: { num: number | null; text: string | null },
+) =>
+  a !== null &&
+  (a.num ?? null) === (b.num ?? null) &&
+  (a.text?.trim() || null) === (b.text?.trim() || null);
+
+/** A tool result for a log or draft that matches what's already there: no receipt, no card. */
+const unchanged = (what: string) => ({
+  ok: true,
+  unchanged: `${what}; nothing changed`,
+  note: "It was already there, so there's no receipt or card. Don't say you logged or drafted it.",
+});
 
 /** The day in focus as the coach sees it: what's logged and what can still be logged. */
 export function renderDayLog(day: DayDto, refs: CoachRefs, features: Record<string, boolean>) {
@@ -380,6 +401,16 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
             if ("error" in built) return built;
             const exercises = built.exercises.filter((e) => e.sets.length > 0);
             if (!exercises.length) return { error: "A workout needs at least one set" };
+            // Already logged that day with the same exercises and sets: no card (§5.9).
+            const shape = (list: { exerciseId: string; sets: unknown[] }[]) =>
+              list.map((e) => `${e.exerciseId}:${e.sets.length}`).join(",");
+            const logged = await workoutRepo.findCompletedOn(c.db, c.userId, date);
+            const twin = logged.find(
+              (w) =>
+                shape(w.exercises as { exerciseId: string; sets: unknown[] }[]) ===
+                shape(exercises),
+            );
+            if (twin) return unchanged(`${twin.name} on ${date} is already logged with these sets`);
             const sets = exercises.reduce((n, x) => n + x.sets.length, 0);
             const name = input.name.trim().slice(0, 80) || "Workout";
             c.drafts.push({
@@ -469,6 +500,10 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
               before.habits
                 .flatMap((h) => [h, ...(h.children ?? [])])
                 .find((h) => h.habit.id === habit.id)?.entry ?? null;
+            if (sameEntry(previous, { num: input.num, text: input.text })) {
+              const shown = formatHabitEntry(habit.type, habit.config as HabitConfig, previous);
+              return unchanged(`${habit.name} on ${date} is already logged as ${shown}`);
+            }
             await saveEntry(c.db, c.userId, date, habit.id, {
               num: input.num,
               text: input.text,
@@ -527,6 +562,11 @@ export function coachTools(c: CoachToolContext, focusDate: string): ToolSet {
             const before = await getDay(c.db, c.userId, date);
             const previous =
               before.objectives.find((o) => o.objective.id === goal.id)?.logged ?? null;
+            if (goal.kind === "reach" ? previous === input.amount : input.amount === 0) {
+              return unchanged(
+                `${goal.name} on ${date} already has ${previous ?? 0} ${goal.unit} logged`,
+              );
+            }
             const value = goal.kind === "reach" ? input.amount : (previous ?? 0) + input.amount;
             await saveObjective(c.db, c.userId, date, goal.id, value);
             const detail =

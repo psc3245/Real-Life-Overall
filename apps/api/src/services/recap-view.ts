@@ -6,6 +6,7 @@ import {
   type RatingNodeDto,
   type RecapDto,
   type SeasonMode,
+  type SoulDayDto,
 } from "@rlo/shared";
 import type { RatingEventRow } from "../repos/rating-event-repo";
 import type { RecapRow } from "../repos/recap-repo";
@@ -17,6 +18,7 @@ export function toRecapDto(
   seasonEvents: RatingEventRow[],
   mode: SeasonMode,
   badges: EarnedBadgeDto[] = [],
+  souls?: SoulDayDto | null,
 ): RecapDto {
   const own = seasonEvents.filter((e) => e.recapId === recap.id);
   const upTo = seasonEvents.filter((e) => e.createdAt <= recap.createdAt);
@@ -51,6 +53,7 @@ export function toRecapDto(
     overallBefore: overall(before),
     overallAfter: overall(after),
     badges,
+    ...(souls !== undefined && { souls }),
     createdAt: recap.createdAt.toISOString(),
   };
 }

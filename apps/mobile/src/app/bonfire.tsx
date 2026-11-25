@@ -67,10 +67,11 @@ export default function BonfireScreen() {
         onRefresh={() => souls.refetch()}
       >
         <Card style={styles.head}>
-          {data.soulLevel !== null && <OvrBadge value={data.soulLevel} size={64} mode="souls" />}
+          <OvrBadge value={data.soulLevel} size={64} mode="souls" />
           <View style={{ flex: 1, alignItems: "flex-end", gap: space.xs }}>
             <Text style={styles.held}>{formatSouls(Math.max(0, data.held))}</Text>
             <Muted style={styles.caps}>{talk.souls.souls} held</Muted>
+            <NextLevel data={data} />
             {data.carried > 0 && (
               <Muted style={{ fontSize: 12 }}>
                 {formatSouls(data.carried)} carried from last season
@@ -139,11 +140,30 @@ function Stats({ data }: { data: SoulsDto }) {
   );
 }
 
+/** One price for the next level, whichever stat it goes to: it rises with the Soul Level. */
+function NextLevel({ data }: { data: SoulsDto }) {
+  const talk = useTalk();
+  const capped = [...SOFT_CAPS].reverse().find((c) => data.soulLevel >= c.level);
+  const short = data.nextCost - Math.max(0, data.held);
+  return (
+    <>
+      <Muted style={{ fontSize: 13 }}>
+        Next level {formatSouls(data.nextCost)} {talk.souls.souls}
+        {short > 0 ? ` · need ${formatSouls(short)} more` : ""}
+      </Muted>
+      {capped && (
+        <Muted style={{ fontSize: 12 }}>
+          Past the {talk.souls.level} {capped.level} soft cap
+        </Muted>
+      )}
+    </>
+  );
+}
+
 function StatRow({ stat, held }: { stat: SoulStatDto; held: number }) {
   const talk = useTalk();
   const levelUp = useLevelUp();
   if (stat.level === null) return null;
-  const capped = [...SOFT_CAPS].reverse().find((c) => stat.level! >= c.level);
   const affordable = stat.cost !== null && stat.cost <= held;
   return (
     <View style={{ gap: space.sm }}>
@@ -151,12 +171,10 @@ function StatRow({ stat, held }: { stat: SoulStatDto; held: number }) {
       <View style={styles.statFoot}>
         <Muted style={{ flex: 1, fontSize: 12 }}>
           {stat.gained > 0 ? `+${stat.gained} this season · ` : ""}
-          {stat.cost === null
-            ? `Maxed at ${STAT_LEVEL_MAX}`
-            : `Next ${formatSouls(stat.cost)} ${talk.souls.souls}`}
-          {capped ? ` · past the ${capped.level} soft cap` : ""}
+          {stat.cost === null ? `Maxed at ${STAT_LEVEL_MAX}` : ""}
         </Muted>
-        {affordable ? (
+        {/* Not affordable: the head says what's missing, once for every stat. */}
+        {affordable && (
           <View style={{ minWidth: 120 }}>
             <Button
               title={talk.souls.levelUp}
@@ -164,13 +182,6 @@ function StatRow({ stat, held }: { stat: SoulStatDto; held: number }) {
               onPress={() => levelUp.mutate({ nodeId: stat.id })}
             />
           </View>
-        ) : (
-          stat.cost !== null && (
-            // A disabled button reads as tappable here, so say what's missing instead.
-            <Muted style={{ fontSize: 12 }}>
-              Need {formatSouls(stat.cost - Math.max(0, held))} more
-            </Muted>
-          )
         )}
       </View>
       <ErrorNote error={levelUp.error} />
@@ -250,9 +261,10 @@ function Rules() {
         {BOSS_SOULS_BASE} for every goal you beat. Weekly reviews can add or take back {s}.
       </Muted>
       <Muted>
-        Spend {s} to raise any attribute one level, up to {STAT_LEVEL_MAX}. Each level costs more
-        than the last, and more again past levels {SOFT_CAPS.map((c) => c.level).join(" and ")}.
-        Levels never fade.
+        Spend {s} to raise any attribute one level, up to {STAT_LEVEL_MAX}. Every level you buy
+        raises your {talk.souls.level} by one, and the price depends only on your {talk.souls.level}
+        , not the attribute: each level costs more than the last, and more again past{" "}
+        {talk.souls.level} {SOFT_CAPS.map((c) => c.level).join(" and ")}. Levels never fade.
       </Muted>
       <Muted>
         A day with nothing logged, a slip on an avoid habit, or a setback day drops your unspent {s}{" "}

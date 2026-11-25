@@ -10,6 +10,7 @@ import {
   COACH_THREAD_LIST,
   computeNodeValues,
   dayOfWeek,
+  formatHabitEntry,
   HABIT_TYPE_LABELS,
   isHabitDone,
   leafGrowthFromEvents,
@@ -179,7 +180,13 @@ export function claimsWork(reply: string) {
  */
 const mentionsDraft = (reply: string) => /\b(?:card|draft)s?\b/i.test(reply);
 
-/** Habits with how often they were done over the last two weeks. */
+/** Days of logged entries the coach sees for every habit, not just the day in focus. */
+const RECENT_ENTRY_DAYS = 7;
+
+/**
+ * Habits with how often they were done over the last two weeks, and what was logged in the last
+ * week ("11-24 6:25 AM"), so the coach never asks what it can already see (DESIGN.md §5.9).
+ */
 async function renderHabits(db: Database, userId: string, today: string, ctx: LeafContext | null) {
   const habits = (await habitRepo.findAllByUser(db, userId)).filter(
     (h) => !h.archivedAt && h.type !== "group",
@@ -213,9 +220,21 @@ async function renderHabits(db: Database, userId: string, today: string, ctx: Le
         .filter(Boolean);
       const schedule =
         h.days.length === 7 ? "daily" : h.days.map((d) => WEEKDAY_SHORT[d]).join("/");
+      const recentFrom = addDays(today, 1 - RECENT_ENTRY_DAYS);
+      const recent = entries
+        .filter((e) => e.habitId === h.id && e.localDate >= recentFrom)
+        .sort((a, b) => b.localDate.localeCompare(a.localDate))
+        .map((e) => {
+          const shown = formatHabitEntry(h.type, h.config as HabitConfig, {
+            num: e.valueNum,
+            text: e.valueText,
+          });
+          return `${e.localDate} ${shown.slice(0, 60)}`;
+        });
       return (
         `- ${h.name} (${HABIT_TYPE_LABELS[h.type].toLowerCase()}, ${schedule}): ` +
         `done ${done} of ${scheduled} scheduled days in the last 2 weeks` +
+        `. Logged in the last ${RECENT_ENTRY_DAYS} days: ${recent.join("; ") || "nothing"}` +
         (builds.length ? `. Builds: ${builds.join(", ")}` : "")
       );
     })

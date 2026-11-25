@@ -22,6 +22,7 @@ import { MetricPicker } from "@/components/MetricPicker";
 import { ReportOptionsRows } from "@/components/ReportOptions";
 import { SettingsGroup } from "@/components/settings";
 import { Button, Card, ErrorNote, Field, Label, Loading, Muted, Screen } from "@/components/ui";
+import { haptics } from "@/lib/haptics";
 import { colors, space } from "@/lib/theme";
 import { FeatureGate } from "@/components/FeatureGate";
 
@@ -170,7 +171,10 @@ function ReportForm({ report }: { report?: ReportDto }) {
           first={i === 0}
           last={i === charts.length - 1}
           onChange={(changes) => setChart(i, changes)}
-          onRemove={() => setCharts((cs) => cs.filter((_, j) => j !== i))}
+          onRemove={() => {
+            haptics.remove();
+            setCharts((cs) => cs.filter((_, j) => j !== i));
+          }}
           onMove={(d) => move(i, d)}
           onEditMetrics={() => openPicker(i)}
         />

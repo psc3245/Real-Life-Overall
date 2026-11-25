@@ -77,6 +77,10 @@ export function useActivity(days = 119) {
 export function useSetGoal() {
   const queryClient = useQueryClient();
   return useMutation({
+    // Clearing a goal is felt as a removal; setting one is a routine save.
+    meta: {
+      haptic: ({ target }: { target: number | null }) => (target === null ? "remove" : undefined),
+    },
     mutationFn: ({ nodeId, target }: { nodeId: string; target: number | null }) =>
       target === null
         ? api<null>(`/goals/${nodeId}`, { method: "DELETE" })

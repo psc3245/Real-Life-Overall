@@ -5,6 +5,8 @@ import {
   foldSouls,
   leafLevelsAsOf,
   levelCost,
+  soulLevelAsOf,
+  startingSoulLevel,
   levelFromRating,
   type DeathCause,
   type SoulDayInput,
@@ -37,8 +39,22 @@ describe("levels", () => {
     const after = levelCost(40)!;
     expect(after / before).toBeGreaterThan(1.4);
     expect(levelCost(60)! / levelCost(59)!).toBeGreaterThan(1.9);
-    for (let l = 1; l < 98; l++) expect(levelCost(l + 1)!).toBeGreaterThanOrEqual(levelCost(l)!);
-    expect(levelCost(99)).toBeNull();
+    for (let l = 1; l < 150; l++) expect(levelCost(l + 1)).toBeGreaterThanOrEqual(levelCost(l));
+  });
+
+  it("starts the Soul Level at the first day's stats, or New Game+'s carried level", () => {
+    const start = (nodeId: string, levels: number, afterDate = "2026-12-01") =>
+      ({ nodeId, kind: "start", levels, afterDate }) as const;
+    const up = (afterDate: string) =>
+      ({ nodeId: "a", kind: "level_up", levels: 1, afterDate }) as const;
+    const rows = [start("a", 32), start("b", 28), start("c", 20), start("d", 90, "2026-12-05")];
+    // A stat added later doesn't move the start.
+    expect(startingSoulLevel(rows)).toBe(27);
+    expect(startingSoulLevel(rows, 41.6)).toBe(42);
+    expect(startingSoulLevel([])).toBe(1);
+    const bought = [...rows, up("2026-12-02"), up("2026-12-03")];
+    expect(soulLevelAsOf(27, bought, "2026-12-02")).toBe(28);
+    expect(soulLevelAsOf(27, bought, "2026-12-31")).toBe(29);
   });
 
   it("pays bosses by the length of the fight, capped", () => {
