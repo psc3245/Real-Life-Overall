@@ -309,6 +309,13 @@
       "when": 1795626052351,
       "tag": "0043_monthly_seasons",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795635138368,
+      "tag": "0044_game_plans",
+      "breakpoints": true
     }
   ]
 }

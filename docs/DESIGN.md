@@ -92,6 +92,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | **Daily recap** | An LLM pass over one day log that produces deltas, reasons and a short narrative. |
 | **Weekly review** | An LLM pass over the week that produces a narrative, corrective deltas, decay-rule revisions, focus goals, habit proposals and a potential projection. |
 | **Decay rule** | An LLM-authored, code-executed rule for how a leaf drops when neglected. |
+| **Game Plan** | An emphasis for a stretch of time with no numbers (§7.16). Not a goal: nothing is scored. |
 | **Season** | A calendar month (a quarter before 2026-12). It sets the structure lock, the recalibration point and the archive boundary. |
 | **Ratings Update** | The league calibration applied at season rollover: a `ratings_update` event per leaf, with a reason (§4.8). |
 | **Elite Club** | Players with a verified rating of 90+ in an attribute (§4.8). |
@@ -503,6 +504,13 @@ A spotlight tour of the main features, shown once. (A walkthrough is the practic
 - Made, renamed, reordered and deleted on Manage habits; a habit's bucket is picked in its editor. Manage, the day log, Today's habits card and the stats glance list habits by bucket in the player's order, with unfiled ones last under "Other". There are no headings until a bucket exists.
 - **Off-schedule habits stay out of the way:** the day log shows scheduled habits plus any already logged as a bonus; the rest sit behind a collapsed "Show N not scheduled today" toggle (still loggable as bonus days). Today's card already showed only those.
 
+### 7.16 Game Plans (added 2026-11-25)
+A **Game Plan** is an emphasis for a stretch of time with no numbers: "Build strength this winter", "Get my sleep back on track". (A team's game plan is what it leans into for a game, not a score to hit.) Talk words: Focus at none, Game Plan at normal and extra, Path in a Souls season. Called `game_plans` in code, since `objectives` already means goals.
+- **Fields:** name, an optional note (what it looks like in practice, up to 500 characters), a start (default today) and an inclusive end (up to a year), and up to 5 linked attributes, stored as node lineages (`node_lineage_ids`) so they survive seasons; any node can be linked, though the pickers offer leaves. Status is computed: upcoming, active or ended. Up to 5 running or upcoming at once (`MAX_GAME_PLANS`). Deleting archives.
+- **Nothing is scored.** They're context: the coach (with goals on), daily recaps and weekly reviews see the ones running that day under one heading (`GAME_PLANS_HEADING`) that tells the model there's nothing to score but to notice work that fits and point advice at them.
+- **Screens:** a Game Plan section at the top of Goals on web and iOS (running and upcoming, then ended behind a toggle), with an editor (end presets: end of month, end of season, 6 weeks, 3 months). It sits under the goals feature switch.
+- **Not yet:** the coach can't draft one.
+
 ## 8. Architecture
 
 ### 8.1 Constraints
@@ -843,6 +851,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Box score after every workout: heart rate, calories and effort, training load, charts and settings, on web and iOS (§7.5)
 - [ ] Box score from Apple Health; extra stats (incline, level) on the cardio form
 - [ ] iOS: customizable tab bar
+- [x] Game Plans: an emphasis for a stretch of time with no numbers, read by the coach, recaps and weekly reviews, on web and iOS (§7.16)
 - [x] Monthly seasons until launch: calendar-month seasons from 2026-12-01 (2026-Q4 ends Nov 30), a 5-day season setup (§7.1)
 
 ---

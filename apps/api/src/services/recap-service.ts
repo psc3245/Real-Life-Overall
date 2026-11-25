@@ -37,6 +37,7 @@ import { ensureCurrentSeason } from "./season-service";
 import { applyDecay, invalidateDecay } from "./decay-service";
 import { renderMemories, searchMemories } from "./memory-service";
 import { currentFocus } from "./weekly-service";
+import { GAME_PLANS_HEADING, gamePlansOn, renderGamePlans } from "./game-plan-service";
 import * as userRepo from "../repos/user-repo";
 import { loadLeafContext } from "./habit-service";
 import { normalizePrompts, normalizeRecapChanges } from "./recap-changes";
@@ -241,9 +242,10 @@ export async function runDailyRecap(
   const { refById, idByRef } = refsFor(ctx.nodes);
   const recent = await recapRepo.findRecentDaily(db, userId, addDays(day, -7), day);
   // Long-term memory: the profile, older days sharing words with this one, the week's focus.
-  const [profile, focus, memories] = await Promise.all([
+  const [profile, focus, plans, memories] = await Promise.all([
     userRepo.findProfileSummary(db, userId),
     currentFocus(db, userId),
+    gamePlansOn(db, userId, day),
     searchMemories(
       db,
       userId,
@@ -267,9 +269,12 @@ export async function runDailyRecap(
       "Current ratings (Overall is the implicit root):",
       renderTree(toPromptNodes(ctx.nodes, refById, values), true),
       `This week's focus goals:\n${focus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
+      plans.length > 0 && `${GAME_PLANS_HEADING}:\n${renderGamePlans(plans)}`,
       renderDay(view, refById, recent),
       `Related older days:\n${renderMemories(memories) || "(none)"}`,
-    ].join("\n\n"),
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
     promptVersion: dailyRecapPrompt.version,
   });
   const changes = normalizeRecapChanges(output.changes, idByRef, ctx.leaves);

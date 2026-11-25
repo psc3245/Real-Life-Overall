@@ -9,6 +9,7 @@ import { Button } from "../../components/Button";
 import { NodeChip } from "../../components/NodeChip";
 import { shortDate } from "../../lib/format";
 import { ErrorNote } from "../onboarding/ErrorNote";
+import { GamePlans } from "./GamePlans";
 import { ObjectiveEditor } from "./ObjectiveEditor";
 import {
   ObjectiveAmount,
@@ -86,6 +87,8 @@ export function GoalsPage() {
           + New goal
         </Button>
       </header>
+
+      <GamePlans nodes={nodes} today={today} seasonEndsOn={ratings.data?.season.endsOn} />
 
       {editing === "new" && editor()}
 
