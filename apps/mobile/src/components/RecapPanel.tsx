@@ -1,11 +1,21 @@
-import { MAX_RECAPS_PER_DAY, type DayDto, type RecapDto } from "@rlo/shared";
+import {
+  changeSouls,
+  DEATH_CAUSE_LABELS,
+  earningParts,
+  formatSouls,
+  MAX_RECAPS_PER_DAY,
+  totalEarned,
+  type DayDto,
+  type RecapDto,
+  type SoulDayDto,
+} from "@rlo/shared";
 import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useAccount } from "@/api/account";
 import { useEndDay } from "@/api/days";
 import { usePreferences } from "@/api/preferences";
-import { colors, fonts, space, tierColor } from "@/lib/theme";
+import { colors, fonts, space, tierColor, tierKeyColor } from "@/lib/theme";
 import { EarnedBadges } from "./badges";
 import { useTalk } from "@/lib/talk";
 import { ChangeDelta, Delta } from "./Delta";
@@ -98,14 +108,17 @@ export function RecapPanel({ day }: { day: DayDto }) {
 /** A day's recap: narrative, badges, every rating change and the scout's notes. */
 export function RecapCard({ recap }: { recap: RecapDto }) {
   const { overallBefore: before, overallAfter: after } = recap;
+  // Souls seasons show what the day earned, never the rating underneath (DESIGN.md §4.7).
+  const souls = recap.mode === "souls";
   return (
     <ScoreProvider mode={recap.mode} values={[]}>
       <Card style={styles.recap}>
         <View style={styles.head}>
           <Text style={styles.title}>Day recap</Text>
-          {before !== null && after !== null && (
-            <OverallMove mode={recap.mode} before={before} after={after} />
-          )}
+          {souls
+            ? recap.souls && <SoulsDay day={recap.souls} />
+            : before !== null &&
+              after !== null && <OverallMove mode={recap.mode} before={before} after={after} />}
         </View>
         <Body>{recap.narrative}</Body>
         <EarnedBadges badges={recap.badges} />
@@ -113,7 +126,19 @@ export function RecapCard({ recap }: { recap: RecapDto }) {
           <View>
             {recap.changes.map((c) => (
               <View key={c.nodeId} style={styles.change}>
-                <ChangeDelta delta={c.delta} growth={c.growth} style={styles.changeDelta} />
+                {souls ? (
+                  <Text
+                    style={[
+                      styles.changeDelta,
+                      styles.changeSouls,
+                      changeSouls(c.delta) === 0 && { color: colors.court500 },
+                    ]}
+                  >
+                    {changeSouls(c.delta) > 0 ? `+${formatSouls(changeSouls(c.delta))}` : "±0"}
+                  </Text>
+                ) : (
+                  <ChangeDelta delta={c.delta} growth={c.growth} style={styles.changeDelta} />
+                )}
                 <View style={{ flex: 1 }}>
                   <Text>
                     <Link
@@ -122,10 +147,12 @@ export function RecapCard({ recap }: { recap: RecapDto }) {
                     >
                       {c.nodeName}
                     </Link>
-                    <Text style={styles.changeAfter}>
-                      {" "}
-                      → {formatScore(recap.mode, c.valueAfter)}
-                    </Text>
+                    {!souls && (
+                      <Text style={styles.changeAfter}>
+                        {" "}
+                        → {formatScore(recap.mode, c.valueAfter)}
+                      </Text>
+                    )}
                   </Text>
                   <Muted>{c.reason}</Muted>
                 </View>
@@ -145,6 +172,42 @@ export function RecapCard({ recap }: { recap: RecapDto }) {
         )}
       </Card>
     </ScoreProvider>
+  );
+}
+
+/**
+ * A Souls day on its recap (DESIGN.md §4.7): the souls it earned by source, in place of the
+ * overall move (the rating), and whether the day died.
+ */
+function SoulsDay({ day }: { day: SoulDayDto }) {
+  const talk = useTalk();
+  const earned = totalEarned(day.earned);
+  const parts = earningParts(day.earned, talk.souls.boss);
+  return (
+    <View style={{ gap: 2 }}>
+      <Text style={styles.ovr}>
+        <Text style={{ color: earned > 0 ? colors.neon : colors.court500 }}>
+          {earned > 0 ? "+" : ""}
+          {formatSouls(earned)}
+        </Text>{" "}
+        {talk.souls.souls}
+      </Text>
+      {parts.length > 1 && (
+        <Muted>
+          {parts.map(([k, n]) => `${n > 0 ? "+" : ""}${formatSouls(n)} ${k}`).join(" · ")}
+        </Muted>
+      )}
+      {day.deaths.length > 0 && (
+        <Text style={{ color: colors.flare }}>
+          {talk.souls.died}: {day.deaths.map((c) => DEATH_CAUSE_LABELS[c]).join(", ")}
+        </Text>
+      )}
+      {day.recovered > 0 && (
+        <Text style={{ color: tierKeyColor("green") }}>
+          Picked up {formatSouls(day.recovered)} {talk.souls.souls}
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -183,6 +246,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.court800,
   },
   changeDelta: { width: 52, fontSize: 18 },
+  changeSouls: { width: 64, color: colors.neon, fontFamily: fonts.display },
   changeName: { color: colors.court100, fontSize: 16, fontWeight: "600" },
   changeAfter: { color: colors.court500, fontSize: 14 },
   flags: {

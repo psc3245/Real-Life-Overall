@@ -1,4 +1,10 @@
-import { MAX_RECAPS_PER_DAY, type DayDto, type RecapDto } from "@rlo/shared";
+import {
+  changeSouls,
+  formatSouls,
+  MAX_RECAPS_PER_DAY,
+  type DayDto,
+  type RecapDto,
+} from "@rlo/shared";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useAccount } from "../../api/account";
@@ -14,6 +20,7 @@ import { useDebug } from "../../components/debug/debugMode";
 import { ErrorNote } from "../onboarding/ErrorNote";
 import { useTalk } from "../../lib/talk";
 import { PostgameModal } from "../coach/PostgameModal";
+import { SoulsDay } from "../souls/SoulsDay";
 
 const WORKING = ["Reading your day…", "Weighing the evidence…", "Updating your ratings…"];
 
@@ -141,31 +148,50 @@ function RecapDebug({ recapId }: { recapId: string }) {
 }
 
 export function RecapCard({ recap }: { recap: RecapDto }) {
+  const talk = useTalk();
   const { overallBefore: before, overallAfter: after } = recap;
+  // Souls seasons show what the day earned, never the rating underneath (DESIGN.md §4.7).
+  const souls = recap.mode === "souls";
   return (
     <ScoreProvider mode={recap.mode} values={[]}>
       <article className="space-y-4 rounded-xl border border-neon/40 bg-court-900 p-5">
         <header className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="font-display text-xl uppercase tracking-wider text-neon">Day recap</h2>
-          {before !== null && after !== null && (
-            <OverallMove mode={recap.mode} before={before} after={after} />
-          )}
+          {souls
+            ? recap.souls && <SoulsDay day={recap.souls} />
+            : before !== null &&
+              after !== null && <OverallMove mode={recap.mode} before={before} after={after} />}
         </header>
         <p className="text-court-100">{recap.narrative}</p>
         <EarnedBadges badges={recap.badges} />
         {recap.changes.length > 0 ? (
           <ul className="divide-y divide-court-800">
             {recap.changes.map((c) => (
-              <li key={c.nodeId} className="grid grid-cols-[4rem_1fr] gap-3 py-2.5">
-                <ChangeDelta delta={c.delta} growth={c.growth} className="text-lg" />
+              <li
+                key={c.nodeId}
+                className={`grid ${souls ? "grid-cols-[4.5rem_1fr]" : "grid-cols-[4rem_1fr]"} gap-3 py-2.5`}
+              >
+                {souls ? (
+                  <span
+                    className={`font-display text-lg tabular-nums ${changeSouls(c.delta) > 0 ? "text-neon" : "text-court-500"}`}
+                    title={`${talk.souls.souls} earned`}
+                  >
+                    {changeSouls(c.delta) > 0 ? `+${formatSouls(changeSouls(c.delta))}` : "±0"}
+                  </span>
+                ) : (
+                  <ChangeDelta delta={c.delta} growth={c.growth} className="text-lg" />
+                )}
                 <div className="min-w-0">
                   <p className="font-medium">
                     <Link to={`/ratings/node/${c.nodeId}`} className="hover:text-neon">
                       {c.nodeName}
-                    </Link>{" "}
-                    <span className="text-sm text-court-500 tabular-nums">
-                      → {formatScore(recap.mode, c.valueAfter)}
-                    </span>
+                    </Link>
+                    {!souls && (
+                      <span className="text-sm text-court-500 tabular-nums">
+                        {" "}
+                        → {formatScore(recap.mode, c.valueAfter)}
+                      </span>
+                    )}
                   </p>
                   <p className="text-sm text-court-300">{c.reason}</p>
                 </div>

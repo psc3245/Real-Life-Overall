@@ -60,6 +60,9 @@ describe("souls mode", () => {
     const earned = await t.souls();
     expect(earned.held).toBe(925); // 9 points × 100 + one habit
     expect(earned.days[0]!.earned).toMatchObject({ recap: 900, habits: 25 });
+    // The day's recap shows what it earned, not the rating move.
+    const recapped = (await body<DayDto>(await t.request(`/days/${t.today}`))).recap!;
+    expect(recapped.souls).toMatchObject({ earned: { recap: 900, habits: 25 }, deaths: [] });
 
     expect((await t.levelUp(t.nodeId("Strength"), 2)).status).toBe(409);
     expect((await t.levelUp(t.nodeId("Fitness"))).status).toBe(400);

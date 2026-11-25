@@ -69,6 +69,7 @@ export function useCreateAccount() {
 export function useDeleteAccount() {
   const onSuccess = useInvalidateAccounts();
   return useMutation({
+    meta: { haptic: "remove" },
     mutationFn: ({ id, confirm }: { id: string; confirm: string }) =>
       api<null>(`/admin/users/${id}`, { method: "DELETE", body: JSON.stringify({ confirm }) }),
     onSuccess,
