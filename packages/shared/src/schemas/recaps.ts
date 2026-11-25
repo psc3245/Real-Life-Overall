@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { SeasonMode } from "../rating/growth";
 import type { EarnedBadgeDto } from "./badges";
+import type { SoulDayDto } from "./souls";
 import { ALL_DAYS, daysSchema } from "./habits";
 
 /** Largest move one attribute can make in one daily recap (DESIGN.md §5.6). */
@@ -52,6 +53,11 @@ export interface RecapDto {
   overallAfter: number | null;
   /** Badges this recap earned. */
   badges: EarnedBadgeDto[];
+  /**
+   * Souls seasons: the day in the run (what it earned by source, a death, a bloodstain picked
+   * up), shown in place of the overall move, which is the rating (DESIGN.md §4.7).
+   */
+  souls?: SoulDayDto | null;
   createdAt: string;
 }
 

@@ -297,7 +297,11 @@ export function useBody() {
 export function useSaveBody() {
   const queryClient = useQueryClient();
   return useMutation({
-    meta: { haptic: "success" },
+    // Clearing a day's readings (every value sent is null) is a delete.
+    meta: {
+      haptic: ({ date: _, ...values }: { date: string } & Record<string, unknown>) =>
+        Object.values(values).every((v) => v === null) ? "remove" : "success",
+    },
     mutationFn: ({
       date,
       ...values

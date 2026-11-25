@@ -78,6 +78,21 @@ export const emptyEarnings = (): SoulEarnings => ({
 export const totalEarned = (e: SoulEarnings) =>
   e.recap + e.weekly + e.habits + e.workouts + e.bosses;
 
+/** A day's earnings by source, for display ("+300 recap · +75 habits"); zero sources left out. */
+export function earningParts(e: SoulEarnings, bossWord: string): [string, number][] {
+  const parts: [string, number][] = [
+    ["recap", e.recap],
+    ["weekly review", e.weekly],
+    ["habits", e.habits],
+    ["workouts", e.workouts],
+    [bossWord.toLowerCase(), e.bosses],
+  ];
+  return parts.filter(([, n]) => n !== 0);
+}
+
+/** What one daily-recap change pays out: gains at SOULS_PER_POINT, setbacks nothing. */
+export const changeSouls = (delta: number) => Math.round(Math.max(0, delta) * SOULS_PER_POINT);
+
 /** One day of the run, as the fold sees it. */
 export interface SoulDayInput {
   date: string;

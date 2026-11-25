@@ -1,6 +1,7 @@
 import {
   BOSS_SOULS_BASE,
   DEATH_CAUSE_LABELS,
+  earningParts,
   formatSouls,
   SOFT_CAPS,
   SOULS_PER_HABIT,
@@ -201,13 +202,7 @@ function RunLog({ days }: { days: SoulDayDto[] }) {
       </h2>
       <ol className="divide-y divide-court-800 rounded-xl border border-court-700 bg-court-900/70">
         {shown.map((d) => {
-          const parts = [
-            ["recap", d.earned.recap],
-            ["weekly review", d.earned.weekly],
-            ["habits", d.earned.habits],
-            ["workouts", d.earned.workouts],
-            [talk.souls.boss.toLowerCase(), d.earned.bosses],
-          ].filter(([, n]) => n !== 0) as [string, number][];
+          const parts = earningParts(d.earned, talk.souls.boss);
           const earned = parts.reduce((s, [, n]) => s + n, 0);
           return (
             <li key={d.date} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">

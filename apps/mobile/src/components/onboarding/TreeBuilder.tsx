@@ -20,6 +20,7 @@ import {
   usedTemplateKeys,
   type Draft,
 } from "@/lib/draft";
+import { haptics } from "@/lib/haptics";
 import { colors, fonts, space } from "@/lib/theme";
 import { Chip } from "../controls";
 import { Button, Card, ErrorNote, Label, Muted } from "../ui";
@@ -153,7 +154,10 @@ function NodeEditor({
           accessibilityRole="button"
           accessibilityLabel={`Remove ${node.name || level}`}
           hitSlop={8}
-          onPress={() => setDraft((d) => removeNode(d, node.key))}
+          onPress={() => {
+            haptics.remove();
+            setDraft((d) => removeNode(d, node.key));
+          }}
         >
           <SymbolView name="xmark.circle.fill" tintColor={colors.court500} size={22} />
         </Pressable>

@@ -35,6 +35,7 @@ import {
   Section,
 } from "@/components/ui";
 import { shortDate } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 import { cap, useTalk } from "@/lib/talk";
 import { colors, fonts, space } from "@/lib/theme";
 
@@ -219,7 +220,15 @@ function LinesField({
 
 function Remove({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={8}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => {
+        haptics.remove();
+        onPress();
+      }}
+      hitSlop={8}
+    >
       <Text style={{ color: colors.flare, fontSize: 18, paddingHorizontal: 4 }}>✕</Text>
     </Pressable>
   );
