@@ -53,7 +53,7 @@ export function HistoryPage() {
           {talk.nav.history}
         </h1>
         <p className="text-court-300">
-          Each calendar quarter is a season. Open one to see how it went.
+          Each calendar month is a season. Open one to see how it went.
         </p>
       </header>
       {rows.length === 0 && (

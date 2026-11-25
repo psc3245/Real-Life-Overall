@@ -24,11 +24,14 @@ export const haptics = {
 
 export type HapticKind = Exclude<keyof typeof haptics, "error">;
 
+/** A fixed feel, or one picked from the mutation's variables (adding vs removing). */
+type HapticMeta = HapticKind | ((variables: never) => HapticKind | undefined);
+
 declare module "@tanstack/react-query" {
   interface Register {
     mutationMeta: {
       /** Felt when the request lands; a failure is always felt as an error. */
-      haptic?: HapticKind;
+      haptic?: HapticMeta;
     };
   }
 }
@@ -37,18 +40,19 @@ declare module "@tanstack/react-query" {
 export const mutationHaptics = {
   onSuccess: (
     _data: unknown,
-    _vars: unknown,
+    vars: unknown,
     _ctx: unknown,
-    m: { meta?: { haptic?: HapticKind } },
+    m: { meta?: { haptic?: HapticMeta } },
   ) => {
-    const kind = m.meta?.haptic;
+    const meta = m.meta?.haptic;
+    const kind = typeof meta === "function" ? (meta as (v: unknown) => HapticKind)(vars) : meta;
     if (kind) haptics[kind]();
   },
   onError: (
     _error: unknown,
     _vars: unknown,
     _ctx: unknown,
-    m: { meta?: { haptic?: HapticKind } },
+    m: { meta?: { haptic?: HapticMeta } },
   ) => {
     if (m.meta?.haptic) haptics.error();
   },

@@ -26,6 +26,7 @@ import { scheduledPrompts } from "./custom-prompt-service";
 import { objectivesForDay, saveObjectiveEntry } from "./objective-service";
 import { workoutsForDay } from "./workout-service";
 import { toRecapDto } from "./recap-view";
+import { soulsDay } from "./souls-service";
 
 async function resolveDate(db: Database, userId: string, date: string | undefined) {
   const user = await userRepo.findById(db, userId);
@@ -69,6 +70,9 @@ export async function getDay(db: Database, userId: string, date?: string): Promi
           await eventRepo.findActiveBySeason(db, ctx.season.id),
           ctx.season.mode,
           (await badgesByRecap(db, [recap.id])).get(recap.id),
+          ctx.season.mode === "souls"
+            ? await soulsDay(db, userId, ctx.season, user.timezone, day)
+            : undefined,
         )
       : null;
   const entries = new Map(

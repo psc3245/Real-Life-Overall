@@ -115,6 +115,7 @@ export function useUndoCoachAction() {
 export function useClearCoach() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { haptic: "remove" },
     mutationFn: () => api<CoachStateDto>("/coach", { method: "DELETE" }),
     onSuccess: () => queryClient.removeQueries({ queryKey: coachKey }),
   });

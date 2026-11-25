@@ -111,6 +111,32 @@ describe("RecapPanel", () => {
     expect(screen.queryByRole("button", { name: "Update recap" })).not.toBeInTheDocument();
   });
 
+  it("shows souls earned in a Souls season, never the rating", () => {
+    const souls: RecapDto = {
+      ...recap,
+      mode: "souls",
+      souls: {
+        date: "2026-10-20",
+        earned: { recap: 60, weekly: 0, habits: 25, workouts: 100, bosses: 0 },
+        spent: 0,
+        recovered: 0,
+        dropped: 0,
+        lost: 0,
+        deaths: [],
+        held: 185,
+        paused: false,
+        open: true,
+      },
+    };
+    renderPanel(day({ journal: "Ran.", status: "recapped", recap: souls }));
+    expect(screen.getByText("+185")).toBeInTheDocument();
+    expect(screen.getByText("+60 recap · +25 habits · +100 workouts")).toBeInTheDocument();
+    expect(screen.getByText("+60")).toBeInTheDocument(); // Cardio's +0.6
+    expect(screen.getByText("±0")).toBeInTheDocument(); // a setback pays nothing
+    expect(screen.queryByText(/70\.6/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/70\.1/)).not.toBeInTheDocument();
+  });
+
   it("offers an update when the day changed after its recap", () => {
     renderPanel(day({ journal: "Ran. Also lifted.", status: "stale", recap }));
     expect(screen.getByRole("button", { name: "Update recap" })).toBeEnabled();

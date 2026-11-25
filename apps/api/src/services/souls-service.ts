@@ -26,6 +26,7 @@ import {
   type RatingNodeDto,
   type SeasonCardDto,
   type SeasonDto,
+  type SoulDayDto,
   type SoulDayInput,
   type SoulEarnings,
   type SoulsDto,
@@ -328,6 +329,32 @@ export async function finalSouls(
   };
 }
 
+/** Each day of a replayed run with its earnings by source, newest first. */
+function dayDtos(
+  state: ReturnType<typeof foldSouls>,
+  days: Awaited<ReturnType<typeof buildRun>>,
+): SoulDayDto[] {
+  const input = new Map(days.map((d) => [d.date, d]));
+  return state.days
+    .map((d) => {
+      const day = input.get(d.date)!;
+      return { ...d, earned: day.earned, paused: day.paused, open: day.open };
+    })
+    .reverse();
+}
+
+/** One day of the current Souls run, for the day's recap (null before the run started). */
+export async function soulsDay(
+  db: Database,
+  userId: string,
+  season: SeasonDto,
+  timezone: string,
+  date: string,
+): Promise<SoulDayDto | null> {
+  const { days, state } = await replaySeason(db, userId, season, timezone, localDateIn(timezone));
+  return dayDtos(state, days).find((d) => d.date === date) ?? null;
+}
+
 export async function getSouls(db: Database, userId: string): Promise<SoulsDto> {
   const { season, today, nodes, ratings, levels, days, state, carried, cycle } = await loadSouls(
     db,
@@ -338,6 +365,7 @@ export async function getSouls(db: Database, userId: string): Promise<SoulsDto> 
   const rolledRatings = computeNodeValues(nodes, ratings);
   const nextCost = levelCost(levels.soulLevel);
   const input = new Map(days.map((d) => [d.date, d]));
+  const root = nodes.find((n) => n.parentId === null);
   return {
     season,
     today,
@@ -366,12 +394,7 @@ export async function getSouls(db: Database, userId: string): Promise<SoulsDto> 
         rating: rolledRatings.get(n.id) ?? null,
       };
     }),
-    days: state.days
-      .map((d) => {
-        const day = input.get(d.date)!;
-        return { ...d, earned: day.earned, paused: day.paused, open: day.open };
-      })
-      .reverse(),
+    days: dayDtos(state, days),
   };
 }
 
