@@ -25,6 +25,7 @@ import {
   lastCompletedWeek,
   leafValuesFromEvents,
   levelCost,
+  STAT_LEVEL_MAX,
   levelFromRating,
   localDateIn,
   normalizeHabitConfig,
@@ -1163,6 +1164,8 @@ async function seedSoulLevels(
     }))
     .reverse();
   const bankFrom = addDays(run.today, -3);
+  // Every level costs by the Soul Level it's bought at (DESIGN.md §4.7).
+  let soulLevel = run.soulLevel;
   const spends: SoulSpend[] = [];
   const rows: (typeof soulLevels.$inferInsert)[] = [];
   for (let i = 0; i < days.length; i++) {
@@ -1175,9 +1178,10 @@ async function seedSoulLevels(
       const leaf = [...leaves].sort(
         (a, b) => level.get(a.name)! - a.weight / 2 - (level.get(b.name)! - b.weight / 2),
       )[0]!;
-      const cost = levelCost(level.get(leaf.name)!);
-      if (cost === null || cost > held) break;
+      const cost = levelCost(soulLevel);
+      if (level.get(leaf.name)! >= STAT_LEVEL_MAX || cost > held) break;
       held -= cost;
+      soulLevel++;
       level.set(leaf.name, level.get(leaf.name)! + 1);
       spends.push({ afterDate: day.date, cost });
       rows.push({
@@ -1195,7 +1199,7 @@ async function seedSoulLevels(
   if (rows.length) await db.insert(soulLevels).values(rows);
 
   const final = await getSouls(db, userId);
-  return `Soul Level ${final.soulLevel?.toFixed(1)}: ${rows.length} levels bought, ${formatSouls(final.earned)} souls earned, ${formatSouls(final.held)} held, ${final.deaths} deaths, ${formatSouls(final.lost)} lost${final.bloodstain ? `, ${formatSouls(final.bloodstain.amount)} in a bloodstain` : ""}`;
+  return `Soul Level ${final.soulLevel}: ${rows.length} levels bought, ${formatSouls(final.earned)} souls earned, ${formatSouls(final.held)} held, ${final.deaths} deaths, ${formatSouls(final.lost)} lost${final.bloodstain ? `, ${formatSouls(final.bloodstain.amount)} in a bloodstain` : ""}`;
 }
 
 /** Last quarter: same tree, starting a little lower, moved week by week to its final values. */

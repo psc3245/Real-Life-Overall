@@ -53,11 +53,9 @@ export function BonfirePage() {
     <ScoreProvider mode="souls" values={[]}>
       <div className="space-y-10 pt-4">
         <header className="flex flex-wrap items-center gap-6">
-          {data.soulLevel !== null && (
-            <div className="ember-flicker">
-              <OvrBadge value={data.soulLevel} mode="souls" />
-            </div>
-          )}
+          <div className="ember-flicker">
+            <OvrBadge value={data.soulLevel} mode="souls" />
+          </div>
           <div className="min-w-0 flex-1 space-y-1">
             <h1 className="font-display text-4xl font-bold uppercase">{talk.souls.bonfire}</h1>
             <p className="text-court-300">
@@ -82,6 +80,7 @@ export function BonfirePage() {
             <p className="text-xs uppercase tracking-[0.3em] text-court-300">
               {talk.souls.souls} held
             </p>
+            <NextLevel data={data} />
           </div>
         </header>
 
@@ -92,6 +91,25 @@ export function BonfirePage() {
         <DebugJson label="GET /souls" data={data} />
       </div>
     </ScoreProvider>
+  );
+}
+
+/** One price for the next level, whichever stat it goes to: it rises with the Soul Level. */
+function NextLevel({ data }: { data: SoulsDto }) {
+  const talk = useTalk();
+  const capped = [...SOFT_CAPS].reverse().find((c) => data.soulLevel >= c.level);
+  return (
+    <p className="mt-2 text-sm text-court-300">
+      Next level{" "}
+      <span className="tabular-nums text-court-100">
+        {formatSouls(data.nextCost)} {talk.souls.souls}
+      </span>
+      {capped && (
+        <span className="block text-xs text-court-500">
+          Past the {talk.souls.level} {capped.level} soft cap
+        </span>
+      )}
+    </p>
   );
 }
 
@@ -159,7 +177,6 @@ function StatRow({ stat, held }: { stat: SoulStatDto; held: number }) {
   const talk = useTalk();
   const levelUp = useLevelUp();
   if (stat.level === null) return null;
-  const capped = [...SOFT_CAPS].reverse().find((c) => stat.level! >= c.level);
   const affordable = stat.cost !== null && stat.cost <= held;
   return (
     <div className="space-y-2">
@@ -169,10 +186,7 @@ function StatRow({ stat, held }: { stat: SoulStatDto; held: number }) {
           {stat.gained > 0 && (
             <span className="text-tier-green">+{stat.gained} this season · </span>
           )}
-          {stat.cost === null
-            ? `Maxed at ${STAT_LEVEL_MAX}`
-            : `Next level ${formatSouls(stat.cost)} ${talk.souls.souls}`}
-          {capped && ` · past the ${capped.level} soft cap`}
+          {stat.cost === null && `Maxed at ${STAT_LEVEL_MAX}`}
         </span>
         {stat.cost !== null && (
           <Button
@@ -270,9 +284,10 @@ function Rules() {
           or take back {s}.
         </li>
         <li>
-          Spend {s} to raise any attribute one level, up to {STAT_LEVEL_MAX}. Each level costs more
-          than the last, and more again past levels {SOFT_CAPS.map((c) => c.level).join(" and ")}.
-          Levels never fade.
+          Spend {s} to raise any attribute one level, up to {STAT_LEVEL_MAX}. Every level you buy
+          raises your {talk.souls.level} by one, and the price depends only on your{" "}
+          {talk.souls.level}, not the attribute: each level costs more than the last, and more again
+          past {talk.souls.level} {SOFT_CAPS.map((c) => c.level).join(" and ")}. Levels never fade.
         </li>
         <li>
           A day with nothing logged, a slip on an avoid habit, or a setback day drops all your
