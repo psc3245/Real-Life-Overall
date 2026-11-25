@@ -230,7 +230,12 @@ describe("coach logging", () => {
 
   it("drafts a workout the player describes; nothing is saved until they accept it", async () => {
     const drafted = jsonResult({ reply: "Here's your leg day; look right?", suggestions: [] });
-    const t = await setup([toolCallResult(["draft_workout", legDay]), drafted]);
+    const t = await setup([
+      toolCallResult(["draft_workout", legDay]),
+      drafted,
+      toolCallResult(["draft_workout", legDay]),
+      jsonResult({ reply: "That one's already in.", suggestions: [] }),
+    ]);
     expect(
       (await t.send("Hit legs: squats 2x5 at 225, leg press 300 for 10. 50 min.")).status,
     ).toBe(200);
@@ -270,11 +275,12 @@ describe("coach logging", () => {
       status: "accepted",
       createdId,
     });
-    // Later turns know it was saved.
-    await t.request("/coach/messages", { method: "POST", ...json({ content: "Thanks" }) });
-    expect(JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt)).toContain(
-      'Draft workout \\"Leg Day\\": saved by the user',
-    );
+    // Later turns know it was saved, and the same workout again gets no card.
+    await t.request("/coach/messages", { method: "POST", ...json({ content: "Log leg day" }) });
+    const prompt = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
+    expect(prompt).toContain('Draft workout \\"Leg Day\\": saved by the user');
+    expect(prompt).toContain("already logged with these sets");
+    expect((await action(t)).message.suggestions).toEqual([]);
   });
 
   it("tells the model when an exercise isn't in the library, or adds it as asked", async () => {
@@ -340,6 +346,42 @@ describe("coach logging", () => {
     const after = await body<DayDto>(await t.request(`/days/${today}`));
     expect(after.objectives[0]!.logged).toBe(3);
     expect(after.habits[0]!.entry).toBeNull();
+  });
+
+  it("doesn't log what's already there, and sees the last week's entries", async () => {
+    const t = await setup([
+      toolCallResult(["log_habit", { habit: "h1", date: null, num: 1, text: null }]),
+      jsonResult({ reply: "Already have your run down.", suggestions: [] }),
+    ]);
+    const today = (await body<DayDto>(await t.request("/days/today"))).today;
+    const yesterday = addDays(today, -1);
+    const wake = await body<HabitDto>(
+      await t.request("/habits", {
+        method: "POST",
+        ...json({ name: "Wake up", type: "time", startsOn: "2026-01-01" }),
+      }),
+    );
+    await t.request(`/days/${yesterday}/habits/${wake.id}`, {
+      method: "PUT",
+      ...json({ num: 390 }),
+    });
+    const run = (await body<DayDto>(await t.request("/days/today"))).habits.find(
+      (h) => h.habit.name === "Morning run",
+    )!;
+    await t.request(`/days/${today}/habits/${run.habit.id}`, {
+      method: "PUT",
+      ...json({ num: 1 }),
+    });
+
+    await t.send("Ran this morning");
+    // Same entry again: no receipt, and the model hears nothing changed.
+    expect((await action(t)).message.actions).toEqual([]);
+    const prompt = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
+    expect(prompt).toContain("nothing changed");
+    // Yesterday's wake-up time is in the context as a clock time, so it isn't asked again.
+    expect(prompt).toContain(`${yesterday} 6:30 AM`);
+    expect(prompt).toContain("Morning run (done / not done");
+    expect(prompt).toMatch(/Morning run \(done \/ not done[^\n]*\): done: ✓/);
   });
 
   it("returns tool errors to the model instead of failing the turn", async () => {
