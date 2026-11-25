@@ -302,6 +302,13 @@
       "when": 1794614261991,
       "tag": "0042_stat_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795626052351,
+      "tag": "0043_monthly_seasons",
+      "breakpoints": true
     }
   ]
 }

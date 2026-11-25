@@ -45,7 +45,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | Missed days | **All of:** decay applies by default, a backfill window exists, and a pause (vacation/injury) mode exists. |
 | Editing a past day after its recap | **Re-run that day's recap.** |
 | Onboarding | **Structured form, then a chat follow-up** with the LLM, then initial ratings. |
-| Recalibration | **Season reset** each **calendar quarter**. |
+| Recalibration | **Season reset** each **calendar month** (calendar quarters until 2026-11-30, §7.1). |
 | Souls mode | **A third season mode, in testing** (decided 2026-11-06, §4.7): Souls-style progression. Days earn souls, the player spends them on the stats they choose (their own attributes, levels 1-99 that never fade), and a missed day, a slip or a setback day drops unspent souls as a bloodstain. Dev and Admin only until it ships. Wording follows sports talk: Souls words by default, plain at None. |
 | Season mode | **Rating or Growth, picked at the start of each season** (decided 2026-10-26, §4.6). Growth ("Most Improved") scores points gained this season: gains only, weekly corrections take back over-credit, decay never subtracts, rolled up by weight. The rating keeps running underneath, revealable only by its owner. Separate boards per mode; the mode locks after setup. |
 | Potential | **Both**: user-set goal ratings plus an LLM-projected end-of-season rating. |
@@ -92,7 +92,7 @@ The spiritual predecessor is the Habit Tracker ([frontend](https://github.com/ps
 | **Daily recap** | An LLM pass over one day log that produces deltas, reasons and a short narrative. |
 | **Weekly review** | An LLM pass over the week that produces a narrative, corrective deltas, decay-rule revisions, focus goals, habit proposals and a potential projection. |
 | **Decay rule** | An LLM-authored, code-executed rule for how a leaf drops when neglected. |
-| **Season** | A calendar quarter. It sets the structure lock, the recalibration point and the archive boundary. |
+| **Season** | A calendar month (a quarter before 2026-12). It sets the structure lock, the recalibration point and the archive boundary. |
 | **Ratings Update** | The league calibration applied at season rollover: a `ratings_update` event per leaf, with a reason (§4.8). |
 | **Elite Club** | Players with a verified rating of 90+ in an attribute (§4.8). |
 | **Pause** | A user-declared period (vacation or injury) during which decay doesn't apply. |
@@ -152,7 +152,7 @@ The tree should measure what the player actually cares about, weighted the way t
 - Screens: `/scouting-report` (the report, "Rating shape": share now vs season start per node, weight shifts with undo, tree proposals), plus weight shifts and the proposal on the weekly review card. Routes: `/scouting-report` (GET, PUT), `/weights` (GET, `POST /weights/changes/:id/undo`), `/tree-proposals` (GET, `POST /tree-proposals/:id/accept|dismiss`).
 
 ### 4.6 Season modes: Rating and Growth (added 2026-10-26)
-- Each season has a **mode** (`seasons.mode`): **rating** (default, everything above) or **growth**, named "Most Improved" (sports talk: Growth / Most Improved / MIP race). Picked before the reveal in onboarding (`PUT /onboarding/mode`, until onboarding completes) and in season setup (`PUT /seasons/setup/mode`, during the 14-day setup window). Rollover carries the mode into the next season. Switching clears goals, since they're in the other mode's units.
+- Each season has a **mode** (`seasons.mode`): **rating** (default, everything above) or **growth**, named "Most Improved" (sports talk: Growth / Most Improved / MIP race). Picked before the reveal in onboarding (`PUT /onboarding/mode`, until onboarding completes) and in season setup (`PUT /seasons/setup/mode`, during the 5-day setup window). Rollover carries the mode into the next season. Switching clears goals, since they're in the other mode's units.
 - **Growth is derived from the same ledger** (`packages/shared/src/rating/growth.ts`), so nothing extra is stored and either mode can be computed for any season. Per event: daily recap gains count, daily setbacks count 0, weekly-review corrections count both ways (so over-credited recaps are taken back), decay, onboarding and recalibration count 0. A leaf's growth is the sum, floored at 0; every rated leaf starts at 0, and parents roll up by the same weighted mean as ratings (bigger trees don't score higher).
 - **What switches in a growth season:** `RatedNodeDto.value`, trends, goals and projections are growth; `rating` carries the rating underneath. History, charts (`rating:<id>` metrics, unit "gained"), the heatmap, recap and weekly before/after, season detail and archived season cards (`finalSnapshot` keeps both) all use growth. Change feeds show the counted part of each change ("±0" for decay and setbacks).
 - **The rating is private to its owner.** The owner can show it with a "Show rating" toggle (remembered per browser) on the ratings and attribute pages, and peek at it on the reveal. Other players never receive it: `player_cards` stores both numbers (`overall`, `growth`, per-category `value` and `growth`) and the card DTO picks by mode, and growth players' rating-level catalog badges (Well-Rounded, Elite) are left off their public profile.
@@ -205,7 +205,7 @@ The league sets what the numbers mean; your own work decides where you sit on th
 - **Snapshot:** leaf ratings are recorded nightly (`leaf_snapshots`: user, season, lineage, group, rating, season-start rating, gains this season, recapped days). Calibration reads these, not ledgers.
 
 **When: Ratings Updates happen only at season rollover**
-- At quarter end the league is measured once per group and frozen in `league_calibrations` (season, group, seed shift, gain factor, sample size, medians). Each player takes it when their season rolls over (`ensureCurrentSeason`), so everyone gets the same numbers whenever they return.
+- At season end the league is measured once per group and frozen in `league_calibrations` (season, group, seed shift, gain factor, sample size, medians). Each player takes it when their season rolls over (`ensureCurrentSeason`), so everyone gets the same numbers whenever they return.
 - **No mid-season updates.** A manual update only the owner can trigger is noted for later and not built (not other admins).
 
 **What a Ratings Update does**
@@ -384,11 +384,11 @@ The weekly review rewrites it each week alongside the profile summary. When the 
   - **personal badges** that the LLM invents in weekly reviews for user-specific achievements, with a cap per season.
 - **Hot/cold streaks**: per-leaf trend indicators from recent deltas, plus a heatmap.
 - **Potential**: user-set goal ratings plus the LLM's projected end-of-season rating, shown as a ghost bar on the stat bars.
-- **Seasons**: each **calendar quarter**:
+- **Seasons**: each **calendar month** (decided 2026-11-25, until the app goes live; `seasonForDate` in `packages/shared/src/season.ts`). Labels are the month (`2026-12`). Seasons before `MONTHLY_SEASONS_FROM` (2026-12-01) were calendar quarters and keep their labels (`2026-Q3`); 2026-Q4 was cut short to end 2026-11-30 (migration `0043_monthly_seasons`), so the first request on or after Dec 1 rolls players into `2026-12`. Season setup is 5 days (`SEASON_SETUP_DAYS`, was 14).
   - the old season's tree and values are archived as a **season card**;
   - in season setup, the user can edit structure and weights and retake questionnaires for changed or new nodes;
   - the LLM recalibrates the starting values, writing `recalibration` events;
-  - *Open: if a user onboards mid-quarter, is the first season shortened or extended? Suggested: shortened (§13).*
+  - A player who onboards mid-month gets a shortened first season (§13).
 
 ### 7.2 Visualizations (Phase 3, plus basics earlier)
 - Rating history line charts (Overall, categories, any node)
@@ -605,7 +605,7 @@ One hourly Cron Trigger (`runHourly` in `services/scheduler.ts`) visits every us
 
 | Step | When | Does |
 |---|---|---|
-| Season rollover | any request, lazily | `ensureCurrentSeason` archives an ended season and starts the new quarter on the user's next request or job run |
+| Season rollover | any request, lazily | `ensureCurrentSeason` archives an ended season and starts the new month on the user's next request or job run |
 | Auto-recap | the user's local 04:00 | Recaps days in the backfill window that have content but no current recap |
 | Decay | every run | Brings decay up to date |
 | Weekly review | the user's local 04:00, once a week has finished | Runs the review when the week's days are recapped |
@@ -843,6 +843,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 - [x] Box score after every workout: heart rate, calories and effort, training load, charts and settings, on web and iOS (§7.5)
 - [ ] Box score from Apple Health; extra stats (incline, level) on the cardio form
 - [ ] iOS: customizable tab bar
+- [x] Monthly seasons until launch: calendar-month seasons from 2026-12-01 (2026-Q4 ends Nov 30), a 5-day season setup (§7.1)
 
 ---
 
@@ -854,7 +855,7 @@ Drizzle schema in `apps/api/src/db/schema.ts`. All tables have `id uuid pk`, `cr
 5. **Mid-season renames:** allow typo fixes and description edits without unlocking structure?
 6. **Backfill window length** (suggested 3 days).
 7. **Questionnaire length cap** (suggested ≤ 40 questions / ~10 min).
-8. ~~**Mid-quarter onboarding**~~ Decided: the first season is shortened (it ends with the calendar quarter).
+8. ~~**Mid-season onboarding**~~ Decided: the first season is shortened (it ends with the calendar month).
 9. **Display precision:** OVR shown as an integer or with one decimal?
 10. **Decay rule visibility and editability** for users.
 11. ~~**Privacy model**~~ Decided: private by default, card-only opt-in visibility (§7.3).

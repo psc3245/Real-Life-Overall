@@ -5,7 +5,7 @@ import type { HistoryDto } from "./history";
 import { CONFIDENCE_LEVELS } from "./ratings";
 
 /** Days after a rollover during which the new season's tree can still be edited. */
-export const SEASON_SETUP_DAYS = 14;
+export const SEASON_SETUP_DAYS = 5;
 
 export interface SeasonSnapshotNode {
   id: string;

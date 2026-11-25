@@ -54,7 +54,7 @@ function toCard(row: Awaited<ReturnType<typeof seasonRepo.findArchived>>[number]
 }
 
 /**
- * Rolls the user into the current calendar quarter if their active season has ended
+ * Rolls the user into the current season (a calendar month, §7.1) if their active season has ended
  * (DESIGN.md §7.1): the old season is frozen into a season card, and the new one starts with
  * the same tree (same lineages), weights, decay rules, goals and mode, and ratings carried over
  * as recalibration events (growth starts again from 0). Safe to call on every request; returns
@@ -118,7 +118,7 @@ export async function ensureCurrentSeason(db: Database, userId: string): Promise
   await db.transaction(async (tx) => {
     if (!(await seasonRepo.archiveIfActive(tx, active.id, snapshot))) return; // already rolled
     const next = await seasonRepo.findOrCreate(tx, userId, period);
-    // An onboarding visit may have pre-created this quarter in "setup"; start it clean.
+    // An onboarding visit may have pre-created this season in "setup"; start it clean.
     await nodeRepo.deleteBySeason(tx, next.id);
     await seasonRepo.update(tx, next.id, {
       status: "active",

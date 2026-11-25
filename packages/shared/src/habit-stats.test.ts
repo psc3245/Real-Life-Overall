@@ -31,7 +31,11 @@ describe("statPeriod", () => {
     });
     expect(statPeriod("season", "2026-10-22", 1)).toEqual({
       start: "2026-10-01",
-      end: "2026-12-31",
+      end: "2026-11-30",
+    });
+    expect(statPeriod("season", "2027-03-09", 1)).toEqual({
+      start: "2027-03-01",
+      end: "2027-03-31",
     });
   });
 });

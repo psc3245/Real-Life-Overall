@@ -54,7 +54,7 @@ function HistoryScreen() {
 
   return (
     <Screen eyebrow="Seasons" title="History">
-      <Muted>Each calendar quarter is a season. Open one to see how it went.</Muted>
+      <Muted>Each calendar month is a season. Open one to see how it went.</Muted>
       {rows.length === 0 && (
         <Card>
           <Muted>Your first season starts when you finish onboarding.</Muted>
