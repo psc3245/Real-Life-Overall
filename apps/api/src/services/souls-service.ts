@@ -364,8 +364,6 @@ export async function getSouls(db: Database, userId: string): Promise<SoulsDto> 
   const rolledLevels = computeNodeValues(nodes, levels.levels);
   const rolledRatings = computeNodeValues(nodes, ratings);
   const nextCost = levelCost(levels.soulLevel);
-  const input = new Map(days.map((d) => [d.date, d]));
-  const root = nodes.find((n) => n.parentId === null);
   return {
     season,
     today,
