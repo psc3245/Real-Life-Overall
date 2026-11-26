@@ -80,7 +80,11 @@ describe("game plans", () => {
       endsOn: addDays(t.today, 30),
       links: [t.nodeId("Strength")],
     });
-    await t.create({ name: "Sleep reset", startsOn: addDays(t.today, 3), endsOn: addDays(t.today, 9) });
+    await t.create({
+      name: "Sleep reset",
+      startsOn: addDays(t.today, 3),
+      endsOn: addDays(t.today, 9),
+    });
 
     await t.request("/coach/messages", { method: "POST", ...json({ content: "What now?" }) });
     const coach = JSON.stringify(t.model.doGenerateCalls.at(-1)!.prompt);
