@@ -1,12 +1,20 @@
-import { OBJECTIVE_TERM_LABELS, type ObjectiveDto, type ObjectiveTerm } from "@rlo/shared";
+import {
+  MAX_GAME_PLANS,
+  OBJECTIVE_TERM_LABELS,
+  type GamePlanDto,
+  type ObjectiveDto,
+  type ObjectiveTerm,
+} from "@rlo/shared";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ActionSheetIOS, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useDeleteGamePlan, useGamePlans } from "@/api/gamePlans";
 import { useDeleteObjective, useObjectives } from "@/api/objectives";
 import { useRatings } from "@/api/ratings";
 import { chartParams } from "@/lib/chartModel";
 import { useFeature } from "@/api/preferences";
 import { shortDate } from "@/lib/format";
+import { useTalk } from "@/lib/talk";
 import { colors, fonts, space } from "@/lib/theme";
 import { ObjectiveAmount, ObjectiveBar, objectiveStatusText, statusColor } from "./goals";
 import { NodeChip } from "./NodeChip";
@@ -38,6 +46,7 @@ export function GoalsView() {
 
   return (
     <View style={{ gap: space.lg }}>
+      <GamePlans names={names} />
       <Button title="+ New goal" onPress={() => router.push("/goals/edit")} />
       {all.length === 0 && (
         <Card style={{ gap: space.xs }}>
@@ -75,6 +84,109 @@ export function GoalsView() {
         </View>
       )}
     </View>
+  );
+}
+
+/**
+ * Game Plans (DESIGN.md §7.16): what the player is leaning into for a while, with no numbers.
+ * The coach, recaps and weekly reviews read them; nothing is scored.
+ */
+function GamePlans({ names }: { names: Map<string, string> }) {
+  const talk = useTalk();
+  const plans = useGamePlans();
+  const [showEnded, setShowEnded] = useState(false);
+  if (!plans.data) return null;
+  const open = plans.data.filter((p) => p.status !== "ended");
+  const ended = plans.data.filter((p) => p.status === "ended");
+  return (
+    <View style={{ gap: space.sm }}>
+      <Text style={styles.heading}>
+        {talk.gamePlan} <Text style={styles.headingDetail}>What you&apos;re leaning into</Text>
+      </Text>
+      {open.length === 0 && (
+        <Muted style={{ fontSize: 13, color: colors.court500 }}>
+          An emphasis for a while, like &quot;Build strength this winter&quot;. No numbers: the
+          coach and your recaps keep it in mind.
+        </Muted>
+      )}
+      {open.map((p) => (
+        <PlanCard key={p.id} plan={p} names={names} />
+      ))}
+      {open.length < MAX_GAME_PLANS && (
+        <Button
+          title={`+ New ${talk.gamePlan.toLowerCase()}`}
+          variant="ghost"
+          onPress={() => router.push("/game-plans/edit")}
+        />
+      )}
+      {ended.length > 0 && (
+        <>
+          <Pressable onPress={() => setShowEnded((v) => !v)} accessibilityRole="button">
+            <Label>
+              Ended ({ended.length}) {showEnded ? "▾" : "▸"}
+            </Label>
+          </Pressable>
+          {showEnded && ended.map((p) => <PlanCard key={p.id} plan={p} names={names} />)}
+        </>
+      )}
+    </View>
+  );
+}
+
+function PlanCard({ plan: p, names }: { plan: GamePlanDto; names: Map<string, string> }) {
+  const remove = useDeleteGamePlan();
+  const menu = () => {
+    const actions = [
+      {
+        label: "Edit",
+        run: () => router.push({ pathname: "/game-plans/edit", params: { id: p.id } }),
+      },
+      {
+        label: "Delete",
+        run: () =>
+          Alert.alert("Delete this?", p.name, [
+            { text: "Keep", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: () => remove.mutate(p.id) },
+          ]),
+      },
+    ];
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: p.name,
+        options: [...actions.map((a) => a.label), "Cancel"],
+        destructiveButtonIndex: actions.length - 1,
+        cancelButtonIndex: actions.length,
+        userInterfaceStyle: "dark",
+      },
+      (i) => actions[i]?.run(),
+    );
+  };
+  return (
+    <Pressable onLongPress={menu} delayLongPress={300}>
+      <Card style={[{ gap: space.xs }, p.status === "active" && { borderColor: colors.neonDim }]}>
+        <View style={styles.head}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{p.name}</Text>
+            <Muted style={{ fontSize: 12, color: colors.court500 }}>
+              {p.status === "upcoming" ? "Starts " : ""}
+              {shortDate(p.startsOn)} – {shortDate(p.endsOn)}
+            </Muted>
+          </View>
+          <Pressable onPress={menu} hitSlop={10} accessibilityLabel={`${p.name} options`}>
+            <Text style={styles.more}>•••</Text>
+          </Pressable>
+        </View>
+        {p.note !== "" && <Muted style={{ fontSize: 14 }}>{p.note}</Muted>}
+        {p.links.length > 0 && (
+          <View style={styles.links}>
+            {p.links.map((id) => (
+              <NodeChip key={id} id={id} name={names.get(id)} />
+            ))}
+          </View>
+        )}
+        <ErrorNote error={remove.error} />
+      </Card>
+    </Pressable>
   );
 }
 

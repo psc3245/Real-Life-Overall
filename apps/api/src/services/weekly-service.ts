@@ -61,6 +61,7 @@ import { awardBadges, badgesByRecap } from "./badge-service";
 import { datedEvents, type DatedEvent } from "./event-dates";
 import { ensureCurrentSeason } from "./season-service";
 import { renderMemories, searchMemories } from "./memory-service";
+import { GAME_PLANS_HEADING, gamePlansOn, renderGamePlans } from "./game-plan-service";
 import { normalizeRecapChanges } from "./recap-changes";
 import {
   applyWeightShifts,
@@ -516,6 +517,7 @@ export async function runWeeklyReview(
     { before: week.start },
   );
 
+  const plans = await gamePlansOn(db, userId, week.end);
   // Both calls read the same facts; renderWeek hits the database, so it runs once.
   const prompt = [
     `What you know about the user:\n${profile || "(nothing yet)"}`,
@@ -537,6 +539,7 @@ export async function runWeeklyReview(
       : []),
     await renderWeek(db, userId, ctx, week, refById, events),
     `Last week's focus goals:\n${lastFocus.map((g) => `- ${g.title}: ${g.detail}`).join("\n") || "(none)"}`,
+    ...(plans.length ? [`${GAME_PLANS_HEADING}:\n${renderGamePlans(plans)}`] : []),
     `The user's ${growthMode ? "growth targets (points to gain by season end)" : ctx.season.mode === "souls" ? "level targets (stat levels 1-99, not ratings)" : "goal ratings"}:\n${goalLines.join("\n") || "(none set)"}`,
     `Season: ${ctx.season.label}, ends ${ctx.season.endsOn} (${daysBetween(week.end, ctx.season.endsOn)} days after this week).`,
     `Current archetype: ${archetype ? `${archetype.name}: ${archetype.description}` : "(none)"}`,

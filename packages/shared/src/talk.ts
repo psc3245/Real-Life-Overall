@@ -55,6 +55,8 @@ export interface TalkTerms {
     died: string;
     boss: string;
   };
+  /** An emphasis for a stretch of time, with no numbers (DESIGN.md §7.16). */
+  gamePlan: string;
   playerCard: string;
   profileHeading: string;
   archetype: string;
@@ -116,6 +118,7 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
       died: "Streak broken",
       boss: "Goal",
     },
+    gamePlan: "Focus",
     playerCard: "Summary card",
     profileHeading: "Profile",
     archetype: "Profile type",
@@ -170,6 +173,7 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
       died: "You died",
       boss: "Boss",
     },
+    gamePlan: "Game Plan",
     playerCard: "Player card",
     profileHeading: "Player profile",
     archetype: "Archetype",
@@ -224,6 +228,7 @@ export const TALK: Record<SportsTalk, TalkTerms> = {
       died: "You died",
       boss: "Boss",
     },
+    gamePlan: "Game Plan",
     playerCard: "Player card",
     profileHeading: "Player profile",
     archetype: "Build",
@@ -285,6 +290,7 @@ export const SOULS_TALK: TalkTerms = {
     died: "You died",
     boss: "Boss",
   },
+  gamePlan: "Path",
   playerCard: "Status",
   profileHeading: "Status",
   archetype: "Class",

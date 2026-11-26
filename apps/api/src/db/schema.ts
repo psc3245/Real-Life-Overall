@@ -477,6 +477,33 @@ export const objectives = pgTable(
   ],
 );
 
+/**
+ * Game Plans (DESIGN.md §7.16): an emphasis for a stretch of time, with no numbers. Linked
+ * attributes are node lineages, so they survive seasons.
+ */
+export const gamePlans = pgTable(
+  "game_plans",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    note: text().notNull().default(""),
+    startsOn: date().notNull(),
+    /** The last day, inclusive. */
+    endsOn: date().notNull(),
+    nodeLineageIds: uuid()
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
+    archivedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId), check("game_plans_window", sql`${t.endsOn} >= ${t.startsOn}`)],
+);
+
 /** Like habit links: by lineage so they survive seasons. */
 export const objectiveLinks = pgTable(
   "objective_links",

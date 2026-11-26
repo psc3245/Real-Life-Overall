@@ -62,6 +62,7 @@ import { renderScoutingReport } from "./evolution-service";
 import { archiveHabit, createHabit, loadLeafContext, type LeafContext } from "./habit-service";
 import { archiveObjective, createObjective, listObjectives } from "./objective-service";
 import { currentFocus } from "./weekly-service";
+import { GAME_PLANS_HEADING, gamePlansOn, renderGamePlans } from "./game-plan-service";
 import {
   createTemplate,
   deleteTemplate,
@@ -265,17 +266,19 @@ async function buildContext(db: Database, userId: string, date?: string) {
   const { features } = user.preferences;
   const refs = ctx ? refsFor(ctx.nodes) : { refById: new Map(), idByRef: new Map() };
 
-  const [profile, report, focus, goals, recaps, habits, events, day, lookup] = await Promise.all([
-    userRepo.findProfileSummary(db, userId),
-    userRepo.findScoutingReport(db, userId),
-    currentFocus(db, userId),
-    features.goals ? listObjectives(db, userId) : [],
-    recapRepo.findRecentDaily(db, userId, addDays(today, -7), addDays(today, 1)),
-    features.habits ? renderHabits(db, userId, today, ctx) : "",
-    ctx ? eventRepo.findActiveBySeason(db, ctx.season.id) : [],
-    getDay(db, userId, focusDate),
-    features.workouts ? loadLookup(db, userId) : null,
-  ]);
+  const [profile, report, focus, goals, recaps, habits, events, day, lookup, plans] =
+    await Promise.all([
+      userRepo.findProfileSummary(db, userId),
+      userRepo.findScoutingReport(db, userId),
+      currentFocus(db, userId),
+      features.goals ? listObjectives(db, userId) : [],
+      recapRepo.findRecentDaily(db, userId, addDays(today, -7), addDays(today, 1)),
+      features.habits ? renderHabits(db, userId, today, ctx) : "",
+      ctx ? eventRepo.findActiveBySeason(db, ctx.season.id) : [],
+      getDay(db, userId, focusDate),
+      features.workouts ? loadLookup(db, userId) : null,
+      features.goals ? gamePlansOn(db, userId, today) : [],
+    ]);
   const dayRefs = refsForDay(day);
   const values = ctx ? computeNodeValues(ctx.nodes, leafValuesFromEvents(events)) : new Map();
   const growth =
@@ -299,6 +302,7 @@ async function buildContext(db: Database, userId: string, date?: string) {
         renderTree(toPromptNodes(ctx.nodes, refs.refById, growth), true),
     features.habits && `Habits:\n${habits || "(none)"}`,
     features.goals && `Goals:\n${renderGoals(goals as ObjectiveDto[]) || "(none running)"}`,
+    features.goals && `${GAME_PLANS_HEADING}:\n${renderGamePlans(plans) || "(none)"}`,
     `This week's focus from the weekly review:\n${focus.map((f) => `- ${f.title}: ${f.detail}`).join("\n") || "(none)"}`,
     `Recent days:\n${recaps.map((r) => `- ${r.periodStart}: ${r.narrative}`).join("\n") || "(no recaps this week)"}`,
     off.length ? `Switched off by the user: ${off.join(", ")}. Don't suggest those.` : "",
